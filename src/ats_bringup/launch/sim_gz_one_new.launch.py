@@ -20,7 +20,7 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # Add the paths to the simulation and controller launch files
-    sim_launch_path = os.path.join(get_package_share_directory('px4_uam_sim'), 'launch', 'gz_martijn_one_arm.launch.py')
+    sim_launch_path = os.path.join(get_package_share_directory('px4_uam_sim'), 'launch', 'gz_martijn.launch.py')
     ld.add_action(IncludeLaunchDescription(
         PythonLaunchDescriptionSource(sim_launch_path),
         launch_arguments={
@@ -55,8 +55,8 @@ def generate_launch_description():
 
     mission_director = Node(
         package="mission_director",
-        executable="ats_mission",
-        name="md_ats_mission",
+        executable="ymca_md",
+        name="ymca_md",
         output="screen",
         parameters=[
             {'sm.frequency': 10.0},
@@ -68,44 +68,44 @@ def generate_launch_description():
     )
     ld.add_action(mission_director)
 
-    tactip_driver = Node(
-        package='tactip_ros2_driver',
-        executable='tactip_ros2_driver',
-        name='tactip_driver',
-        output='screen',
-        parameters=[
-            {'source': 4},
-            {'frequency': 10.},
-            {'verbose': False},
-            {'test_model_time': False},
-            {'save_debug_image': False},
-            {'ssim_contact_threshold': 0.5},
-            {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},
-            {'fake_data': False}
-        ],
-        arguments=['--ros-args', '--log-level', 'info']
-    )
-    ld.add_action(tactip_driver)
+    # tactip_driver = Node(
+    #     package='tactip_ros2_driver',
+    #     executable='tactip_ros2_driver',
+    #     name='tactip_driver',
+    #     output='screen',
+    #     parameters=[
+    #         {'source': 4},
+    #         {'frequency': 10.},
+    #         {'verbose': False},
+    #         {'test_model_time': False},
+    #         {'save_debug_image': False},
+    #         {'ssim_contact_threshold': 0.5},
+    #         {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},
+    #         {'fake_data': False}
+    #     ],
+    #     arguments=['--ros-args', '--log-level', 'info']
+    # )
+    # ld.add_action(tactip_driver)
 
-    controller = Node(
-        package='pose_based_ats',
-        executable='pose_based_ats',
-        name='controller',
-        output='screen',
-        parameters=[
-            {'frequency': 10.},
-            {'reference_pose': [0., 0., 0.003]},
-            {'Kp_linear': -10.0},
-            {'Kp_angular': -0.3},
-            {'Ki_linear': 0.2},
-            {'Ki_angular':0.01 },
-            {'windup_clip': 0.1},
-            {'publish_log': False},
-            {'regularization_weight': 0.001},
-            {'test_execution_time': False}
-        ],
-        arguments=['--ros-args', '--log-level', 'info']
-    )
-    ld.add_action(controller)
+    # controller = Node(
+    #     package='pose_based_ats',
+    #     executable='pose_based_ats',
+    #     name='controller',
+    #     output='screen',
+    #     parameters=[
+    #         {'frequency': 10.},
+    #         {'reference_pose': [0., 0., 0.003]},
+    #         {'Kp_linear': -10.0},
+    #         {'Kp_angular': -0.3},
+    #         {'Ki_linear': 0.2},
+    #         {'Ki_angular':0.01 },
+    #         {'windup_clip': 0.1},
+    #         {'publish_log': False},
+    #         {'regularization_weight': 0.001},
+    #         {'test_execution_time': False}
+    #     ],
+    #     arguments=['--ros-args', '--log-level', 'info']
+    # )
+    # ld.add_action(controller)
 
     return ld

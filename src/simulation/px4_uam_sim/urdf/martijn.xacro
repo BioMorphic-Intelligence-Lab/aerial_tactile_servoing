@@ -218,7 +218,7 @@
   <joint name="shoulder_joint_1" type="revolute">
     <parent link="base_link"/>
     <child link="shoulder_link_1"/>
-    <origin xyz="0.015 0 0" rpy="1.5708 0 -1.5708"/>
+    <origin xyz="0.015 0 0" rpy="1.5708 -1.5708 -1.5708"/>
     <axis xyz="0 0 -1"/>
     <limit lower="-6.28" upper="6.28" velocity="2.0" effort="100.0"/>
     <dynamics damping="0.005" friction="0.01"/>
@@ -280,8 +280,8 @@
   <joint name="elbow_joint_1" type="revolute">
     <parent link="motor_link_shoulder_1"/>
     <child link="elbow_link_1"/>
-    <origin xyz="0 0 0.0125" rpy="1.5708 1.5708 0"/>
-    <axis xyz="0 0 -1"/>
+    <origin xyz="0 0 0.0125" rpy="1.5708 1.5708 3.14"/>
+    <axis xyz="0 0 1"/>
     <limit lower="-1.5708" upper="1.5708" velocity="2" effort="100"/>
     <dynamics damping="0.01" friction="0.1"/>
   </joint>  
@@ -344,7 +344,7 @@
     <child link="forearm_link_1"/>
     <origin xyz="-0.31 0 0" rpy="0 0 0"/>
     <axis xyz="0 -1 0"/>
-    <limit lower="-1.5708" upper="1.9" velocity="20" effort="100"/>
+    <limit lower="-1.9" upper="1.9" velocity="20" effort="100"/>
     <dynamics damping="0.0001" friction="0.0"/>    
   </joint>  
   
@@ -379,7 +379,7 @@
   <joint name="shoulder_joint_2" type="revolute">
     <parent link="base_link"/>
     <child link="shoulder_link_2"/>
-    <origin xyz="-0.015 0 0" rpy="1.5708 0 1.5708"/>
+    <origin xyz="-0.015 0 0" rpy="1.5708 -1.5708 1.5708"/>
     <axis xyz="0 0 1"/>
     <limit lower="-6.28" upper="6.28" velocity="2.0" effort="100.0"/>
     <dynamics damping="0.005" friction="0.01"/>
@@ -416,7 +416,7 @@
   </joint>  
   <link name="elbow_link_2">
     <collision>
-      <origin xyz="-0.16 0 0" rpy="0 0 0"/>
+      <origin xyz="-0.16 0 0" rpy="0 0 3.14"/>
       <geometry>
         <box size="0.34 0.024 0.054"/>
       </geometry>
@@ -505,7 +505,7 @@
     <child link="forearm_link_2"/>
     <origin xyz="-0.31 0 0" rpy="0 0 0"/>
     <axis xyz="0 -1 0"/>
-    <limit lower="-1.5708" upper="1.9" velocity="20" effort="100"/>
+    <limit lower="-1.9" upper="1.9" velocity="20" effort="100"/>
     <dynamics damping="0.0001" friction="0.0"/>    
   </joint>  
 
