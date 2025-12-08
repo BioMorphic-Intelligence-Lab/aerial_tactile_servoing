@@ -38,6 +38,7 @@ DXLDriver::DXLDriver(dynamixel::GroupSyncRead *positionReader, dynamixel::GroupS
     this->declare_parameter("servos.gear_ratios", std::vector<double>{1.0});
     this->declare_parameter("servos.min_angles", std::vector<double>(0.0));
     this->declare_parameter("servos.max_angles", std::vector<double>(0.0));
+    this->declare_parameter("servos.start_offsets", std::vector<double>(0.0));
 
     // Generate uint8_t vector of ids
     std::vector<int64_t> int_ids = this->get_parameter("servos.ids").as_integer_array();
@@ -55,6 +56,7 @@ DXLDriver::DXLDriver(dynamixel::GroupSyncRead *positionReader, dynamixel::GroupS
     std::vector<double> max_speeds = this->get_parameter("servos.max_speeds").as_double_array();
     std::vector<double> min_angles = this->get_parameter("servos.min_angles").as_double_array();
     std::vector<double> max_angles = this->get_parameter("servos.max_angles").as_double_array();
+    std::vector<double> start_offsets = this->get_parameter("servos.start_offsets").as_double_array();
 
     for (int i = 0; i < num_servos_; i++)
     {
@@ -69,24 +71,25 @@ DXLDriver::DXLDriver(dynamixel::GroupSyncRead *positionReader, dynamixel::GroupS
         current_servo_data.goal_position = 0.0;
         current_servo_data.goal_velocity = 0.0;
         current_servo_data.max_velocity = max_speeds[i];
+        current_servo_data.start_offset = start_offsets[i];
         servodata_.push_back(current_servo_data);
 
         int dxl_addparam_result = false;
         dxl_addparam_result = gsrPosition->addParam(ids_[i]);
         if (dxl_addparam_result != true) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to addparam to groupSyncRead Position for Dynamixel ID %d", servodata_[i].id);
+            RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Failed to addparam to groupSyncRead Position for Dynamixel ID %d", servodata_[i].id);
         }
         dxl_addparam_result = gsrVelocity->addParam(ids_[i]);
         if (dxl_addparam_result != true) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to addparam to groupSyncRead Velocity for Dynamixel ID %d", servodata_[i].id);
+            RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Failed to addparam to groupSyncRead Velocity for Dynamixel ID %d", servodata_[i].id);
         }
         dxl_addparam_result = gsrCurrent->addParam(ids_[i]);
         if (dxl_addparam_result != true) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to addparam to groupSyncRead Current for Dynamixel ID %d", servodata_[i].id);
+            RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Failed to addparam to groupSyncRead Current for Dynamixel ID %d", servodata_[i].id);
         }
         dxl_addparam_result = gsrPWM->addParam(ids_[i]);
         if (dxl_addparam_result != true) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to addparam to groupSyncRead PWMS for Dynamixel ID %d", servodata_[i].id);
+            RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Failed to addparam to groupSyncRead PWMS for Dynamixel ID %d", servodata_[i].id);
         }
     }
     RCLCPP_INFO(this->get_logger(), "Succeeded assigning servodata");
@@ -259,7 +262,7 @@ int DXLDriver::read_present_positions()
     }
     else
     {
-        RCLCPP_ERROR(this->get_logger(), "Failed to get present positions with GroupSyncRead. Error code %d", dxl_comm_result);
+        RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Failed to get present positions with GroupSyncRead. Error code %d", dxl_comm_result);
     }
     return dxl_comm_result;
 }
@@ -276,7 +279,7 @@ int DXLDriver::read_present_velocities()
     }
     else
     {
-        RCLCPP_ERROR(this->get_logger(), "Failed to get present velocities with GroupSyncRead. Error code %d", dxl_comm_result);
+        RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Failed to get present velocities with GroupSyncRead. Error code %d", dxl_comm_result);
     }
     return dxl_comm_result;
 }
@@ -293,7 +296,7 @@ int DXLDriver::read_present_currents()
     }
     else
     {
-        RCLCPP_ERROR(this->get_logger(), "Failed to get present currents with GroupSyncRead. Error code %d", dxl_comm_result);
+        RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Failed to get present currents with GroupSyncRead. Error code %d", dxl_comm_result);
     }
     return dxl_comm_result;
 }
@@ -310,7 +313,7 @@ int DXLDriver::read_present_pwms()
     }
     else
     {
-        RCLCPP_ERROR(this->get_logger(), "Failed to get present pwms with GroupSyncRead. Error code %d", dxl_comm_result);
+        RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Failed to get present pwms with GroupSyncRead. Error code %d", dxl_comm_result);
     }
     return dxl_comm_result;
 }
@@ -418,7 +421,7 @@ bool DXLDriver::write_home_position_at_current_position()
         }
 
         // Update homing offset with current position
-        int32_t new_homing_offset = -(pos_rad2int(servodata_[i].id, servodata_[i].present_position) - homing_offset);
+        int32_t new_homing_offset = -(pos_rad2int(servodata_[i].id, servodata_[i].present_position) - homing_offset + pos_rad2int(servodata_[i].id, servodata_[i].start_offset));
         RCLCPP_INFO(this->get_logger(), "[ID: %i] Home position was %d, new home position %d", servodata_[i].id, homing_offset, new_homing_offset);
         dxl_comm_result = packetHandler->write4ByteTxRx(
             portHandler,
@@ -429,8 +432,8 @@ bool DXLDriver::write_home_position_at_current_position()
         );
         if (dxl_comm_result == COMM_SUCCESS)
         {
-            servodata_[i].present_position = 0.0;
-            servodata_[i].goal_position = 0.0;
+            servodata_[i].present_position = servodata_[i].start_offset;
+            servodata_[i].goal_position = servodata_[i].start_offset;
         }
         else
         {
@@ -605,6 +608,11 @@ void DXLDriver::check_parameter_sizes(size_t num_servos) const
     if (this->get_parameter("servos.max_angles").as_double_array().size() != num_servos)
     {
         RCLCPP_ERROR(this->get_logger(), "servos.max_angles not the same size as number of servos!");
+        exit(-1);
+    }
+    if (this->get_parameter("servos.start_offsets").as_double_array().size() != num_servos)
+    {
+        RCLCPP_ERROR(this->get_logger(), "servos.start_offsets not the same size as number of servos!");
         exit(-1);
     }
 }

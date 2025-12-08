@@ -79,6 +79,7 @@ struct ServoData
     double present_position;
     double present_velocity;
     double present_current;
+    double start_offset; // in rad
     uint32_t present_pwm;
     int16_t home_position; // In ticks at the servo horn
 };

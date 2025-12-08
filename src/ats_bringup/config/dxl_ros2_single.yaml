@@ -12,3 +12,4 @@
       gear_ratios: [1.0] # Gear ratio between servo horn and output shaft
       min_angles: [0.0] # Minimum angle limit in rad (if both set to zero, no limits are applied)
       max_angles: [0.0] # Maximum angle limit in rad (if both set to zero, no limits are applied)
+      start_offsets: [0.0] # Start offset in rad added to the initial position after homing

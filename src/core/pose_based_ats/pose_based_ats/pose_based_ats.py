@@ -135,7 +135,8 @@ class PoseBasedATS(Node):
         self.broadcast_tf2(state_transform, "world", "present_body_frame")
 
         # Evaluate the error
-        P_SC = self.evaluate_P_SC(self.tactip.twist.angular.x, self.tactip.twist.angular.y, self.tactip.twist.linear.z)
+        P_SC = self.evaluate_P_SC(self.tactip.twist.angular.x, self.tactip.twist.angular.y, 
+                                  self.tactip.twist.linear.x, self.tactip.twist.linear.y, self.tactip.twist.linear.z)
         E_Sref = P_SC @ self.P_Cref
         e_sr = self.transformation_to_vector(E_Sref)
 
@@ -245,20 +246,20 @@ class PoseBasedATS(Node):
 
     ''' Evaluate transformation matrix of contact frame in sensor frame
     '''
-    def evaluate_P_SC(self, alpha, beta, d):
+    def evaluate_P_SC(self, alpha, beta, x_CS, y_CS, z_CS):
         P_SC = np.zeros((4,4))
         P_SC[0,0] = np.cos(beta)
         P_SC[0,1] = 0
         P_SC[0,2] = -np.sin(beta)
-        P_SC[0,3] = d*np.sin(beta)
+        P_SC[0,3] = -x_CS*np.cos(beta) + z_CS*np.sin(beta)
         P_SC[1,0] = np.sin(alpha)*np.sin(beta)
         P_SC[1,1] = np.cos(alpha)
         P_SC[1,2] = np.sin(alpha)*np.cos(beta)
-        P_SC[1,3] = -d*np.sin(alpha)*np.cos(beta)
+        P_SC[1,3] = -x_CS*np.sin(alpha)*np.sin(beta) - y_CS*np.cos(alpha) - z_CS*np.sin(alpha)*np.cos(beta)
         P_SC[2,0] = np.sin(beta)*np.cos(alpha)
         P_SC[2,1] = -np.sin(alpha)
         P_SC[2,2] = np.cos(alpha)*np.cos(beta)
-        P_SC[2,3] = -d*np.cos(alpha)*np.cos(beta)
+        P_SC[2,3] = -x_CS*np.sin(beta)*np.cos(alpha) + y_CS*np.sin(alpha) - z_CS*np.cos(alpha)*np.cos(beta)
         P_SC[3,0] = 0
         P_SC[3,1] = 0
         P_SC[3,2] = 0
