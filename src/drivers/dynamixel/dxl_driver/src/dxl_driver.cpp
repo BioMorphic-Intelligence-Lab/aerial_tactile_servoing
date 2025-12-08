@@ -383,7 +383,7 @@ bool DXLDriver::write_max_velocity(const uint8_t id)
     );
     if (dxl_comm_result == COMM_SUCCESS)
     {
-        RCLCPP_INFO(this->get_logger(), "[ID: %i] Backread max velocity %d ticks", servodata_[i].id, backread_velocity);
+        //RCLCPP_INFO(this->get_logger(), "[ID: %i] Backread max velocity %d ticks", servodata_[i].id, backread_velocity);
         if (backread_velocity == profile_velocity)
         {
             return true;
@@ -421,7 +421,7 @@ bool DXLDriver::write_home_position_at_current_position()
         }
 
         // Update homing offset with current position
-        int32_t new_homing_offset = -(pos_rad2int(servodata_[i].id, servodata_[i].present_position) - homing_offset + pos_rad2int(servodata_[i].id, servodata_[i].start_offset));
+        int32_t new_homing_offset = -(pos_rad2int(servodata_[i].id, servodata_[i].present_position) - homing_offset - pos_rad2int(servodata_[i].id, servodata_[i].start_offset));
         RCLCPP_INFO(this->get_logger(), "[ID: %i] Home position was %d, new home position %d", servodata_[i].id, homing_offset, new_homing_offset);
         dxl_comm_result = packetHandler->write4ByteTxRx(
             portHandler,
@@ -515,6 +515,7 @@ void DXLDriver::srv_set_torque_enable_callback(
     const std::shared_ptr<dxl_driver::srv::SetTorqueEnable::Request> request,
     std::shared_ptr<dxl_driver::srv::SetTorqueEnable::Response> response)
 {
+    RCLCPP_INFO(this->get_logger(), "[SERVICE] Setting torque enable to %d", request->set_torque_enable);
     bool success;
     success = write_torque_enable(request->set_torque_enable);
     response->success = success;
