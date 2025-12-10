@@ -32,9 +32,10 @@ def generate_launch_description():
         parameters=[
             {'source': 4},
             {'frequency': 20.},
+            {'dimension': 5},
             {'verbose': True},
             {'test_model_time': False},
-            {'save_debug_image': True},
+            {'save_debug_image': False},
             {'save_interval': 5.},
             {'ssim_contact_threshold': 0.7},
             {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},

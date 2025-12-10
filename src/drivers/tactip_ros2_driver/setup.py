@@ -4,7 +4,7 @@ import os
 
 package_name = 'tactip_ros2_driver'
 
-model_name = 'simple_cnn_A3_2025'
+model_name = 'simple_cnn_hypopt_5D'
 
 setup(
     name=package_name,
