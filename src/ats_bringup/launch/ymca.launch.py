@@ -35,10 +35,10 @@ def generate_launch_description():
         name="md_ymca",
         output="screen",
         parameters=[
-            {'sm.frequency': 10.0},
+            {'sm.frequency': 30.0},
             {'sm.position_clip': 3.0},
             {'sm.fcu_on': True},
-            {'sm.sim': True}
+            {'sm.sim': False}
         ],
         arguments=["--ros-args", "--log-level", "info"]
     )
