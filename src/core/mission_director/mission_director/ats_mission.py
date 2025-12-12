@@ -51,13 +51,13 @@ class MissionDirector(UAMStateMachine):
                 self.state_wait_for_arming(next_state="takeoff")
 
             case "takeoff":
-                self.state_takeoff(target_altitude=1.5, next_state="hover")
+                self.state_takeoff(target_altitude=1.7, next_state="hover")
 
             case "hover":
                 self.state_hover(duration_sec=3, next_state="pre_contact_uam_position")
 
             case "pre_contact_uam_position":
-                self.state_move_uam_to_position([0.0, 0.7, -1.6, 0.0], next_state="pre_contact_arm_position")
+                self.state_move_uam_to_position([0.0, 0.7, -1.7, 0.0], next_state="pre_contact_arm_position")
 
             case "pre_contact_arm_position":
                 q_right = [np.pi/3, 0.0, np.pi/6] # put some position here
@@ -114,7 +114,7 @@ class MissionDirector(UAMStateMachine):
                 )
 
                 self.publish_servo_position_references(self.servo_reference.position)
-                self.get_logger().info(f'Contact depth: {self.tactip_data.twist.linear.z} / {self.contact_depth_threshold} m', throttle_duration_sec=1)
+                self.get_logger().info(f'Contact depth: {self.tactip_data.twist.linear.z} m', throttle_duration_sec=1)
                 if self.ts_no_contact_counter > self.ts_no_contact_max_cycles: # If no contact for 10 cycles, go back to approach
                     self.get_logger().info('Lost contact, returning to approach state.')
                     self.ts_no_contact_counter = 0
@@ -125,7 +125,7 @@ class MissionDirector(UAMStateMachine):
                     self.transition_to_state('emergency')
             
             case "land_position":
-                self.state_move_uam_to_position([0.0, 0.0, -1.5, 0.0], next_state="land_arms_position")
+                self.state_move_uam_to_position([0.0, 0.0, -1.0, 0.0], next_state="land_arms_position")
 
             case "land_arms_position":
                 q_right = [1.57, 0.0, -1.57] # put some position here

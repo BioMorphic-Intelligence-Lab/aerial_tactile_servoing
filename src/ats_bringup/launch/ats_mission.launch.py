@@ -11,7 +11,7 @@ Launch file for testing the ROS2 Dynamixel driver.
 The package can be launched with 'ros2 launch ats_bringup dxl_example_config.launch.py'
 """
 
-logging = False
+logging = True
 log_path = '/ros2_ws/aerial_tactile_servoing/rosbags/'
 config_name = 'dxl_ros2_ats.yaml'
 
@@ -71,12 +71,12 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 50.},
-            {'reference_pose': [0., 0., 0.003]},
+            {'reference_pose': [0., 0., 0.0035]},
             {'Kp_linear': 10.0},
             {'Kp_angular': 0.3},
-            {'Ki_linear': 0.0}, # was 0.2
+            {'Ki_linear': 0.4}, # was 0.2
             {'Ki_angular': 0.0}, # was 0.01
-            {'windup_clip': 0.1},
+            {'windup_clip': 0.03},
             {'publish_log': False},
             {'regularization_weight': 0.001},
             {'test_execution_time': False}
