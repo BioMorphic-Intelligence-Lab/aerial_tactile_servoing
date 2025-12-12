@@ -11,7 +11,7 @@ Launch file for testing the ROS2 Dynamixel driver.
 The package can be launched with 'ros2 launch ats_bringup dxl_example_config.launch.py'
 """
 
-logging = True
+logging = False
 log_path = '/ros2_ws/aerial_tactile_servoing/rosbags/'
 config_name = 'dxl_ros2_ats.yaml'
 
