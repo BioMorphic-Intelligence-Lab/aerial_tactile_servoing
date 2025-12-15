@@ -54,6 +54,8 @@ class TactipDriver(Node):
         if self.get_parameter('save_debug_image').get_parameter_value().bool_value:
             self.image_outfile_path = self.get_parameter('save_directory').get_parameter_value().string_value
             self.get_logger().info(f'Saving debug images in {self.image_outfile_path}')
+            if not os.path.exists(self.image_outfile_path):
+                os.makedirs(self.image_outfile_path)
             self.img_counter = 0
             if len(os.listdir(self.image_outfile_path)) != 0: # If directory is not empty, exit to avoid overwriting data
                 self.get_logger().error("Directory not empty. Please delete or move data before proceeding.")
@@ -125,10 +127,8 @@ class TactipDriver(Node):
 
     def publish_real_data(self, sensor_image):
         data = self.sensor.predict(sensor_image)
-        # self.get_logger().info(f"Model output data (length: {len(data)}): {data}")
-        # The model outputs the sensor pose in the contact frame ?? NB in mm and deg
 
-        if self.get_parameter('save_debug_image').get_parameter_value().bool_value:
+        if self.get_parameter('save_debug_image').get_parameter_value().bool_value and self.cycle_counter%int(self.frequency*self.image_save_interval) == 0:
             with open(os.path.join(self.get_parameter('save_directory').get_parameter_value().string_value, 'image_list.csv'), 'a') as f:
                 f.writelines([f"{self.img_counter}, {data[6]:.2f}, {data[7]:.2f}, {data[2]:.2f}, {data[3]:.2f}, {data[4]:.2f}, {data[11]:.2f} \n"]) # Log image data
 
@@ -194,7 +194,7 @@ class TactipDriver(Node):
         elif self.get_parameter('verbose').get_parameter_value().bool_value and self.dimension == 5:
             self.get_logger().info(f"[P_SC] X (mm): 0.00 \t Y (mm): 0.00 \t Z (mm): 0.00 \t Rx (deg): 0.00 \t Ry (deg): 0.00 (no contact)")
 
-        if self.get_parameter('save_debug_image').get_parameter_value().bool_value:
+        if self.get_parameter('save_debug_image').get_parameter_value().bool_value and self.cycle_counter%int(self.frequency*self.image_save_interval) == 0:
             with open(os.path.join(self.get_parameter('save_directory').get_parameter_value().string_value, 'image_list.csv'), 'a') as f:
                 f.writelines([f"{self.img_counter}, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00 \n"]) # Log image data
 
