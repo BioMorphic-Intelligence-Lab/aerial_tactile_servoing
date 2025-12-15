@@ -59,6 +59,9 @@ class TactipDriver(Node):
                 self.get_logger().error("Directory not empty. Please delete or move data before proceeding.")
                 self.get_logger().error("Node will now exit. Please kill stack with  Ctrl+C.")
                 return
+            else:
+                with open(os.path.join(self.get_parameter('save_directory').get_parameter_value().string_value, 'image_list.csv'), 'w') as f:
+                    f.writelines([f"Image number, shear_x, shear_y, pose_z, pose_Rx, pose_Ry, shear_Rz \n"]) # Create empty csv file to log images
 
         # publishers
         self.publisher_pose_ = self.create_publisher(TwistStamped, '/tactip/pose', 10)
@@ -125,6 +128,11 @@ class TactipDriver(Node):
         # self.get_logger().info(f"Model output data (length: {len(data)}): {data}")
         # The model outputs the sensor pose in the contact frame ?? NB in mm and deg
 
+        if self.get_parameter('save_debug_image').get_parameter_value().bool_value:
+            with open(os.path.join(self.get_parameter('save_directory').get_parameter_value().string_value, 'image_list.csv'), 'a') as f:
+                f.writelines([f"{self.img_counter}, {data[6]:.2f}, {data[7]:.2f}, {data[2]:.2f}, {data[3]:.2f}, {data[4]:.2f}, {data[11]:.2f} \n"]) # Log image data
+
+
         data[2] = -data[2]  # Invert Z to comply with convention
         data[3] = -data[3]  # Invert Rx to comply with
         data[4] = data[4]  # 
@@ -185,6 +193,10 @@ class TactipDriver(Node):
             self.get_logger().info(f"[P_SC] Z (mm): 0.00 \t Rx (deg): 0.00 \t Ry (deg): 0.00 (no contact)")
         elif self.get_parameter('verbose').get_parameter_value().bool_value and self.dimension == 5:
             self.get_logger().info(f"[P_SC] X (mm): 0.00 \t Y (mm): 0.00 \t Z (mm): 0.00 \t Rx (deg): 0.00 \t Ry (deg): 0.00 (no contact)")
+
+        if self.get_parameter('save_debug_image').get_parameter_value().bool_value:
+            with open(os.path.join(self.get_parameter('save_directory').get_parameter_value().string_value, 'image_list.csv'), 'a') as f:
+                f.writelines([f"{self.img_counter}, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00 \n"]) # Log image data
 
         msg = TwistStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
