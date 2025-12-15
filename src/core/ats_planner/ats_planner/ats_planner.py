@@ -1,8 +1,10 @@
 import rclpy
 from rclpy.node import Node
-import time
+import numpy as np
 
 from geometry_msgs.msg import TwistStamped
+from px4_msgs.msg import InputRc # non-normalized values
+from px4_msgs.msg import RcChannels # normalized values
 
 class ATSPlanner(Node):
     '''
@@ -10,18 +12,48 @@ class ATSPlanner(Node):
     The references are defined in the contact frame, with Z perpendicular to the interaction surface. THe surface_3d 
     Tactip feedback only allows tracking contact depth (z position), roll (around x axis), and pitch (around y axis).
     Setting the other references nonzero will induce a movement in that direction as the feedback is always zero.
+
+    Channel map
+    [0]: Yaw
+    [1]: Throttle
+    [2]: Pitch
+    [3]: Roll
+    [4]: Left silver 3 position switch - not used
+    [5]: Left green 3 position switch - Arm: 1 is armed, -1 is disarmed
+    [6]: Right yellow 3 position switch - Flight mode: 1 is position, 0 is stabilized, -1 is altitude
+    [7]: Right white 3 position switch - Offboard mode: 1 is offboard, -1 is manual
+    [8]: Left black switch - not used
+    [9]: Left red 2 position switch - Kill: 1 is killed, -1 is alive
+    [10]: Right blue 3 position switch - not used
+    [11]: Right pink 2 position button switch - not used
+    [12]: S1 switch - not used
+    [13]: S2 switch - not used
+    [14]: Left side dial - not used
+    [15]: Right side dial - not used
     '''
     def __init__(self):
         super().__init__('ats_planner')
 
         # Parameters
         self.declare_parameter('frequency', 10.)
+        self.declare_parameter('default_depth', 3.0) # default contact depth in mm
 
         # Initialization log message
         self.get_logger().info("Planner node initialized")
 
         # Publishers
-        self.ee_velocity_publisher_ = self.create_publisher(TwistStamped, '/references/ee_pose', 10)
+        self.ee_velocity_publisher_ = self.create_publisher(TwistStamped, '/references/sensor_in_contact', 10)
+
+        self.sub_rc_channels = self.create_subscription(RcChannels, '/fmu/out/rc_channels', self.rc_callback, 10)
+        self.rc_input = RcChannels()
+
+        self.reference_msg = TwistStamped()
+        self.reference_msg.twist.linear.x = 0.0
+        self.reference_msg.twist.linear.y = 0.0
+        self.reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value/1000. # m
+        self.reference_msg.twist.angular.x = 0.0
+        self.reference_msg.twist.angular.y = 0.0
+        self.reference_msg.twist.angular.z = 0.0
 
         self.period = 1.0/float(self.get_parameter('frequency').get_parameter_value().double_value) # seconds
 
@@ -31,15 +63,24 @@ class ATSPlanner(Node):
     Publish the reference end effector velocity
     '''
     def timer_callback(self):
-        msg = TwistStamped()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.twist.linear.x = 0.0 # end effector x ref in contact frame (6d) (mm)
-        msg.twist.linear.y = 0.0 # end effector y ref in contact frame (6d) (mm)
-        msg.twist.linear.z = -2.2 # end effector z ref in contact frame (3d) (mm)
-        msg.twist.angular.z = 0.0 # end effector yaw ref in contact frame (6d) (deg)
-        msg.twist.angular.y = 0.0 # end effector pitch ref in contact frame (3d) (deg)
-        msg.twist.angular.x = 0.0 # end effector roll ref in contact frame (3d) (deg)
-        self.ee_velocity_publisher_.publish(msg)
+        self.reference_msg.header.stamp = self.get_clock().now().to_msg()
+        if self.enable_reference_manipulation:
+            self.reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value/1000. + (self.rc_input.channels[3])*0.005 # m
+            self.reference_msg.twist.angular.x = (self.rc_input.channels[2])*0.5 # rad
+            self.reference_msg.twist.angular.y = (self.rc_input.channels[0])*0.5 # rad
+            self.get_logger().info(f"Feeding RC to references: Depth: {(self.reference_msg.twist.linear.z*1000.):.3f} mm, "
+                                   f"Roll: {np.rad2deg(self.reference_msg.twist.angular.x):.3f} deg, "
+                                   f"Pitch: {np.rad2deg(self.reference_msg.twist.angular.y):.3f} deg", throttle_duration_sec=1.0)
+        else:
+            self.reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value/1000. # m
+            self.reference_msg.twist.angular.x = 0.0
+            self.reference_msg.twist.angular.y = 0.0
+        self.ee_velocity_publisher_.publish(self.reference_msg)
+
+    def rc_callback(self, msg):
+        self.rc_input = msg
+        if msg.channels[10] > 0.5: # If right blue switch is on -> towards you
+            self.enable_reference_manipulation = True
 
 def main(args=None):
     rclpy.init(args=args)

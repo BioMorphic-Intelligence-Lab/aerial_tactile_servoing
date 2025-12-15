@@ -22,7 +22,6 @@ class PoseBasedATS(Node):
 
         # Parameters
         self.declare_parameter('frequency', 10.)
-        self.declare_parameter('reference_pose', [0., 0., 0.])
         self.declare_parameter('Kp_linear', 3.0)
         self.declare_parameter('Kp_angular', 3.0)
         self.declare_parameter('Ki_linear', 0.1)
@@ -41,6 +40,7 @@ class PoseBasedATS(Node):
         self.subscription_servos = self.create_subscription(JointState, '/servo/out/state', self.callback_servo, 10)
         self.subscription_fmu = self.create_subscription(VehicleOdometry, '/fmu/in/vehicle_visual_odometry', self.callback_fmu, 10)
         self.subscription_md = self.create_subscription(Int32, '/md/state', self.md_callback, 10)
+        self.sub_reference = self.create_subscription(TwistStamped, '/references/sensor_in_contact', self.callback_reference, 10)
 
         # Publishers (necessary)
         self.publisher_servo_positions = self.create_publisher(JointState, '/controller/out/servo_positions', 10)
@@ -70,15 +70,7 @@ class PoseBasedATS(Node):
         self.Ki[4,4] = self.get_parameter('Ki_angular').get_parameter_value().double_value
         self.Ki[5,5] = self.get_parameter('Ki_angular').get_parameter_value().double_value
 
-        # Data
-        reference_pose = self.get_parameter('reference_pose').get_parameter_value().double_array_value
-        if len(reference_pose) != 3:
-            self.get_logger().error("Parameter 'reference_pose' must be a list of 3 elements.")
-            return
-        self.P_Cref = self.evaluate_P_CS(
-            reference_pose[0],
-            reference_pose[1],
-            reference_pose[2])
+        self.P_Cref = self.evaluate_P_CS(0., 0., 0.) # Initial contact frame at zero angles and zero depth
 
         self.tactip = TwistStamped()
         self.tactip.twist.linear.x = 0.0
@@ -203,6 +195,12 @@ class PoseBasedATS(Node):
 
     def callback_tactip(self, msg):
         self.tactip = msg
+
+    def callback_reference(self, msg):
+        self.P_Cref = self.evaluate_P_CS(
+            msg.twist.angular.x,
+            msg.twist.angular.y,
+            msg.twist.linear.z)
 
     def callback_tactip_contact(self, msg):
         self.contact = msg.data

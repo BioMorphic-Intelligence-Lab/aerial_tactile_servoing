@@ -35,7 +35,7 @@ def generate_launch_description():
         name="md_ats_mission",
         output="screen",
         parameters=[
-            {'sm.frequency': 50.0},
+            {'sm.frequency': 100.0},
             {'sm.position_clip': 3.0},
             {'sm.fcu_on': True},
             {'sm.sim': False}
@@ -70,8 +70,7 @@ def generate_launch_description():
         name='controller',
         output='screen',
         parameters=[
-            {'frequency': 50.},
-            {'reference_pose': [0., 0., 0.0035]},
+            {'frequency': 100.},
             {'Kp_linear': 10.0},
             {'Kp_angular': 0.3},
             {'Ki_linear': 0.4}, # was 0.2
@@ -84,6 +83,18 @@ def generate_launch_description():
         arguments=['--ros-args', '--log-level', 'info']
     )
     ld.add_action(controller)
+
+    planner = Node(
+        package='ats_planner',
+        executable='ats_planner',
+        name='planner',
+        output='screen',
+        parameters=[
+            {'frequency': 100.}, # You can use some low frequency because RC driven ref
+            {'default_depth': 3.0} # default contact depth in mm
+        ],
+    )
+    ld.add_action(planner)
 
     if logging:
         rosbag_name = 'ros2bag_ats_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
