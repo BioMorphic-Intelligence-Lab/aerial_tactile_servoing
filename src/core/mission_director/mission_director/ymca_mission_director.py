@@ -66,23 +66,23 @@ class MissionDirector(UAMStateMachine):
                 self.state_move_arms(q=q, next_state="hold_A")
             
             case "hold_A":
-                self.state_hover(duration_sec=2.0, next_state="wave_left")
-
-            case "wave_left":
-                q = [1.0, 0.0, -1.5,
-                    -1.0, 0.0, -0.5]
-                self.state_move_arms(q=q, next_state="hold_wave_left")
-
-            case "hold_wave_left":
-                self.state_hover(duration_sec=2.0, next_state="wave_right")
-            
-            case "wave_right":
-                q = [1.0, 0.0, 0.5,
-                    -1.0, 0.0, 1.5]
-                self.state_move_arms(q=q, next_state="hold_wave_right")
-            
-            case "hold_wave_right":
                 self.state_hover(duration_sec=2.0, next_state="arms_landing_position")
+
+            # case "wave_left":
+            #     q = [1.0, 0.0, -1.5,
+            #         -1.0, 0.0, -0.5]
+            #     self.state_move_arms(q=q, next_state="hold_wave_left")
+
+            # case "hold_wave_left":
+            #     self.state_hover(duration_sec=2.0, next_state="wave_right")
+            
+            # case "wave_right":
+            #     q = [1.0, 0.0, 0.5,
+            #         -1.0, 0.0, 1.5]
+            #     self.state_move_arms(q=q, next_state="hold_wave_right")
+            
+            # case "hold_wave_right":
+            #     self.state_hover(duration_sec=2.0, next_state="arms_landing_position")
 
             case "arms_landing_position":
                 q = [1.57, 0.0, -1.57,
