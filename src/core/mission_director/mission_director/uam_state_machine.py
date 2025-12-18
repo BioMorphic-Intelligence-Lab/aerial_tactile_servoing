@@ -410,4 +410,4 @@ class UAMStateMachine(Node):
             if error > epsilon:
                 self.publish_servo_velocity_references(q_dot_cmd)
             else:
-                self.publish_servo_velocity_references([0.0 for x in q])  # Stop the servos if within epsilon
+                self.publish_servo_velocity_references([0.0 for x in q_emergency])  # Stop the servos if within epsilon
