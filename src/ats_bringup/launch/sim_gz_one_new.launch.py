@@ -34,8 +34,9 @@ def generate_launch_description():
         name='sim_remapper',
         output='screen',
         parameters=[
-            {'frequency': 50.0},
-            {'verbose': False}
+            {'frequency': 100.0},
+            {'verbose': False},
+            {'operating_mode': 'velocity'}  # position or velocity
         ],
         arguments=['--ros-args', '--log-level', 'info']
     )
@@ -81,7 +82,7 @@ def generate_launch_description():
             {'ssim_contact_threshold': 0.65},
             {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},
             {'zero_when_no_contact': True},
-            {'fake_data': True}
+            {'fake_data': False}
         ],
         arguments=['--ros-args', '--log-level', 'info']
     )
@@ -89,15 +90,15 @@ def generate_launch_description():
 
     controller = Node(
         package='pose_based_ats',
-        executable='pose_based_ats',
+        executable='velocity_based_ats',
         name='controller',
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'Kp_linear': -10.0},
-            {'Kp_angular': -0.3},
+            {'Kp_linear': 10.0},
+            {'Kp_angular': 0.3},
             {'Ki_linear': 0.2},
-            {'Ki_angular':0.01 },
+            {'Ki_angular': 0.01},
             {'windup_clip': 0.1},
             {'publish_log': False},
             {'regularization_weight': 0.001},

@@ -5,7 +5,7 @@ from mission_director.uam_state_machine import UAMStateMachine
 
 class MissionDirector(UAMStateMachine):
     def __init__(self):
-        super().__init__('mission_director', fcu_on=False)
+        super().__init__('mission_director')
         self.get_logger().info("MissionDirector node uam_control_test initialized.")
 
         # Timer -- always last
@@ -28,7 +28,7 @@ class MissionDirector(UAMStateMachine):
                 self.state_move_arms(q=q_right, next_state="sim_arm_vehicle")
             
             case "sim_arm_vehicle":
-                self.state_sim_arm(next_state="takeoff")
+                self.state_wait_for_arming(next_state="takeoff")
 
             case "takeoff":
                 self.state_takeoff(target_altitude = 1.5, next_state="hover")

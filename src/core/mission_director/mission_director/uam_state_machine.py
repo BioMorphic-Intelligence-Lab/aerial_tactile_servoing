@@ -29,6 +29,10 @@ class UAMStateMachine(Node):
         self.fcu_on = self.get_parameter('sm.fcu_on').get_parameter_value().bool_value
         self.declare_parameter('sm.sim', False)
         self.sim = self.get_parameter('sm.sim').get_parameter_value().bool_value
+        self.declare_parameter('sm.platform_mode', 'position')
+        self.platform_mode = self.get_parameter('sm.platform_mode').get_parameter_value().string_value
+        self.declare_parameter('sm.manipulator_mode', 'position')
+        self.manipulator_mode = self.get_parameter('sm.manipulator_mode').get_parameter_value().string_value
         if self.sim:
             self.fcu_on = False  # In sim, FCU is always off
 
@@ -75,6 +79,10 @@ class UAMStateMachine(Node):
         self.hover_position = np.zeros(4)  # x, y, z, heading
         self.land_position = np.zeros(4)  # x, y, z, heading
         self.running_position = np.zeros(4)  # x, y, z, heading
+        self.max_speed = 3.0 # Maximum platform speed for velocity setpoints
+
+        self.kp = 2.0 # Arm position control proportional gain
+        self.kd = 0.3 # Arm position control derivative gain
 
     def publish_offboard_position_mode(self):
         msg = OffboardControlMode()
@@ -107,6 +115,22 @@ class UAMStateMachine(Node):
         msg.timestamp = int(self.get_clock().now().nanoseconds/1000)
         self.pub_vehicle_trajectory_setpoint.publish(msg)
 
+    def publish_trajectory_velocity_setpoint(self, vx: float, vy: float, vz: float, yawspeed: float):
+        # If clipping is not zero, clip the position
+        vx_max = np.min(self.max_speed, np.max(0.0, self.position_clip - abs(self.vehicle_odometry.position[0])))
+        vy_max = np.min(self.max_speed, np.max(0.0, self.position_clip - abs(self.vehicle_odometry.position[1])))
+        vz_max = np.min(self.max_speed, np.max(0.0, self.position_clip + self.vehicle_odometry.position[2]))
+
+        msg = TrajectorySetpoint()
+        msg.position = [np.nan, np.nan, np.nan]
+        msg.velocity[0] = np.clip(vx, -vx_max, vx_max)
+        msg.velocity[1] = np.clip(vy, -vy_max, vy_max)
+        msg.velocity[2] = np.clip(vz, -vz_max, vz_max)
+        msg.yaw = np.nan
+        msg.yawspeed = yawspeed
+        msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+        self.pub_vehicle_trajectory_setpoint.publish(msg)
+
     def transition_to_state(self, new_state='emergency'):
         if self.input_state != 0:
             self.get_logger().info('Manually triggered state transition')
@@ -132,6 +156,14 @@ class UAMStateMachine(Node):
         for q in q_list:
             msg.name.append('q'+str(len(msg.position)+1))
             msg.position.append(q)
+        msg.header.stamp = self.get_clock().now().to_msg()
+        self.pub_servo_references.publish(msg)
+
+    def publish_servo_velocity_references(self, q_dot_list: list):
+        msg = JointState()
+        for q_dot in q_dot_list:
+            msg.name.append('q'+str(len(msg.velocity)+1))
+            msg.velocity.append(q_dot)
         msg.header.stamp = self.get_clock().now().to_msg()
         self.pub_servo_references.publish(msg)
 
@@ -306,9 +338,9 @@ class UAMStateMachine(Node):
         elif (datetime.datetime.now()-self.state_start_time).seconds > duration_sec or self.input_state==1:
             self.transition_to_state(new_state=next_state)
 
-    def state_move_arms(self, q: list, next_state='emergency'):
+    def state_move_arms(self, q: list, mode='position', next_state='emergency', epsilon=0.1):
         self.handle_state(state_number=11)
-
+        error = 0.0
         # First state loop
         if self.first_state_loop:
             self.hover_position[0] = self.vehicle_local_position.x
@@ -317,18 +349,25 @@ class UAMStateMachine(Node):
             self.hover_position[3] = self.vehicle_local_position.heading
             self.get_logger().info(f'[11] Hovering at altitude: {self.home_position[2]} m while moving arms to states {q}')
             self.first_state_loop = False
-
-        self.publish_servo_position_references(q)
-        # Calculate euclidean distance between current and target servo positions
-        current_q = np.array(self.servo_state.position)
-        target_q = np.array(q)[:len(current_q)]  # Match lengths
-        error = np.linalg.norm(current_q - target_q)
-        self.get_logger().info(f'Current arm positions: {current_q}, Target arm positions: {target_q}, Error: {error:.4f}', throttle_duration_sec=1)
+        
+        if mode=='position': # If the servos are controlled in position mode
+            self.publish_servo_position_references(q)
+        elif mode=='velocity': # If the servos are controlled in velocity mode
+            q_dot_cmd = []
+            for i in range(len(q)):
+                qd = (self.kp*(q[i] - self.servo_state.position[i]) - self.kd*self.servo_state.velocity[i]) # Simple P controller to reach target position
+                q_dot_cmd.append(qd)
+                error += abs(q[i]-self.servo_state.position[i])
+            error = np.sqrt(error)
+            if error > epsilon:
+                self.publish_servo_velocity_references(q_dot_cmd)
+            else:
+                self.publish_servo_velocity_references([0.0 for x in q])  # Stop the servos if within epsilon
 
         # State transition
         if not self.offboard and self.fcu_on and self.flying:
             self.transition_to_state('emergency')
-        elif (error < 0.1) or self.input_state==1: # If error is small enough or input state is 1
+        elif (error < epsilon) or self.input_state==1: # If error is small enough or input state is 1
             self.transition_to_state(new_state=next_state)
 
     def state_move_uam_to_position(self, target_position: list, next_state='emergency'):
@@ -353,9 +392,22 @@ class UAMStateMachine(Node):
         elif (error < 0.2) or self.input_state==1: # If error is small enough or input state is 1
             self.transition_to_state(new_state=next_state)
 
-    def state_emergency(self):
+    def state_emergency(self, mode = 'position'):
         self.handle_state(state_number=-1)
         self.get_logger().warn("EMERGENCY STATE! No offboard mode.", throttle_duration_sec=1)
-
+        error = 0.0
+        epsilon = 0.1
         q_emergency = [1.578, 0.0, -1.85]
-        self.publish_servo_position_references(q_emergency)
+        if mode=='position': # If the servos are controlled in position mode
+            self.publish_servo_position_references(q_emergency)
+        elif mode=='velocity': # If the servos are controlled in velocity mode
+            q_dot_cmd = []
+            for i in range(len(q_emergency)):
+                qd = (self.kp*(q_emergency[i] - self.servo_state.position[i]) - self.kd*self.servo_state.velocity[i]) # Simple P controller to reach target position
+                q_dot_cmd.append(qd)
+                error += abs(q_emergency[i]-self.servo_state.position[i])
+            error = np.sqrt(error)
+            if error > epsilon:
+                self.publish_servo_velocity_references(q_dot_cmd)
+            else:
+                self.publish_servo_velocity_references([0.0 for x in q])  # Stop the servos if within epsilon
