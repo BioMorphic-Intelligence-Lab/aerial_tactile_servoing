@@ -119,6 +119,7 @@ private:
     /// @brief Callback for the timer, execute interface loop
     void loop();
     void write_goal_positions();
+    void write_goal_velocities();
     int read_all_servo_data();
     void servo_reference_callback(const sensor_msgs::msg::JointState::SharedPtr msg);
     void publish_all_servo_data();

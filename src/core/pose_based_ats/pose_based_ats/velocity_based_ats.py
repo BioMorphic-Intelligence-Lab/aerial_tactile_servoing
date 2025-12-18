@@ -126,7 +126,7 @@ class VelocityBasedATS(Node):
         J_controlled = Jc[:,[0,1,2,5,6,7,8]] # X, Y, Z, yaw, q1, q2, q3 are controlled DOFs
         J_uncontrolled = Jc[:,[3,4]] # Pitch and roll are uncontrolled DOFs
         J_controlled_pinv = np.linalg.pinv(J_controlled) # Pseudo-inverse of controlled jacobian
-        J_uncontrolled_pinv = np.linalg.pinv(J_uncontrolled) # Pseudo-inverse of uncontrolled jacobian
+        # J_uncontrolled_pinv = np.linalg.pinv(J_uncontrolled) # Pseudo-inverse of uncontrolled jacobian
         J_null = np.eye(J_controlled.shape[1]) - J_controlled_pinv @ J_controlled # Null space projector of controlled jacobian
 
         state_transform = self.evaluate_P_B(state)
@@ -147,7 +147,7 @@ class VelocityBasedATS(Node):
 
         u_ss = -self.Kp@e_sr - np.clip(self.integrator,-self.windup, self.windup)
 
-        q_secondary = np.zeros((7,1))
+        q_secondary = np.zeros((7,1)) # TODO: Add secondary objective following
 
         # Inverse kinematics
         controlled_state_reference = J_controlled_pinv @ u_ss - \

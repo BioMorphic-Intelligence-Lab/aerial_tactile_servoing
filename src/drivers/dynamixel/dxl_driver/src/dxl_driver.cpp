@@ -164,7 +164,15 @@ DXLDriver::~DXLDriver()
 
 void DXLDriver::loop()
 {
-    write_goal_positions(); // set servo references on servo
+    // WARNING: current implementation causes setting of the first servo to be applied for all servos
+    if (servodata_[0].operating_mode == DXLMode::EXTENDED_POSITION)
+    {
+        write_goal_positions(); // set servo references on servo
+    }
+    else if (servodata_[0].operating_mode == DXLMode::VELOCITY)
+    {
+        write_goal_velocities();
+    }
     read_all_servo_data(); // get data from the servos
     publish_all_servo_data(); // publish data to ROS topic
 }
@@ -209,6 +217,51 @@ void DXLDriver::write_goal_positions()
         RCLCPP_INFO(this->get_logger(), "%s", packetHandler->getRxPacketError(dxl_error));
     }
     gswPosition->clearParam(); 
+}
+
+void DXLDriver::write_goal_velocities()
+{
+    for(int i = 0; i<num_servos_; i++)
+    {
+        int dxl_addparam_result = false;
+        uint8_t param_goal_velocity[4];
+        double goal_velocity;
+        double max_velocity;
+        if (!(servodata_[i].min_angle == 0.0 && servodata_[i].max_angle == 0.0))
+        {
+            // Calculate max velocity based on distance to angle limit
+            max_velocity = std::min(std::min(5.*servodata_[i].max_velocity*std::max(servodata_[i].present_position - servodata_[i].min_angle, 0.0), 
+                5.*servodata_[i].max_velocity*std::max(servodata_[i].max_angle-servodata_[i].present_position, 0.0)),
+                servodata_[i].max_velocity);
+        }
+        else
+        {
+            goal_velocity = servodata_[i].goal_velocity;
+        }
+        int32_t goal_vel_ticks = vel_rad2int(servodata_[i].id, goal_velocity);
+        // RCLCPP_INFO(this->get_logger(), "goal position %f", goal_position);
+        // RCLCPP_INFO(this->get_logger(), "goal position ticks %i", goal_pos_ticks);
+
+        param_goal_velocity[0] = DXL_LOBYTE(DXL_LOWORD(goal_vel_ticks));
+        param_goal_velocity[1] = DXL_HIBYTE(DXL_LOWORD(goal_vel_ticks));
+        param_goal_velocity[2] = DXL_LOBYTE(DXL_HIWORD(goal_vel_ticks));
+        param_goal_velocity[3] = DXL_HIBYTE(DXL_HIWORD(goal_vel_ticks));
+        dxl_addparam_result = gswVelocity->addParam(ids_[i], param_goal_velocity);
+        if (dxl_addparam_result != true) 
+        {
+            RCLCPP_ERROR(this->get_logger(), "[ID: %d] Failed to addparam to groupSyncWrite with error code %d", 
+                servodata_[i].id, 
+                dxl_addparam_result
+                );
+        }
+    }
+    dxl_comm_result = gswVelocity->txPacket();
+    if (dxl_comm_result != COMM_SUCCESS) {
+        RCLCPP_INFO(this->get_logger(), "%s", packetHandler->getTxRxResult(dxl_comm_result));
+    } else if (dxl_error != 0) {
+        RCLCPP_INFO(this->get_logger(), "%s", packetHandler->getRxPacketError(dxl_error));
+    }
+    gswVelocity->clearParam(); 
 }
 
 int DXLDriver::read_all_servo_data()
@@ -328,13 +381,21 @@ void DXLDriver::configure_servos()
             portHandler,
             servodata_[i].id,
             DXLREGISTER::OPERATING_MODE,
-            DXLMode::EXTENDED_POSITION,
+            servodata_[i].operating_mode,
             &dxl_error
         );
         if (dxl_comm_result == COMM_SUCCESS)
         {
-            RCLCPP_INFO(this->get_logger(), "[ID: %i] Set extended position operating mode", 
-                static_cast<int>(servodata_[i].id));
+            if (servodata_[i].operating_mode == DXLMode::EXTENDED_POSITION)
+            {
+                RCLCPP_INFO(this->get_logger(), "[ID: %i] Set extended position operating mode", 
+                    static_cast<int>(servodata_[i].id));
+            }
+            else if (servodata_[i].operating_mode == DXLMode::VELOCITY)
+            {
+                RCLCPP_INFO(this->get_logger(), "[ID: %i] Set velocity operating mode", 
+                    static_cast<int>(servodata_[i].id));
+            }
         }
         else
         {
@@ -508,6 +569,7 @@ void DXLDriver::servo_reference_callback(const sensor_msgs::msg::JointState::Sha
     for (int i = 0; i < num_servos_; i++)
     {
         servodata_[i].goal_position = msg->position[i];
+        servodata_[i].goal_velocity = msg->velocity[i];
     }
 }
 

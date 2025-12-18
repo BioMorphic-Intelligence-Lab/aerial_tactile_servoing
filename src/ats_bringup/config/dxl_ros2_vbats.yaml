@@ -1,0 +1,15 @@
+/dxl_driver:
+  ros__parameters:
+    driver:
+      frequency: 100.0
+
+    servos:
+      ids: [31, 32, 33] # Servo IDs
+      operating_modes: [1, 1, 1] # Driver operating mode, [4 is extended position control, 1 is velocity control]
+      homing_modes: [0, 0, 0] # Homing mode, [0 is no homing]
+      directions: [-1, -1, 1] # Direction of rotation for each servo [-1, 1]
+      max_speeds: [0.8, 0.8, 0.8] # Maximum allowable speed in rad/s
+      gear_ratios: [4.0, 1.0, 2.0] # Gear ratio between servo horn and output shaft
+      min_angles: [0.0, -0.52, -1.9] # Minimum angle limit in rad (if both set to zero, no limits are applied)
+      max_angles: [3.14, 0.52, 1.9] # Maximum angle limit in rad (if both set to zero, no limits are applied)
+      start_offsets: [1.57, 0.0, -1.82] # Start offset in rad added to the initial position after homing
