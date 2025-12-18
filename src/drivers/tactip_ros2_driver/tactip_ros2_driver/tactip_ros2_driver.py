@@ -141,11 +141,11 @@ class TactipDriver(Node):
 
         # Rotation from output frame (P_CS - sensor frame in contact frame) to desired frame (P_SC - contact frame in sensor frame)
         if self.dimension == 3:
-            P_SC = self.evaluate_P_SC(0., 0., data[2]/1000., np.deg2rad(data[3]), np.deg2rad(data[4])) # Input pose elements as rad and meter, set sign to comply with convention
+            P_SC = self.evaluate_P_SC(0., 0., data[2], data[3], data[4]) # Input pose elements as rad and meter, set sign to comply with convention
         elif self.dimension == 5:
-            P_SC = self.evaluate_P_SC(data[6]/1000., data[7]/1000., data[2]/1000., np.deg2rad(data[3]), np.deg2rad(data[4])) # Input pose elements as rad and meter, set sign to comply with convention
+            P_SC = self.evaluate_P_SC(data[6], data[7], data[2], data[3], data[4]) # Input pose elements as rad and meter, set sign to comply with convention
         
-        rot_pred_pos = P_SC[0:3,3]*1000.
+        rot_pred_pos = P_SC[0:3,3]
         rot_pred_ang = np.rad2deg(R.from_matrix(P_SC[0:3, 0:3]).as_euler('xyz'))
         rot_pred_pose = np.concatenate([rot_pred_pos, rot_pred_ang])
 
@@ -159,12 +159,12 @@ class TactipDriver(Node):
         # The model outputs are in mm and deg, so convert to SI
         msg = TwistStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.twist.linear.x = rot_pred_pose[0]/1000.
-        msg.twist.linear.y = rot_pred_pose[1]/1000.
-        msg.twist.linear.z = rot_pred_pose[2]/1000.
-        msg.twist.angular.x = np.deg2rad(rot_pred_pose[3]) # deg2rad
-        msg.twist.angular.y = np.deg2rad(rot_pred_pose[4]) # deg2rad
-        msg.twist.angular.z = np.deg2rad(rot_pred_pose[5]) # deg2rad
+        msg.twist.linear.x = rot_pred_pose[0]
+        msg.twist.linear.y = rot_pred_pose[1]
+        msg.twist.linear.z = rot_pred_pose[2]
+        msg.twist.angular.x = rot_pred_pose[3] # deg2rad
+        msg.twist.angular.y = rot_pred_pose[4] # deg2rad
+        msg.twist.angular.z = rot_pred_pose[5] # deg2rad
         self.publisher_pose_.publish(msg)
         #self.get_logger().info(f"Published data: {msg}")
 
@@ -179,9 +179,9 @@ class TactipDriver(Node):
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = "present_sensor_frame"
         t.child_frame_id = "present_contact_frame"
-        t.transform.translation.x = float(translation_inv[0])/1000.
-        t.transform.translation.y = float(translation_inv[1])/1000.
-        t.transform.translation.z = float(translation_inv[2])/1000.
+        t.transform.translation.x = float(translation_inv[0])
+        t.transform.translation.y = float(translation_inv[1])
+        t.transform.translation.z = float(translation_inv[2])
         t.transform.rotation.x = float(q_inv[0])
         t.transform.rotation.y = float(q_inv[1])
         t.transform.rotation.z = float(q_inv[2])
@@ -242,6 +242,8 @@ class TactipDriver(Node):
         self.get_logger().info(f"Average predict time: {sum(predict_time)/iterations} [seconds/it]")
     
     def evaluate_P_SC(self, x_CS, y_CS, z_CS, alpha, beta):
+        alpha = np.deg2rad(alpha)
+        beta = np.deg2rad(beta)
         P_SC = np.zeros((4,4))
         P_SC[0,0] = np.cos(beta)
         P_SC[0,1] = 0
