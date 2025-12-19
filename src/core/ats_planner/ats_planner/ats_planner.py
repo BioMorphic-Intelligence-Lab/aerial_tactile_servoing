@@ -55,8 +55,11 @@ class ATSPlanner(Node):
         self.reference_msg.twist.angular.y = 0.0
         self.reference_msg.twist.angular.z = 0.0
 
-        self.period = 1.0/float(self.get_parameter('frequency').get_parameter_value().double_value) # seconds
+        # Class data
+        self.enable_reference_manipulation = False
 
+        # Timer
+        self.period = 1.0/float(self.get_parameter('frequency').get_parameter_value().double_value) # seconds
         self.timer = self.create_timer(self.period, self.timer_callback)
 
     '''
@@ -81,6 +84,8 @@ class ATSPlanner(Node):
         self.rc_input = msg
         if msg.channels[10] > 0.5: # If right blue switch is on -> towards you
             self.enable_reference_manipulation = True
+        elif msg.channels[10] < -0.5: # If right blue switch is off -> away from you
+            self.enable_reference_manipulation = False
 
 def main(args=None):
     rclpy.init(args=args)

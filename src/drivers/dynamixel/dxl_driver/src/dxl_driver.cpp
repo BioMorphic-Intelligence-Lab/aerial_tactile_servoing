@@ -238,7 +238,7 @@ void DXLDriver::write_goal_velocities()
         {
             goal_velocity = servodata_[i].goal_velocity;
         }
-        int32_t goal_vel_ticks = vel_rad2int(servodata_[i].id, goal_velocity);
+        int32_t goal_vel_ticks = vel_rad2int(servodata_[i].id, std::min(goal_velocity, max_velocity));
         // RCLCPP_INFO(this->get_logger(), "goal position %f", goal_position);
         // RCLCPP_INFO(this->get_logger(), "goal position ticks %i", goal_pos_ticks);
 

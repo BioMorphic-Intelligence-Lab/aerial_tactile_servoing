@@ -134,7 +134,7 @@ class VelocityBasedATS(Node):
         self.broadcast_tf2(state_transform, "world", "present_body_frame")
 
         # Evaluate the error
-        P_SC = self.evaluate_P_SC(self.tactip.twist.angular.x, self.tactip.twist.angular.y, 
+        P_SC = self.evaluate_P_SC(np.deg2rad(self.tactip.twist.angular.x), np.deg2rad(self.tactip.twist.angular.y), 
                                   self.tactip.twist.linear.x, self.tactip.twist.linear.y, self.tactip.twist.linear.z)
         E_Sref = P_SC @ self.P_Cref
         e_sr = self.transformation_to_vector(E_Sref)
@@ -147,12 +147,18 @@ class VelocityBasedATS(Node):
 
         u_ss = -self.Kp@e_sr - np.clip(self.integrator,-self.windup, self.windup)
 
-        q_secondary = np.zeros((7,1)) # TODO: Add secondary objective following
+        q_secondary = np.zeros(7) # TODO: Add secondary objective following
 
-        # Inverse kinematics
+        # Inverse kinematics - controlled states [x, y, z, yaw, q1, q2, q3]
         controlled_state_reference = J_controlled_pinv @ u_ss - \
-            J_controlled_pinv @ J_uncontrolled @ np.array([[self.vehicle_odometry.angular_velocity[0]], [self.vehicle_odometry.angular_velocity[1]]]) \
+            J_controlled_pinv @ J_uncontrolled @ np.array([self.vehicle_odometry.angular_velocity[0], self.vehicle_odometry.angular_velocity[1]]) \
             + J_null @ q_secondary # Secondary objective velocities
+        # self.get_logger().info(f"u_ss: {u_ss}, {u_ss.shape}, {type(u_ss)}")
+        # self.get_logger().info(f"J_controlled_pinv: {J_controlled_pinv}, {J_controlled_pinv.shape}, {type(J_controlled_pinv)}")
+        # self.get_logger().info(f"J_uncontrolled: {J_uncontrolled}, {J_uncontrolled.shape}, {type(J_uncontrolled)}")
+        # self.get_logger().info(f"J_null: {J_null}, {J_null.shape}, {type(J_null)}")
+        # self.get_logger().info(f"controlled_state_reference: {controlled_state_reference}, {controlled_state_reference.shape}, {type(controlled_state_reference)}")
+        # self.get_logger().info(f"q_secondary: {q_secondary}, {q_secondary.shape}, {type(q_secondary)}")
 
         # Broadcast the sensor frame in the body frame
         P_BS = self.evaluate_P_BS(state[6], state[7], state[8])
@@ -161,15 +167,15 @@ class VelocityBasedATS(Node):
         # Publish velocity commands
         servo_cmd = JointState()
         servo_cmd.name = ['q1', 'q2', 'q3']
-        servo_cmd.velocity = [controlled_state_reference[6], controlled_state_reference[7], controlled_state_reference[8]]
+        servo_cmd.velocity = [controlled_state_reference[4], controlled_state_reference[5], controlled_state_reference[6]]
         servo_cmd.header.stamp = self.get_clock().now().to_msg()
         self.publisher_servo_state.publish(servo_cmd)
 
         drone_cmd = TrajectorySetpoint()
-        drone_cmd.position = [None, None, None]  # Position is not controlled
-        drone_cmd.velocity = [controlled_state_reference[0], controlled_state_reference[1], controlled_state_reference[2]]
-        drone_cmd.yaw = None  # Yaw position is not controlled
-        drone_cmd.yawspeed = controlled_state_reference[5]
+        drone_cmd.position = [np.nan, np.nan, np.nan]  # Position is not controlled
+        drone_cmd.velocity = [float(controlled_state_reference[0]), float(controlled_state_reference[1]), float(controlled_state_reference[2])]
+        drone_cmd.yaw = np.nan  # Yaw position is not controlled
+        drone_cmd.yawspeed = float(controlled_state_reference[5])
         drone_cmd.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.publisher_drone_ref.publish(drone_cmd)
 
@@ -178,8 +184,8 @@ class VelocityBasedATS(Node):
 
     def callback_reference(self, msg):
         self.P_Cref = self.evaluate_P_CS(
-            msg.twist.angular.x,
-            msg.twist.angular.y,
+            np.deg2rad(msg.twist.angular.x),
+            np.deg2rad(msg.twist.angular.y),
             msg.twist.linear.z)
 
     def callback_tactip_contact(self, msg):

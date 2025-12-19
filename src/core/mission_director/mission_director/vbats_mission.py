@@ -72,7 +72,7 @@ class MissionDirector(UAMStateMachine):
                     self.first_state_loop = False
                 
                 # Update position setpoint
-                self.get_logger().info(f'Approaching... : {self.vehicle_odometry.velocity[1]}/{approach_speed} m/s', throttle_duration_sec=1)
+                self.get_logger().info(f'Approaching... : {self.vehicle_odometry.velocity[1]:.3f}/{approach_speed} m/s, {self.vehicle_odometry.position[1]:.2f}/{self.position_clip} m', throttle_duration_sec=1)
                 self.publish_trajectory_velocity_setpoint(
                     0.0,
                     approach_speed,

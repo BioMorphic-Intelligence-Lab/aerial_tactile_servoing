@@ -117,9 +117,9 @@ class UAMStateMachine(Node):
 
     def publish_trajectory_velocity_setpoint(self, vx: float, vy: float, vz: float, yawspeed: float):
         # If clipping is not zero, clip the position
-        vx_max = np.min(self.max_speed, np.max(0.0, self.position_clip - abs(self.vehicle_odometry.position[0])))
-        vy_max = np.min(self.max_speed, np.max(0.0, self.position_clip - abs(self.vehicle_odometry.position[1])))
-        vz_max = np.min(self.max_speed, np.max(0.0, self.position_clip + self.vehicle_odometry.position[2]))
+        vx_max = min(self.max_speed, max(0.0, self.position_clip - abs(self.vehicle_odometry.position[0])))
+        vy_max = min(self.max_speed, max(0.0, self.position_clip - abs(self.vehicle_odometry.position[1])))
+        vz_max = min(self.max_speed, max(0.0, self.position_clip + self.vehicle_odometry.position[2]))
 
         msg = TrajectorySetpoint()
         msg.position = [np.nan, np.nan, np.nan]
@@ -354,6 +354,7 @@ class UAMStateMachine(Node):
             self.publish_servo_position_references(q)
         elif mode=='velocity': # If the servos are controlled in velocity mode
             q_dot_cmd = []
+            self.get_logger().info(f'commanded positions: {q}')
             for i in range(len(q)):
                 qd = (self.kp*(q[i] - self.servo_state.position[i]) - self.kd*self.servo_state.velocity[i]) # Simple P controller to reach target position
                 q_dot_cmd.append(qd)

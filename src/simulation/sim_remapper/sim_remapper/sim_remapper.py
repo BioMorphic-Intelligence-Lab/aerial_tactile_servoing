@@ -30,6 +30,7 @@ class SimRemapper(Node):
         # self.direcions = [1., -1., -1., ]
 
         self.q_cmd = []
+        self.qd_cmd = []
         self.arm_positions = []
         self.arm_velocities = []
         self.kp = 2.
@@ -50,7 +51,7 @@ class SimRemapper(Node):
         if self.operating_mode == 'position':
             self.move_arm_to_position(self.q_cmd)
         elif self.operating_mode == 'velocity':
-            self.publish_arm_velocity_commands(self.q_cmd)
+            self.publish_arm_velocity_commands(self.qd_cmd)
 
         if self.feedback_length != self.ref_length:
             self.get_logger().warn(f"Feedback length {self.feedback_length} does not match reference length {self.ref_length}", throttle_duration_sec=5.0)
@@ -61,8 +62,9 @@ class SimRemapper(Node):
         self.arm_velocities = msg.velocity
 
     def servo_refs_callback(self, msg):
-        self.ref_length = len(msg.position)
+        self.ref_length = max(len(msg.position), len(msg.velocity))
         self.q_cmd = msg.position
+        self.qd_cmd = msg.velocity
 
     def publish_arm_velocity_commands(self, q_dot_cmd : list):
         for i, q_dot in enumerate(q_dot_cmd):
