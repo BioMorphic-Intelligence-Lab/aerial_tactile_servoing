@@ -1,8 +1,6 @@
 import rclpy
 from rclpy.node import Node
 
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
-
 from std_msgs.msg import Float64
 from sensor_msgs.msg import JointState
 
@@ -57,7 +55,7 @@ class SimRemapper(Node):
             self.get_logger().warn(f"Feedback length {self.feedback_length} does not match reference length {self.ref_length}", throttle_duration_sec=5.0)
 
     def joint_states_callback(self, msg):
-        self.feedback_length = len(msg.position)
+        self.feedback_length = max(len(msg.position), len(msg.velocity))
         self.arm_positions = msg.position
         self.arm_velocities = msg.velocity
 
@@ -93,7 +91,6 @@ class SimRemapper(Node):
             return True
         else:
             return False
-
 
 def main(args=None):
     rclpy.init(args=args)

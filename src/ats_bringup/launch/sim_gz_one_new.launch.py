@@ -68,25 +68,25 @@ def generate_launch_description():
     )
     ld.add_action(mission_director)
 
-    # tactip_driver = Node(
-    #     package='tactip_ros2_driver',
-    #     executable='tactip_ros2_driver',
-    #     name='tactip_driver',
-    #     output='screen',
-    #     parameters=[
-    #         {'source': 4},
-    #         {'frequency': 15.},
-    #         {'verbose': False},
-    #         {'test_model_time': False},
-    #         {'save_debug_image': False},
-    #         {'ssim_contact_threshold': 0.65},
-    #         {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},
-    #         {'zero_when_no_contact': True},
-    #         {'fake_data': False}
-    #     ],
-    #     arguments=['--ros-args', '--log-level', 'info']
-    # )
-    # ld.add_action(tactip_driver)
+    tactip_driver = Node(
+        package='tactip_ros2_driver',
+        executable='tactip_ros2_driver',
+        name='tactip_driver',
+        output='screen',
+        parameters=[
+            {'source': 4},
+            {'frequency': 15.},
+            {'verbose': False},
+            {'test_model_time': False},
+            {'save_debug_image': False},
+            {'ssim_contact_threshold': 0.65},
+            {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},
+            {'zero_when_no_contact': True},
+            {'fake_data': False}
+        ],
+        arguments=['--ros-args', '--log-level', 'info']
+    )
+    ld.add_action(tactip_driver)
 
     controller = Node(
         package='pose_based_ats',
@@ -95,7 +95,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'Kp_linear': 10.0},
+            {'Kp_linear': 50.0},
             {'Kp_angular': 0.3},
             {'Ki_linear': 0.2},
             {'Ki_angular': 0.01},

@@ -26,7 +26,7 @@ class MissionDirector(UAMStateMachine):
 
         # Controller interfaces
         self.sub_controller = self.create_subscription(TrajectorySetpoint, '/controller/out/trajectory_setpoint', self.controller_callback, 10)
-        self.sub_controller_servo = self.create_subscription(JointState, '/controller/out/servo_positions', self.controller_servo_callback, 10)
+        self.sub_controller_servo = self.create_subscription(JointState, '/controller/out/servo_state', self.controller_servo_callback, 10)
 
         # Tactile servoing specific variables
         self.vehicle_trajectory_setpoint = TrajectorySetpoint()

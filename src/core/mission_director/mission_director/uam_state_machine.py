@@ -354,7 +354,6 @@ class UAMStateMachine(Node):
             self.publish_servo_position_references(q)
         elif mode=='velocity': # If the servos are controlled in velocity mode
             q_dot_cmd = []
-            self.get_logger().info(f'commanded positions: {q}')
             for i in range(len(q)):
                 qd = (self.kp*(q[i] - self.servo_state.position[i]) - self.kd*self.servo_state.velocity[i]) # Simple P controller to reach target position
                 q_dot_cmd.append(qd)

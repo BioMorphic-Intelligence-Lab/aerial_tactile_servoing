@@ -37,7 +37,7 @@ class VelocityBasedATS(Node):
         # Subscribers
         self.subscription_tactip = self.create_subscription(TwistStamped, '/tactip/pose', self.callback_tactip, 10)
         self.subscription_tactip_contact = self.create_subscription(Int8, '/tactip/contact', self.callback_tactip_contact, 10)
-        self.subscription_servos = self.create_subscription(JointState, '/servo/out/state', self.callback_servo, 10)
+        self.subscription_servos = self.create_subscription(JointState, '/servo/out/state', self.callback_servo_feedback, 10)
         self.subscription_fmu = self.create_subscription(VehicleOdometry, '/fmu/in/vehicle_visual_odometry', self.callback_fmu, 10)
         self.subscription_md = self.create_subscription(Int32, '/md/state', self.md_callback, 10)
         self.sub_reference = self.create_subscription(TwistStamped, '/references/sensor_in_contact', self.callback_reference, 10)
@@ -135,7 +135,7 @@ class VelocityBasedATS(Node):
 
         # Evaluate the error
         P_SC = self.evaluate_P_SC(np.deg2rad(self.tactip.twist.angular.x), np.deg2rad(self.tactip.twist.angular.y), 
-                                  self.tactip.twist.linear.x, self.tactip.twist.linear.y, self.tactip.twist.linear.z)
+                                  self.tactip.twist.linear.x/1000., self.tactip.twist.linear.y/1000., self.tactip.twist.linear.z/1000.)
         E_Sref = P_SC @ self.P_Cref
         e_sr = self.transformation_to_vector(E_Sref)
 
@@ -191,7 +191,7 @@ class VelocityBasedATS(Node):
     def callback_tactip_contact(self, msg):
         self.contact = msg.data
 
-    def callback_servo(self, msg):
+    def callback_servo_feedback(self, msg):
         self.servo_state = msg
 
     def callback_fmu(self, msg):
