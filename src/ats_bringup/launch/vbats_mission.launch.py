@@ -90,7 +90,7 @@ def generate_launch_description():
         name='planner',
         output='screen',
         parameters=[
-            {'frequency': 100.}, # You can use some low frequency because RC driven ref
+            {'frequency': 100.},
             {'default_depth': 3.0} # default contact depth in mm
         ],
     )

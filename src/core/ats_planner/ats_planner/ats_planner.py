@@ -3,7 +3,6 @@ from rclpy.node import Node
 import numpy as np
 
 from geometry_msgs.msg import TwistStamped
-from px4_msgs.msg import InputRc # non-normalized values
 from px4_msgs.msg import RcChannels # normalized values
 
 class ATSPlanner(Node):

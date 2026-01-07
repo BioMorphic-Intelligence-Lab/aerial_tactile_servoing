@@ -15,7 +15,7 @@ class MissionDirector(UAMStateMachine):
 
         # Tactile servoing parameters
         self.ts_no_contact_counter = 0
-        self.ts_no_contact_max_seconds = 10  # Max cycles without contact before aborting tactile servoing
+        self.ts_no_contact_max_seconds = 30  # Max cycles without contact before aborting tactile servoing
         self.ts_no_contact_max_cycles = int(self.ts_no_contact_max_seconds * self.frequency)
 
         # Tactip interfaces
@@ -60,7 +60,7 @@ class MissionDirector(UAMStateMachine):
 
             case "pre_contact_arm_position":
                 q_right = [np.pi/3, 0.0, np.pi/6] # put some position here
-                self.state_move_arms(q=q_right, mode='velocity', next_state="approach")
+                self.state_move_arms(q=q_right, mode='velocity', next_state="tactile_servoing") # TODO Fix for flight test
 
             case "approach": # Better way is to command a negative z velocity on the end-effector and run it through the inverse kinematics
                 self.handle_state(state_number=21)

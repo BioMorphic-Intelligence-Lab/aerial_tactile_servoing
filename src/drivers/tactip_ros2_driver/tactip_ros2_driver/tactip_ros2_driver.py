@@ -51,7 +51,7 @@ class TactipDriver(Node):
             self.get_logger().info("Using fake data mode. No camera input.")
 
         # Set up period image saving if enabled in launch
-        if self.get_parameter('save_debug_image').get_parameter_value().bool_value:
+        if self.get_parameter('save_debug_image').get_parameter_value().bool_value and not self.fake_data:
             self.image_outfile_path = self.get_parameter('save_directory').get_parameter_value().string_value
             self.get_logger().info(f'Saving debug images in {self.image_outfile_path}')
             if not os.path.exists(self.image_outfile_path):
@@ -87,7 +87,8 @@ class TactipDriver(Node):
     def timer_callback(self):
         # Fake data hijack
         if self.fake_data:
-            self.publish_fake_data()
+            self.publish_zero_data()
+            # TODO set back to publish_fake_data
             return
 
         # read the data
@@ -290,7 +291,7 @@ class TactipDriver(Node):
         t = time.time()
         msg.twist.linear.x = 0.0
         msg.twist.linear.y = 0.0
-        msg.twist.linear.z = 0.03*math.sin(0.5*t)
+        msg.twist.linear.z = 3*math.sin(0.5*t)
         msg.twist.angular.x = np.deg2rad(15.*math.sin(0.4*t))
         msg.twist.angular.y = np.deg2rad(15.*math.sin(0.6*t))
         msg.twist.angular.z = np.deg2rad(15.*math.sin(0.8*t))

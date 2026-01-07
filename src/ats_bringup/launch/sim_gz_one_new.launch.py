@@ -76,13 +76,14 @@ def generate_launch_description():
         parameters=[
             {'source': 4},
             {'frequency': 15.},
+            {'dimension': 3},
             {'verbose': False},
             {'test_model_time': False},
             {'save_debug_image': False},
             {'ssim_contact_threshold': 0.65},
             {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},
             {'zero_when_no_contact': True},
-            {'fake_data': False}
+            {'fake_data': True}
         ],
         arguments=['--ros-args', '--log-level', 'info']
     )
@@ -114,7 +115,7 @@ def generate_launch_description():
         name='planner',
         output='screen',
         parameters=[
-            {'frequency': 100.}, # You can use some low frequency because RC driven ref
+            {'frequency': 100.},
             {'default_depth': 3.0} # default contact depth in mm
         ],
         arguments=['--ros-args', '--log-level', 'info']

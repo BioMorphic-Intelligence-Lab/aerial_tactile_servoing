@@ -126,7 +126,6 @@ class VelocityBasedATS(Node):
         J_controlled = Jc[:,[0,1,2,5,6,7,8]] # X, Y, Z, yaw, q1, q2, q3 are controlled DOFs
         J_uncontrolled = Jc[:,[3,4]] # Pitch and roll are uncontrolled DOFs
         J_controlled_pinv = np.linalg.pinv(J_controlled) # Pseudo-inverse of controlled jacobian
-        # J_uncontrolled_pinv = np.linalg.pinv(J_uncontrolled) # Pseudo-inverse of uncontrolled jacobian
         J_null = np.eye(J_controlled.shape[1]) - J_controlled_pinv @ J_controlled # Null space projector of controlled jacobian
 
         state_transform = self.evaluate_P_B(state)
@@ -138,6 +137,8 @@ class VelocityBasedATS(Node):
                                   self.tactip.twist.linear.x/1000., self.tactip.twist.linear.y/1000., self.tactip.twist.linear.z/1000.)
         E_Sref = P_SC @ self.P_Cref
         e_sr = self.transformation_to_vector(E_Sref)
+
+        self.get_logger().info(f'CMD EE velocity: {e_sr}', throttle_duration_sec=1) # See if the upward movement originates before or after reference generation 
 
         # Check for contact through SSIM
         if self.accumulate_integrator: # If contact, accumulate integrator
@@ -153,13 +154,9 @@ class VelocityBasedATS(Node):
         controlled_state_reference = J_controlled_pinv @ u_ss - \
             J_controlled_pinv @ J_uncontrolled @ np.array([self.vehicle_odometry.angular_velocity[0], self.vehicle_odometry.angular_velocity[1]]) \
             + J_null @ q_secondary # Secondary objective velocities
-        # self.get_logger().info(f"u_ss: {u_ss}, {u_ss.shape}, {type(u_ss)}")
-        # self.get_logger().info(f"J_controlled_pinv: {J_controlled_pinv}, {J_controlled_pinv.shape}, {type(J_controlled_pinv)}")
-        # self.get_logger().info(f"J_uncontrolled: {J_uncontrolled}, {J_uncontrolled.shape}, {type(J_uncontrolled)}")
-        # self.get_logger().info(f"J_null: {J_null}, {J_null.shape}, {type(J_null)}")
-        # self.get_logger().info(f"controlled_state_reference: {controlled_state_reference}, {controlled_state_reference.shape}, {type(controlled_state_reference)}")
-        # self.get_logger().info(f"q_secondary: {q_secondary}, {q_secondary.shape}, {type(q_secondary)}")
 
+        self.get_logger().info(f'CMD state velocity: {controlled_state_reference}', throttle_duration_sec=1)
+#       Output: [-1.4e-5  6.6e-3 -1.4e-1 -1.9e-12 -2.6e-2  1.5e-12  2.6e-2]
         # Broadcast the sensor frame in the body frame
         P_BS = self.evaluate_P_BS(state[6], state[7], state[8])
         self.broadcast_tf2(P_BS, "present_body_frame", "present_sensor_frame")
