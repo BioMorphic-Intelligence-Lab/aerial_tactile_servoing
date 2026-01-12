@@ -6,9 +6,9 @@ import os
 import datetime
 
 """
-Launch file for testing the ROS2 Dynamixel driver. 
+Launch file for testing the aerial tactile servoing system with velocity-based controller.
 
-The package can be launched with 'ros2 launch ats_bringup dxl_example_config.launch.py'
+The package can be launched with 'ros2 launch ats_bringup vbats_mission.launch.py'
 """
 
 logging = True
@@ -31,8 +31,8 @@ def generate_launch_description():
 
     mission_director = Node(
         package="mission_director",
-        executable="ats_mission",
-        name="md_ats_mission",
+        executable="vbats_mission",
+        name="vbats_mission",
         output="screen",
         parameters=[
             {'sm.frequency': 100.0},
@@ -50,8 +50,9 @@ def generate_launch_description():
         name='tactip_driver',
         output='screen',
         parameters=[
-            {'source': 0},
+            {'source': 4},
             {'frequency': 15.},
+            {'dimension': 5},
             {'verbose': False},
             {'test_model_time': False},
             {'save_debug_image': False},
@@ -66,16 +67,16 @@ def generate_launch_description():
 
     controller = Node(
         package='pose_based_ats',
-        executable='pose_based_ats',
+        executable='velocity_based_ats',
         name='controller',
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'Kp_linear': 0.05},
-            {'Kp_angular': 0.01},
-            {'Ki_linear': 0.4}, # was 0.2
-            {'Ki_angular': 0.0}, # was 0.01
-            {'windup_clip': 0.03},
+            {'Kp_linear': 50.0},
+            {'Kp_angular': 0.3},
+            {'Ki_linear': 0.2},
+            {'Ki_angular': 0.01},
+            {'windup_clip': 0.1},
             {'publish_log': False},
             {'regularization_weight': 0.001},
             {'test_execution_time': False}
