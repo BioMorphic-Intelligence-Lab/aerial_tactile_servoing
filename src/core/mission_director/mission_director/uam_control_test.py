@@ -15,17 +15,18 @@ class MissionDirector(UAMStateMachine):
     def execute(self):
         match self.FSM_state:
             case "entrypoint":
-                self.state_entrypoint(next_state="move_arms")
+                self.state_entrypoint(next_state="wait")
+
+            case "wait":
+                self.state_do_nothing(next_state="move_arms")
 
             case "move_arms":
                 q_right = [1.0, 0.1, 1.3]
-                q_right.append(q_right[0]-np.pi)
                 self.state_move_arms(q=q_right, next_state="arms_takeoff_position")
 
             case "arms_takeoff_position":
                 q_right = [1.57, 0.0, -1.57]
-                q_right.append(q_right[0]-np.pi)
-                self.state_move_arms(q=q_right, next_state="sim_arm_vehicle")
+                self.state_move_arms(q=q_right, next_state="move_arms")
             
             case "sim_arm_vehicle":
                 self.state_wait_for_arming(next_state="takeoff")

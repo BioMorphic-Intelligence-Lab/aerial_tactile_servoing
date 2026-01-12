@@ -36,8 +36,8 @@ class UAMStateMachine(Node):
         if self.sim:
             self.fcu_on = False  # In sim, FCU is always off
 
-        self.get_logger().info(f"StateMachine node '{node_name}' initialized with params: "
-                                f"frequency={self.frequency}, position_clip={self.position_clip}, fcu_on={self.fcu_on}, sim={self.sim}")
+        self.get_logger().info(f"StateMachine node '{node_name}' initialized with params: \n"
+                                f"frequency={self.frequency}, \n position_clip={self.position_clip}, \n fcu_on={self.fcu_on}, \n sim={self.sim}, \n platform_mode={self.platform_mode}, \n manipulator_mode={self.manipulator_mode}")
 
         # State machine publishers and subscribers
         self.pub_sm_state = self.create_publisher(Int32, '/md/state', 10)
@@ -253,6 +253,14 @@ class UAMStateMachine(Node):
             self.get_logger().info('Bypassing position fix wait')
             self.transition_to_state(new_state=next_state)
 
+    def state_do_nothing(self, next_state='emergency'):
+        self.handle_state(state_number=1)
+        self.get_logger().info('[1] Doing nothing... Publish 1 to continue \n ros2 topic pub --once /md/input std_msgs/msg/Int32 "{data: 1}"', throttle_duration_sec=1)
+
+        # State transition
+        if self.input_state == 1:
+            self.transition_to_state(new_state=next_state)
+
     def state_wait_for_arming(self, next_state='emergency'):
         self.handle_state(state_number=3)
 
@@ -327,7 +335,7 @@ class UAMStateMachine(Node):
             self.hover_position[1] = self.vehicle_local_position.y
             self.hover_position[2] = self.vehicle_local_position.z
             self.hover_position[3] = self.vehicle_local_position.heading
-            self.get_logger().info(f'[5] Hovering at altitude: {self.home_position[2]} m for {duration_sec} seconds')
+            self.get_logger().info(f'[5] Hovering at altitude: {self.home_position[2]:.2f} m for {duration_sec} seconds')
             self.first_state_loop = False
 
         self.get_logger().info(f'Hovering... {(datetime.datetime.now()-self.state_start_time).seconds:.1f}/{duration_sec} sec', throttle_duration_sec=1)
@@ -338,7 +346,15 @@ class UAMStateMachine(Node):
         elif (datetime.datetime.now()-self.state_start_time).seconds > duration_sec or self.input_state==1:
             self.transition_to_state(new_state=next_state)
 
-    def state_move_arms(self, q: list, mode='position', next_state='emergency', epsilon=0.1):
+    """ Move the arms to the specified joint positions 'q' using either servo position or velocity control mode. Always goes to a specified position
+    using either servo position or servo velocity as the controlled variables.
+    Args:
+        q (list): Target joint positions for the arms.
+        mode (str, optional): Control mode, either 'position' or 'velocity'. Defaults to 'position'.
+        next_state (str, optional): Next state to transition to after completion. Defaults to 'emergency'.
+        epsilon (float, optional): Position error threshold for completion. Defaults to 0.1.
+    """
+    def state_move_arms(self, q: list, next_state='emergency', epsilon=0.1):
         self.handle_state(state_number=11)
         error = 0.0
         # First state loop
@@ -347,18 +363,19 @@ class UAMStateMachine(Node):
             self.hover_position[1] = self.vehicle_local_position.y
             self.hover_position[2] = self.vehicle_local_position.z
             self.hover_position[3] = self.vehicle_local_position.heading
-            self.get_logger().info(f'[11] Hovering at altitude: {self.home_position[2]} m while moving arms to states {q}')
+            self.get_logger().info(f'[11] Hovering at altitude: {self.home_position[2]:.2f} m while moving arms to states {q} in mode {self.manipulator_mode}')
             self.first_state_loop = False
         
-        if mode=='position': # If the servos are controlled in position mode
+        if self.manipulator_mode=='position': # If the servos are controlled in position mode
             self.publish_servo_position_references(q)
-        elif mode=='velocity': # If the servos are controlled in velocity mode
+        elif self.manipulator_mode=='velocity': # If the servos are controlled in velocity mode
             q_dot_cmd = []
             for i in range(len(q)):
                 qd = (self.kp*(q[i] - self.servo_state.position[i]) - self.kd*self.servo_state.velocity[i]) # Simple P controller to reach target position
                 q_dot_cmd.append(qd)
                 error += abs(q[i]-self.servo_state.position[i])
             error = np.sqrt(error)
+            # self.get_logger().info(f'Arm position error: {error:.4f} rad')
             if error > epsilon:
                 self.publish_servo_velocity_references(q_dot_cmd)
             else:
@@ -367,7 +384,7 @@ class UAMStateMachine(Node):
         # State transition
         if not self.offboard and self.fcu_on and self.flying:
             self.transition_to_state('emergency')
-        elif (error < epsilon) or self.input_state==1: # If error is small enough or input state is 1
+        elif (error < epsilon) or self.input_state == 1: # If error is small enough or input state is 1
             self.transition_to_state(new_state=next_state)
 
     def state_move_uam_to_position(self, target_position: list, next_state='emergency'):
@@ -392,15 +409,15 @@ class UAMStateMachine(Node):
         elif (error < 0.2) or self.input_state==1: # If error is small enough or input state is 1
             self.transition_to_state(new_state=next_state)
 
-    def state_emergency(self, mode = 'position'):
+    def state_emergency(self):
         self.handle_state(state_number=-1)
         self.get_logger().warn("EMERGENCY STATE! No offboard mode.", throttle_duration_sec=1)
         error = 0.0
         epsilon = 0.1
         q_emergency = [1.578, 0.0, -1.85]
-        if mode=='position': # If the servos are controlled in position mode
+        if self.manipulator_mode=='position': # If the servos are controlled in position mode
             self.publish_servo_position_references(q_emergency)
-        elif mode=='velocity': # If the servos are controlled in velocity mode
+        elif self.manipulator_mode=='velocity': # If the servos are controlled in velocity mode
             q_dot_cmd = []
             for i in range(len(q_emergency)):
                 qd = (self.kp*(q_emergency[i] - self.servo_state.position[i]) - self.kd*self.servo_state.velocity[i]) # Simple P controller to reach target position

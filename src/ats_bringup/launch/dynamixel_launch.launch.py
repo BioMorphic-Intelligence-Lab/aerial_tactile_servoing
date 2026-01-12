@@ -13,7 +13,7 @@ The package can be launched with 'ros2 launch ats_bringup dxl_example_config.lau
 
 logging = False
 log_path = '/ros2_ws/aerial_tactile_servoing/rosbags/'
-config_name = 'dxl_ros2_single.yaml'
+config_name = 'dxl_ros2_vbats.yaml'
 
 def generate_launch_description():
     ld = LaunchDescription()
@@ -28,6 +28,23 @@ def generate_launch_description():
         parameters=[param_file],
         arguments=["--ros-args", "--log-level", "info"]
     )
+    ld.add_action(servo_driver)
+
+    uam_test_md = Node(
+        package="mission_director",
+        executable="uam_control_test",
+        name="md_uam_control_test",
+        output="screen",
+        parameters=[
+            {'sm.frequency': 30.0},
+            {'sm.position_clip': 3.0},
+            {'sm.fcu_on': True},
+            {'sm.sim': False},
+            {'sm.platform_mode': 'position'}, # Mode in which the vehicle is to be controlled (i.e. what refs to send to FCU)
+            {'sm.manipulator_mode': 'velocity'} # Mode in which the servos are to be controlled (i.e. type of refs to send to the servo driver)
+        ]
+    )
+    ld.add_action(uam_test_md)
 
     if logging:
         rosbag_name = 'ros2bag_servo_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
@@ -37,7 +54,5 @@ def generate_launch_description():
             log_cmd=True,
         )
         ld.add_action(ros2bag)
-
-    ld.add_action(servo_driver)
     
     return ld

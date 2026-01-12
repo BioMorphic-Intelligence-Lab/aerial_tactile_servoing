@@ -38,7 +38,9 @@ def generate_launch_description():
             {'sm.frequency': 30.0},
             {'sm.position_clip': 3.0},
             {'sm.fcu_on': True},
-            {'sm.sim': False}
+            {'sm.sim': False},
+            {'sm.platform_mode': 'position'},
+            {'sm.manipulator_mode': 'position'},
         ],
         arguments=["--ros-args", "--log-level", "info"]
     )

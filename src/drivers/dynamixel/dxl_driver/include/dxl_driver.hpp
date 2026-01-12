@@ -140,7 +140,8 @@ private:
 
     bool write_home_position_at_current_position();
     bool write_torque_enable(int8_t torque_enable);
-    bool write_max_velocity(const uint8_t id);
+    bool write_profile_velocity(const uint8_t id);
+    bool write_velocity_limit(const uint8_t id);
 
     void check_parameter_sizes(size_t num_servos) const;
 

@@ -3,6 +3,7 @@ from rclpy.node import Node
 import numpy as np
 
 from geometry_msgs.msg import TwistStamped
+from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 from px4_msgs.msg import RcChannels # normalized values
 
 class ATSPlanner(Node):
@@ -36,6 +37,8 @@ class ATSPlanner(Node):
         # Parameters
         self.declare_parameter('frequency', 10.)
         self.declare_parameter('default_depth', 3.0) # default contact depth in mm
+        self.declare_parameter('verbose', True)
+        self.verbose = self.get_parameter('verbose').get_parameter_value().bool_value
 
         # Initialization log message
         self.get_logger().info("Planner node initialized")
@@ -43,7 +46,14 @@ class ATSPlanner(Node):
         # Publishers
         self.ee_velocity_publisher_ = self.create_publisher(TwistStamped, '/references/sensor_in_contact', 10)
 
-        self.sub_rc_channels = self.create_subscription(RcChannels, '/fmu/out/rc_channels', self.rc_callback, 10)
+        # Flight controller interfaces
+        px4_qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+        self.sub_rc_channels = self.create_subscription(RcChannels, '/fmu/out/rc_channels', self.rc_callback, px4_qos_profile)
         self.rc_input = RcChannels()
 
         self.reference_msg = TwistStamped()
@@ -67,12 +77,13 @@ class ATSPlanner(Node):
     def timer_callback(self):
         self.reference_msg.header.stamp = self.get_clock().now().to_msg()
         if self.enable_reference_manipulation:
-            self.reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value/1000. + (self.rc_input.channels[3])*0.005 # m
+            self.reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value/1000. + (self.rc_input.channels[0])*0.005 # m
             self.reference_msg.twist.angular.x = (self.rc_input.channels[2])*0.5 # rad
-            self.reference_msg.twist.angular.y = (self.rc_input.channels[0])*0.5 # rad
-            self.get_logger().info(f"Feeding RC to references: Depth: {(self.reference_msg.twist.linear.z*1000.):.3f} mm, "
-                                   f"Roll: {np.rad2deg(self.reference_msg.twist.angular.x):.3f} deg, "
-                                   f"Pitch: {np.rad2deg(self.reference_msg.twist.angular.y):.3f} deg", throttle_duration_sec=1.0)
+            self.reference_msg.twist.angular.y = (self.rc_input.channels[3])*0.5 # rad
+            if self.verbose:
+                self.get_logger().info(f"Feeding RC to references: Depth: {(self.reference_msg.twist.linear.z*1000.):.3f} mm, "
+                                    f"Pitch: {np.rad2deg(self.reference_msg.twist.angular.x):.3f} deg, "
+                                    f"Roll: {np.rad2deg(self.reference_msg.twist.angular.y):.3f} deg", throttle_duration_sec=1.0)
         else:
             self.reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value/1000. # m
             self.reference_msg.twist.angular.x = 0.0
