@@ -1,9 +1,8 @@
 import rclpy
 from rclpy.node import Node
-from math import pi
 import time
 import os
-import math
+
 import numpy as np
 from skimage.metrics import structural_similarity as ssim
 from scipy.spatial.transform import Rotation as R
@@ -87,8 +86,7 @@ class TactipDriver(Node):
     def timer_callback(self):
         # Fake data hijack
         if self.fake_data:
-            self.publish_zero_data()
-            # TODO set back to publish_fake_data
+            self.publish_fake_data()
             return
 
         # read the data
@@ -160,12 +158,12 @@ class TactipDriver(Node):
         # The model outputs are in mm and deg, so convert to SI
         msg = TwistStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.twist.linear.x = rot_pred_pose[0]
-        msg.twist.linear.y = rot_pred_pose[1]
-        msg.twist.linear.z = rot_pred_pose[2]
-        msg.twist.angular.x = rot_pred_pose[3] # deg2rad
-        msg.twist.angular.y = rot_pred_pose[4] # deg2rad
-        msg.twist.angular.z = rot_pred_pose[5] # deg2rad
+        msg.twist.linear.x = rot_pred_pose[0] # in mm
+        msg.twist.linear.y = rot_pred_pose[1] # in mm
+        msg.twist.linear.z = rot_pred_pose[2] # in mm
+        msg.twist.angular.x = rot_pred_pose[3] # in deg
+        msg.twist.angular.y = rot_pred_pose[4] # in deg
+        msg.twist.angular.z = rot_pred_pose[5] # in deg
         self.publisher_pose_.publish(msg)
         #self.get_logger().info(f"Published data: {msg}")
 
@@ -289,12 +287,12 @@ class TactipDriver(Node):
         msg = TwistStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
         t = time.time()
-        msg.twist.linear.x = 0.0
-        msg.twist.linear.y = 0.0
-        msg.twist.linear.z = 3*math.sin(0.5*t)
-        msg.twist.angular.x = np.deg2rad(15.*math.sin(0.4*t))
-        msg.twist.angular.y = np.deg2rad(15.*math.sin(0.6*t))
-        msg.twist.angular.z = np.deg2rad(15.*math.sin(0.8*t))
+        msg.twist.linear.x = 0.0 # in mm
+        msg.twist.linear.y = 0.0 # in mm
+        msg.twist.linear.z = 3.0 # in mm
+        msg.twist.angular.x = 0.0 # in deg
+        msg.twist.angular.y = 15.0 # in deg
+        msg.twist.angular.z = 0.0 # in deg
         self.publisher_pose_.publish(msg)
 
         ssim_score = 0.3
