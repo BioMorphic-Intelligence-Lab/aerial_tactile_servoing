@@ -29,15 +29,13 @@ class UAMStateMachine(Node):
         self.fcu_on = self.get_parameter('sm.fcu_on').get_parameter_value().bool_value
         self.declare_parameter('sm.sim', False)
         self.sim = self.get_parameter('sm.sim').get_parameter_value().bool_value
-        self.declare_parameter('sm.platform_mode', 'position')
-        self.platform_mode = self.get_parameter('sm.platform_mode').get_parameter_value().string_value
         self.declare_parameter('sm.manipulator_mode', 'position')
         self.manipulator_mode = self.get_parameter('sm.manipulator_mode').get_parameter_value().string_value
         if self.sim:
             self.fcu_on = False  # In sim, FCU is always off
 
         self.get_logger().info(f"StateMachine node '{node_name}' initialized with params: \n"
-                                f"frequency={self.frequency}, \n position_clip={self.position_clip}, \n fcu_on={self.fcu_on}, \n sim={self.sim}, \n platform_mode={self.platform_mode}, \n manipulator_mode={self.manipulator_mode}")
+                                f"frequency={self.frequency}, \n position_clip={self.position_clip}, \n fcu_on={self.fcu_on}, \n sim={self.sim}, \n manipulator_mode={self.manipulator_mode}")
 
         # State machine publishers and subscribers
         self.pub_sm_state = self.create_publisher(Int32, '/md/state', 10)

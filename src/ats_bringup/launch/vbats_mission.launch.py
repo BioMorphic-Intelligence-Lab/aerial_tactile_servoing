@@ -39,7 +39,6 @@ def generate_launch_description():
             {'sm.position_clip': 3.0},
             {'sm.fcu_on': True},
             {'sm.sim': False},
-            {'sm.platform_mode': 'position'},
             {'sm.manipulator_mode': 'velocity'}
         ],
         arguments=["--ros-args", "--log-level", "info"]
