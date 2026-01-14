@@ -354,7 +354,7 @@ class UAMStateMachine(Node):
         next_state (str, optional): Next state to transition to after completion. Defaults to 'emergency'.
         epsilon (float, optional): Position error threshold for completion. Defaults to 0.1.
     """
-    def state_move_arms(self, q: list, next_state='emergency', epsilon=0.1):
+    def state_move_arms(self, q: list, next_state='emergency', epsilon=0.2): # keep at 0.2 
         self.handle_state(state_number=11)
         error = 0.0
         # First state loop
@@ -376,7 +376,7 @@ class UAMStateMachine(Node):
                 error += abs(q[i]-self.servo_state.position[i])
             error = np.sqrt(error)
             # self.get_logger().info(f'Arm position error: {error:.4f} rad')
-            if error > epsilon:
+            if error >= epsilon:
                 self.publish_servo_velocity_references(q_dot_cmd)
             else:
                 self.publish_servo_velocity_references([0.0 for x in q])  # Stop the servos if within epsilon

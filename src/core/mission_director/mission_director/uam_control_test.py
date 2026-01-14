@@ -15,9 +15,6 @@ class MissionDirector(UAMStateMachine):
     def execute(self):
         match self.FSM_state:
             case "entrypoint":
-                self.state_entrypoint(next_state="wait")
-
-            case "wait":
                 self.state_do_nothing(next_state="move_arms")
 
             case "move_arms":

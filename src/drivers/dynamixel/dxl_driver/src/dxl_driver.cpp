@@ -241,9 +241,9 @@ void DXLDriver::write_goal_velocities()
             max_velocity = servodata_[i].max_velocity;
             goal_velocity = servodata_[i].goal_velocity;
         }
-        int32_t goal_vel_ticks = vel_rad2int(servodata_[i].id, std::max(-max_velocity, std::min(goal_velocity, max_velocity))); // Deal with negative velocities
-        RCLCPP_INFO(this->get_logger(), "[ID: %d] goal vel %f", servodata_[i].id, goal_velocity);
-        RCLCPP_INFO(this->get_logger(), "[ID: %d] goal vel ticks %i", servodata_[i].id, goal_vel_ticks);
+        int32_t goal_vel_ticks = vel_rad2int(servodata_[i].id, std::clamp(goal_velocity, -max_velocity, max_velocity)); // Deal with negative velocities
+        // RCLCPP_INFO(this->get_logger(), "[ID: %d] goal vel %f", servodata_[i].id, goal_velocity);
+        // RCLCPP_INFO(this->get_logger(), "[ID: %d] goal vel ticks %i", servodata_[i].id, goal_vel_ticks);
 
         param_goal_velocity[0] = DXL_LOBYTE(DXL_LOWORD(goal_vel_ticks));
         param_goal_velocity[1] = DXL_HIBYTE(DXL_LOWORD(goal_vel_ticks));
