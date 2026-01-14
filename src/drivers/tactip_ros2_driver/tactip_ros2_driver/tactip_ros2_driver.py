@@ -177,7 +177,7 @@ class TactipDriver(Node):
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = "present_sensor_frame"
-        t.child_frame_id = "present_contact_frame"
+        t.child_frame_id = "present_contact_frame_tactipdriver"
         t.transform.translation.x = float(translation_inv[0])
         t.transform.translation.y = float(translation_inv[1])
         t.transform.translation.z = float(translation_inv[2])
@@ -211,7 +211,7 @@ class TactipDriver(Node):
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = "present_sensor_frame"
-        t.child_frame_id = "present_contact_frame"
+        t.child_frame_id = "present_contact_frame_tactipdriver"
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
         t.transform.translation.z = 0.0
@@ -304,6 +304,20 @@ class TactipDriver(Node):
         msg_contact = Int8()
         msg_contact.data = contact
         self.publisher_contact_.publish(msg_contact)
+
+        # Broadcast the TF
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = "present_sensor_frame"
+        t.child_frame_id = "present_contact_frame_tactipdriver_fake"
+        t.transform.translation.x = 0.0
+        t.transform.translation.y = 0.0
+        t.transform.translation.z = 0.0
+        t.transform.rotation.x = 0.0
+        t.transform.rotation.y = 0.0
+        t.transform.rotation.z = 0.0
+        t.transform.rotation.w = 1.0
+        self.broadcaster_tf.sendTransform(t)
 
 def main(args=None):
     rclpy.init(args=args)

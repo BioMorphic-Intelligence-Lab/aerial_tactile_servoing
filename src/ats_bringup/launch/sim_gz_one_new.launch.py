@@ -62,7 +62,8 @@ def generate_launch_description():
             {'sm.frequency': 100.0},
             {'sm.position_clip': 3.0},
             {'sm.fcu_on': False},
-            {'sm.sim': True}
+            {'sm.sim': True},
+            {'sm.manipulator_mode': 'velocity'},
         ],
         arguments=["--ros-args", "--log-level", "info"]
     )
@@ -83,7 +84,7 @@ def generate_launch_description():
             {'ssim_contact_threshold': 0.65},
             {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},
             {'zero_when_no_contact': True},
-            {'fake_data': True}
+            {'fake_data': False}
         ],
         arguments=['--ros-args', '--log-level', 'info']
     )
