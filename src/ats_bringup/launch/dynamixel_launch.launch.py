@@ -30,21 +30,21 @@ def generate_launch_description():
     )
     ld.add_action(servo_driver)
 
-    uam_test_md = Node(
-        package="mission_director",
-        executable="uam_control_test",
-        name="md_uam_control_test",
-        output="screen",
-        parameters=[
-            {'sm.frequency': 100.0},
-            {'sm.position_clip': 3.0},
-            {'sm.fcu_on': True},
-            {'sm.sim': False},
-            {'sm.platform_mode': 'position'}, # Mode in which the vehicle is to be controlled (i.e. what refs to send to FCU)
-            {'sm.manipulator_mode': 'velocity'} # Mode in which the servos are to be controlled (i.e. type of refs to send to the servo driver)
-        ]
-    )
-    ld.add_action(uam_test_md)
+    # uam_test_md = Node(
+    #     package="mission_director",
+    #     executable="uam_control_test",
+    #     name="md_uam_control_test",
+    #     output="screen",
+    #     parameters=[
+    #         {'sm.frequency': 100.0},
+    #         {'sm.position_clip': 3.0},
+    #         {'sm.fcu_on': True},
+    #         {'sm.sim': False},
+    #         {'sm.platform_mode': 'position'}, # Mode in which the vehicle is to be controlled (i.e. what refs to send to FCU)
+    #         {'sm.manipulator_mode': 'velocity'} # Mode in which the servos are to be controlled (i.e. type of refs to send to the servo driver)
+    #     ]
+    # )
+    # ld.add_action(uam_test_md)
 
     if logging:
         rosbag_name = 'ros2bag_servo_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')

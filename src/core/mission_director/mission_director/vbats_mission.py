@@ -60,31 +60,10 @@ class MissionDirector(UAMStateMachine):
                 self.state_move_arms(q_des=q_right, next_state="approach") # TODO Fix for flight test
 
             case "approach": # Better way is to command a negative z velocity on the end-effector and run it through the inverse kinematics
-                self.handle_state(state_number=21)
-                approach_speed = 0.05  # m/s
-
-                # First state loop
-                if self.first_state_loop:
-                    self.get_logger().info(f'[21] Approaching contact surface at {approach_speed} m/s')
-                    self.first_state_loop = False
-                
-                # Update position setpoint
-                self.get_logger().info(f'Approaching... : {self.vehicle_odometry.velocity[1]:.3f}/{approach_speed} m/s, {self.vehicle_odometry.position[1]:.2f}/{self.position_clip} m', throttle_duration_sec=1)
-                self.publish_trajectory_velocity_setpoint(
-                    0.0,
-                    approach_speed,
-                    0.0,
-                    0.0
-                )
-
-                # State transition
-                if not self.offboard and self.fcu_on:
-                    self.transition_to_state('emergency')
-                elif self.contact or self.input_state==1:
-                    self.transition_to_state(new_state="tactile_servoing")
+                self.state_approach_wall_position(approach_speed=0.05, transition=self.contact, next_state="tactile_servoing")
             
             case "tactile_servoing":
-                self.handle_state(state_number=22)
+                self.handle_state(state_number=30)
                 if not self.contact:
                     self.ts_no_contact_counter += 1
                     self.get_logger().info(f'No contact detected. Counter: {self.ts_no_contact_counter}/{self.ts_no_contact_max_cycles}', throttle_duration_sec=1)

@@ -408,6 +408,63 @@ class UAMStateMachine(Node):
         elif (error < 0.2) or self.input_state==1: # If error is small enough or input state is 1
             self.transition_to_state(new_state=next_state)
 
+    """ Approach a wall using position control mode until a transition condition is met.
+    Args:
+        approach_speed (float): Speed at which to approach the wall (m/s). Applied on world Y-axis.
+        transition (bool): Condition to trigger state transition. Defaults to False.
+        next_state (str, optional): Next state to transition to after completion. Defaults to 'emergency'.
+    """
+    def state_approach_wall_position(self, approach_speed: float, transition: bool=False, next_state='emergency'):
+                self.handle_state(state_number=21)
+
+                # First state loop
+                if self.first_state_loop:
+                    self.running_position[0] = self.vehicle_local_position.x
+                    self.running_position[1] = self.vehicle_local_position.y
+                    self.running_position[2] = self.vehicle_local_position.z
+                    self.running_position[3] = self.vehicle_local_position.heading
+                    self.get_logger().info(f'[21] Approaching contact surface at {approach_speed} m/s')
+                    self.first_state_loop = False
+                
+                # Update position setpoint
+                self.running_position[1] += approach_speed / self.frequency  # Increase y at approach
+                self.get_logger().info(f'Approaching... Y setpoint: {self.running_position[1]} m', throttle_duration_sec=1)
+                self.publish_trajectory_position_setpoint(
+                    self.running_position[0],
+                    self.running_position[1],
+                    self.running_position[2],
+                    self.running_position[3]
+                )
+
+                # State transition
+                if not self.offboard and self.fcu_on:
+                    self.transition_to_state('emergency')
+                elif transition or self.input_state==1:
+                    self.transition_to_state(new_state=next_state)
+
+    def state_approach_wall_velocity(self, approach_speed: float, transition: bool=False, next_state='emergency'): # Better way is to command a negative z velocity on the end-effector and run it through the inverse kinematics
+        self.handle_state(state_number=22)
+
+        # First state loop
+        if self.first_state_loop:
+            self.get_logger().info(f'[22] Approaching contact surface at {approach_speed} (world Y-axis) m/s')
+            self.first_state_loop = False
+        
+        # Update position setpoint
+        self.get_logger().info(f'Approaching... : {self.vehicle_odometry.velocity[1]:.3f}/{approach_speed} m/s, {self.vehicle_odometry.position[1]:.2f}/{self.position_clip} m', throttle_duration_sec=1)
+        self.publish_trajectory_velocity_setpoint(
+            0.0,
+            approach_speed,
+            0.0,
+            0.0
+        )
+
+        # State transition
+        if not self.offboard and self.fcu_on:
+            self.transition_to_state('emergency')
+        elif transition or self.input_state==1:
+            self.transition_to_state(new_state=next_state)
+
     def state_emergency(self):
         self.handle_state(state_number=-1)
         self.get_logger().warn("EMERGENCY STATE! No offboard mode.", throttle_duration_sec=1)
