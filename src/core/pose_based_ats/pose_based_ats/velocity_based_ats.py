@@ -47,8 +47,8 @@ class VelocityBasedATS(Node):
         self.publisher_drone_ref = self.create_publisher(TrajectorySetpoint, '/controller/out/trajectory_setpoint', 10)
 
         # Publishers (for logging and debugging of IK)
-        self.publisher_ki_error = self.create_publisher(Float64, '/controller/optimizer/ki_error', 10)
-        self.publisher_regularization = self.create_publisher(Float64, '/controller/optimizer/regularization', 10)
+        self.pub_u_s = self.create_publisher(TwistStamped, '/controller/log/us', 10)
+        self.pub_u_ss = self.create_publisher(TwistStamped, '/controller/log/uss', 10)
 
         # Broadcasters
         self.broadcaster_tf2 = TransformBroadcaster(self)
@@ -121,10 +121,12 @@ class VelocityBasedATS(Node):
             self.integrator = 0.
 
         u_ss = -self.Kp@e_sr - np.clip(self.integrator,-self.windup, self.windup) # u_ss is in sensor frame, transform to inertial frame
+        self.publish_twist(u_ss, self.pub_u_ss) # Publish u_ss for logging
 
         # Rotate u_ss from sensor frame to inertial frame
         R_S = self.evaluate_P_S(state)[0:3, 0:3]
         u_s = np.concatenate((R_S @ u_ss[0:3], R_S @ u_ss[3:]), axis=0)
+        self.publish_twist(u_s, self.pub_u_s) # Publish u_s for log
 
         q_secondary = np.zeros(7) 
         # TODO: Add secondary objective following
@@ -500,6 +502,17 @@ class VelocityBasedATS(Node):
         t.transform.rotation.w = quat[3]
 
         self.broadcaster_tf2.sendTransform(t)
+
+    def publish_twist(self, vec:np.array, publisher):
+        msg = TwistStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.twist.linear.x = vec[0]
+        msg.twist.linear.y = vec[1]
+        msg.twist.linear.z = vec[2]
+        msg.twist.angular.x = vec[3]
+        msg.twist.angular.y = vec[4]
+        msg.twist.angular.z = vec[5]
+        publisher.publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)

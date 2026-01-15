@@ -44,7 +44,7 @@ class MissionDirector(UAMStateMachine):
 
             case "arms_takeoff_position":
                 q_right = [np.pi/2, 0.0, -np.pi/2] # put some position here
-                self.state_move_arms(q=q_right, next_state="wait_for_arm_offboard")
+                self.state_move_arms(q_des=q_right, next_state="wait_for_arm_offboard")
 
             case "wait_for_arm_offboard":
                 self.state_wait_for_arming(next_state="takeoff")
@@ -53,14 +53,11 @@ class MissionDirector(UAMStateMachine):
                 self.state_takeoff(target_altitude=1.7, next_state="hover")
 
             case "hover":
-                self.state_hover(duration_sec=1, next_state="pre_contact_uam_position")
-
-            case "pre_contact_uam_position":
-                self.state_move_uam_to_position([0.0, 0.7, -1.7, 0.0], next_state="pre_contact_arm_position")
+                self.state_hover(duration_sec=1, next_state="pre_contact_arm_position")
 
             case "pre_contact_arm_position":
                 q_right = [np.pi/3, 0.0, np.pi/6] # put some position here
-                self.state_move_arms(q=q_right, next_state="tactile_servoing") # TODO Fix for flight test
+                self.state_move_arms(q_des=q_right, next_state="approach") # TODO Fix for flight test
 
             case "approach": # Better way is to command a negative z velocity on the end-effector and run it through the inverse kinematics
                 self.handle_state(state_number=21)
@@ -123,7 +120,7 @@ class MissionDirector(UAMStateMachine):
 
             case "land_arms_position":
                 q_right = [1.57, 0.0, -1.57] # put some position here
-                self.state_move_arms(q=q_right, next_state="land")
+                self.state_move_arms(q_des=q_right, next_state="land")
 
             case "land":
                 self.state_land(next_state="done")

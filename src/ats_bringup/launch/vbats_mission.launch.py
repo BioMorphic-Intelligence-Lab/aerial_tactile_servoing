@@ -51,7 +51,7 @@ def generate_launch_description():
         name='tactip_driver',
         output='screen',
         parameters=[
-            {'source': 4},
+            {'source': 0},
             {'frequency': 15.},
             {'dimension': 5},
             {'verbose': False},
@@ -73,8 +73,8 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'Kp_linear': 50.0},
-            {'Kp_angular': 0.3},
+            {'Kp_linear': 25.0},
+            {'Kp_angular': 0.5},
             {'Ki_linear': 0.2},
             {'Ki_angular': 0.01},
             {'windup_clip': 0.1},
@@ -99,7 +99,7 @@ def generate_launch_description():
     ld.add_action(planner)
 
     if logging:
-        rosbag_name = 'ros2bag_ats_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        rosbag_name = 'vbats_ros2bag_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         ros2bag = ExecuteProcess(
             cmd=['ros2', 'bag', 'record', '-o', log_path+rosbag_name, '-a'], 
             output='screen', 

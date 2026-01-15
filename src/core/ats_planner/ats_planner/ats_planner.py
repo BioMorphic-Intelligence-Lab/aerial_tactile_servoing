@@ -66,6 +66,7 @@ class ATSPlanner(Node):
 
         # Class data
         self.enable_reference_manipulation = False
+        self.offboard = False
 
         # Timer
         self.period = 1.0/float(self.get_parameter('frequency').get_parameter_value().double_value) # seconds
@@ -76,7 +77,7 @@ class ATSPlanner(Node):
     '''
     def timer_callback(self):
         self.reference_msg.header.stamp = self.get_clock().now().to_msg()
-        if self.enable_reference_manipulation:
+        if self.enable_reference_manipulation and self.offboard: # If the right blue switch is on and we are in offboard mode
             self.reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value/1000. + (self.rc_input.channels[0])*0.005 # m
             self.reference_msg.twist.angular.x = (self.rc_input.channels[2])*0.5 # rad
             self.reference_msg.twist.angular.y = (self.rc_input.channels[3])*0.5 # rad
@@ -96,6 +97,11 @@ class ATSPlanner(Node):
             self.enable_reference_manipulation = True
         elif msg.channels[10] < -0.5: # If right blue switch is off -> away from you
             self.enable_reference_manipulation = False
+        
+        if msg.channels[7] > 0.5: # If right white switch is on -> offboard
+            self.offboard = True
+        elif msg.channels[7] < -0.5: # If right white switch is off -> manual
+            self.offboard = False
 
 def main(args=None):
     rclpy.init(args=args)

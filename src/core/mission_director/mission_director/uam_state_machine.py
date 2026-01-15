@@ -244,7 +244,7 @@ class UAMStateMachine(Node):
             self.first_state_loop = False
 
         # State transition
-        if (self.home_position[0] != 0.0 and self.home_position[1] != 0.0):
+        if (self.home_position[0] != 0.0 and self.home_position[1] != 0.0 and len(self.servo_state.position)>0):
             self.get_logger().info(f'Got position fix! \t x: {self.home_position[0]:.3f} [m] \t y: {self.home_position[1]:.3f} [m] \t {np.rad2deg(self.home_position[3]):.2f} [deg]')
             self.transition_to_state(new_state=next_state)
         elif self.input_state == 1:
@@ -352,7 +352,7 @@ class UAMStateMachine(Node):
         next_state (str, optional): Next state to transition to after completion. Defaults to 'emergency'.
         epsilon (float, optional): Position error threshold for completion. Defaults to 0.1.
     """
-    def state_move_arms(self, q: list, next_state='emergency', epsilon=0.2): # keep at 0.2 
+    def state_move_arms(self, q_des: list, next_state='emergency', epsilon=0.2): # keep at 0.2 
         self.handle_state(state_number=11)
         error = 0.0
         # First state loop
@@ -361,23 +361,24 @@ class UAMStateMachine(Node):
             self.hover_position[1] = self.vehicle_local_position.y
             self.hover_position[2] = self.vehicle_local_position.z
             self.hover_position[3] = self.vehicle_local_position.heading
-            self.get_logger().info(f'[11] Hovering at altitude: {self.home_position[2]:.2f} m while moving arms to states {q} in mode {self.manipulator_mode}')
+            self.get_logger().info(f'[11] Hovering at altitude: {self.home_position[2]:.2f} m while moving arms to states {q_des} in mode {self.manipulator_mode}')
             self.first_state_loop = False
         
         if self.manipulator_mode=='position': # If the servos are controlled in position mode
-            self.publish_servo_position_references(q)
+            self.publish_servo_position_references(q_des)
         elif self.manipulator_mode=='velocity': # If the servos are controlled in velocity mode
             q_dot_cmd = []
-            for i in range(len(q)):
-                qd = (self.kp*(q[i] - self.servo_state.position[i]) - self.kd*self.servo_state.velocity[i]) # Simple P controller to reach target position
+            for i in range(len(q_des)):
+                qd = (self.kp*(q_des[i] - self.servo_state.position[i]) - self.kd*self.servo_state.velocity[i]) # Simple P controller to reach target position
                 q_dot_cmd.append(qd)
-                error += abs(q[i]-self.servo_state.position[i])
+                error += abs(q_des[i]-self.servo_state.position[i])
+            # self.get_logger().info(f"q_des: {q_des}, q_current: {self.servo_state.position}, qd_cmd: {q_dot_cmd}", throttle_duration_sec=1)
             error = np.sqrt(error)
             # self.get_logger().info(f'Arm position error: {error:.4f} rad')
             if error >= epsilon:
                 self.publish_servo_velocity_references(q_dot_cmd)
             else:
-                self.publish_servo_velocity_references([0.0 for x in q])  # Stop the servos if within epsilon
+                self.publish_servo_velocity_references([0.0 for x in q_des])  # Stop the servos if within epsilon
 
         # State transition
         if not self.offboard and self.fcu_on and self.flying:
