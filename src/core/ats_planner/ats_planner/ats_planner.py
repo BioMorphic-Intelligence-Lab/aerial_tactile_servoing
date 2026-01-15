@@ -78,15 +78,15 @@ class ATSPlanner(Node):
     def timer_callback(self):
         self.reference_msg.header.stamp = self.get_clock().now().to_msg()
         if self.enable_reference_manipulation and self.offboard: # If the right blue switch is on and we are in offboard mode
-            self.reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value/1000. + (self.rc_input.channels[0])*0.005 # m
-            self.reference_msg.twist.angular.x = (self.rc_input.channels[2])*0.5 # rad
-            self.reference_msg.twist.angular.y = (self.rc_input.channels[3])*0.5 # rad
+            self.reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value + (self.rc_input.channels[0])*5. # mm
+            self.reference_msg.twist.angular.x = (self.rc_input.channels[2])*25. # deg
+            self.reference_msg.twist.angular.y = (self.rc_input.channels[3])*25. # deg
             if self.verbose:
-                self.get_logger().info(f"Feeding RC to references: Depth: {(self.reference_msg.twist.linear.z*1000.):.3f} mm, "
-                                    f"Pitch: {np.rad2deg(self.reference_msg.twist.angular.x):.3f} deg, "
-                                    f"Roll: {np.rad2deg(self.reference_msg.twist.angular.y):.3f} deg", throttle_duration_sec=1.0)
+                self.get_logger().info(f"Feeding RC to references: Depth: {(self.reference_msg.twist.linear.z):.3f} mm, "
+                                    f"Pitch: {self.reference_msg.twist.angular.x:.2f} deg, "
+                                    f"Roll: {self.reference_msg.twist.angular.y:.2f} deg", throttle_duration_sec=1.0)
         else:
-            self.reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value/1000. # m
+            self.reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value # mm
             self.reference_msg.twist.angular.x = 0.0
             self.reference_msg.twist.angular.y = 0.0
         self.ee_velocity_publisher_.publish(self.reference_msg)

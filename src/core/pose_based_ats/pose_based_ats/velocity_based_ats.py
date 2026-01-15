@@ -137,7 +137,6 @@ class VelocityBasedATS(Node):
             np.array([self.vehicle_odometry.angular_velocity[0], self.vehicle_odometry.angular_velocity[1], self.vehicle_odometry.angular_velocity[2]])
 
         # Inverse kinematics - controlled states [x, y, z, yaw, q1, q2, q3]
-        # CONTINUE HERE WITH BUGFIXING!!!!!!!!
         controlled_state_reference = J_controlled_pinv @ u_s - \
             J_controlled_pinv @ J_uncontrolled @ np.array([euler_rate_inertial[0], euler_rate_inertial[1]]) \
             + J_null @ q_secondary # Secondary objective velocities
@@ -169,9 +168,11 @@ class VelocityBasedATS(Node):
 
     def callback_reference(self, msg):
         self.P_Cref = self.evaluate_P_CS(
-            np.deg2rad(msg.twist.angular.x),
-            np.deg2rad(msg.twist.angular.y),
-            msg.twist.linear.z)
+            np.deg2rad(msg.twist.angular.x), # received in deg
+            np.deg2rad(msg.twist.angular.y), # received in deg
+            msg.twist.linear.z/1000.) # received in mm # TODO Invert to publish transform (sensor in contact to contact in sensor frames)
+    
+        
 
     def callback_tactip_contact(self, msg):
         self.contact = msg.data
