@@ -49,6 +49,8 @@ class VelocityBasedATS(Node):
         # Publishers (for logging and debugging of IK)
         self.pub_u_s = self.create_publisher(TwistStamped, '/controller/log/us', 10)
         self.pub_u_ss = self.create_publisher(TwistStamped, '/controller/log/uss', 10)
+        self.pub_proportional = self.create_publisher(TwistStamped, '/controller/log/proportional', 10)
+        self.pub_integrator = self.create_publisher(TwistStamped, '/controller/log/integrator', 10)
 
         # Broadcasters
         self.broadcaster_tf2 = TransformBroadcaster(self)
@@ -122,14 +124,19 @@ class VelocityBasedATS(Node):
 
         u_ss = -self.Kp@e_sr - np.clip(self.integrator,-self.windup, self.windup) # u_ss is in sensor frame, transform to inertial frame
         self.publish_twist(u_ss, self.pub_u_ss) # Publish u_ss for logging
+        self.publish_twist(-self.Kp@e_sr, self.pub_proportional) # Publish proportional term for logging
+        self.publish_twist(-np.clip(self.integrator, -self.windup, self.windup), self.pub_integrator) # Publish integrator for logging
 
         # Rotate u_ss from sensor frame to inertial frame
         R_S = self.evaluate_P_S(state)[0:3, 0:3]
         u_s = np.concatenate((R_S @ u_ss[0:3], R_S @ u_ss[3:]), axis=0)
         self.publish_twist(u_s, self.pub_u_s) # Publish u_s for log
 
+        # Secondary objective: move servos to nominal position and away from the singularity
         q_secondary = np.zeros(7) 
-        # TODO: Add secondary objective following
+        q_secondary[4] = self.nominal_state[6] - state[6]  # q1 nominal position
+        q_secondary[5] = self.nominal_state[7] - state[7]  # q2 nominal position
+        q_secondary[6] = self.nominal_state[8] - state[8]  # q3 nominal position
 
         # Transform angular velocity from FCU to euler angle rates
         euler_rate_inertial = self.T_euler_rate_to_angular_velocity_inv(state[4], state[5]) @ \

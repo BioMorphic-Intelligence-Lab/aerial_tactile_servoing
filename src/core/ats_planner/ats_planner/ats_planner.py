@@ -2,6 +2,7 @@ import rclpy
 from rclpy.node import Node
 import numpy as np
 
+from std_msgs.msg import Int32
 from geometry_msgs.msg import TwistStamped
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 from px4_msgs.msg import RcChannels # normalized values
@@ -43,6 +44,9 @@ class ATSPlanner(Node):
         # Initialization log message
         self.get_logger().info("Planner node initialized")
 
+        # MD sub
+        self.sub_md = self.create_subscription(Int32, '/md/state', self.md_callback, 10)
+
         # Publishers
         self.ee_velocity_publisher_ = self.create_publisher(TwistStamped, '/references/sensor_in_contact', 10)
 
@@ -67,6 +71,8 @@ class ATSPlanner(Node):
         # Class data
         self.enable_reference_manipulation = False
         self.offboard = False
+        self.tactile_servoing_active = False
+        self.ts_time_elapsed = 0.0
 
         # Timer
         self.period = 1.0/float(self.get_parameter('frequency').get_parameter_value().double_value) # seconds
@@ -77,18 +83,42 @@ class ATSPlanner(Node):
     '''
     def timer_callback(self):
         self.reference_msg.header.stamp = self.get_clock().now().to_msg()
+        # Clean message
+        reference_msg = TwistStamped()
+
         if self.enable_reference_manipulation and self.offboard: # If the right blue switch is on and we are in offboard mode
-            self.reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value + (self.rc_input.channels[0])*5. # mm
-            self.reference_msg.twist.angular.x = (self.rc_input.channels[2])*25. # deg
-            self.reference_msg.twist.angular.y = (self.rc_input.channels[3])*25. # deg
+            reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value + (self.rc_input.channels[0])*5. # mm
+            reference_msg.twist.angular.x = (self.rc_input.channels[2])*25. # deg
+            reference_msg.twist.angular.y = (self.rc_input.channels[3])*25. # deg
             if self.verbose:
-                self.get_logger().info(f"Feeding RC to references: Depth: {(self.reference_msg.twist.linear.z):.3f} mm, "
-                                    f"Pitch: {self.reference_msg.twist.angular.x:.2f} deg, "
-                                    f"Roll: {self.reference_msg.twist.angular.y:.2f} deg", throttle_duration_sec=1.0)
+                self.get_logger().info(f"Feeding RC to references: Depth: {(reference_msg.twist.linear.z):.3f} mm, "
+                                    f"Pitch: {reference_msg.twist.angular.x:.2f} deg, "
+                                    f"Roll: {reference_msg.twist.angular.y:.2f} deg", throttle_duration_sec=1.0)
         else:
-            self.reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value # mm
-            self.reference_msg.twist.angular.x = 0.0
-            self.reference_msg.twist.angular.y = 0.0
+            reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value # mm
+            reference_msg.twist.angular.x = 0.0
+            reference_msg.twist.angular.y = 0.0
+
+        # Modify the reference msg with time-based references
+        if self.tactile_servoing_active:
+            self.ts_time_elapsed += self.period
+            if self.ts_time_elapsed > 30.0 and self.ts_time_elapsed < 60.0:
+                self.get_logger().info(f"Changing x angular reference to 15 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds")
+                reference_msg.twist.angular.x += 15.0 # deg
+                np.clip(reference_msg.twist.angular, -25.0, 25.0, out=reference_msg.twist.angular)
+            elif self.ts_time_elapsed >= 60.0 and self.ts_time_elapsed < 90.0:
+                self.get_logger().info(f"Changing y angular reference to 15 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds")
+                reference_msg.twist.angular.x += 15.0 # deg
+                reference_msg.twist.angular.y += 15.0 # deg
+            elif self.ts_time_elapsed >= 90.0:
+                self.get_logger().info(f"Returning angular references to 0 deg after {self.ts_time_elapsed:.1f} seconds")
+                reference_msg.twist.angular.x = 0.0
+                reference_msg.twist.angular.y = 0.0
+                self.ts_time_elapsed = 0.0
+        
+        np.clip(reference_msg.twist.linear, -8.0, 8.0, out=reference_msg.twist.linear)
+        np.clip(reference_msg.twist.angular, -25.0, 25.0, out=reference_msg.twist.angular)
+
         self.ee_velocity_publisher_.publish(self.reference_msg)
 
     def rc_callback(self, msg):
@@ -102,6 +132,13 @@ class ATSPlanner(Node):
             self.offboard = True
         elif msg.channels[7] < -0.5: # If right white switch is off -> manual
             self.offboard = False
+
+    def md_callback(self, msg):
+        if msg.data == 30: # If in MD state tactile_servoing
+            self.tactile_servoing_active = True
+        else:
+            self.tactile_servoing_active = False
+            self.ts_time_elapsed = 0.0
 
 def main(args=None):
     rclpy.init(args=args)
