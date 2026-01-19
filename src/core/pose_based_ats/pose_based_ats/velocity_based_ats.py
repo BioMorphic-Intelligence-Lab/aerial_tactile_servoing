@@ -120,7 +120,7 @@ class VelocityBasedATS(Node):
         if self.accumulate_integrator: # If contact, accumulate integrator
             self.integrator += self.Ki @ e_sr
         else: # If not contact, reset integrator    
-            self.integrator = 0.
+            self.integrator = np.zeros(6)
 
         u_ss = -self.Kp@e_sr - np.clip(self.integrator,-self.windup, self.windup) # u_ss is in sensor frame, transform to inertial frame
         self.publish_twist(u_ss, self.pub_u_ss) # Publish u_ss for logging
@@ -178,8 +178,6 @@ class VelocityBasedATS(Node):
             np.deg2rad(msg.twist.angular.x), # received in deg
             np.deg2rad(msg.twist.angular.y), # received in deg
             msg.twist.linear.z/1000.) # received in mm # TODO Invert to publish transform (sensor in contact to contact in sensor frames)
-    
-        
 
     def callback_tactip_contact(self, msg):
         self.contact = msg.data

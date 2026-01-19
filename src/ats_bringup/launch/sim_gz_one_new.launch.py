@@ -84,7 +84,7 @@ def generate_launch_description():
             {'ssim_contact_threshold': 0.65},
             {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},
             {'zero_when_no_contact': True},
-            {'fake_data': False}
+            {'fake_data': True}
         ],
         arguments=['--ros-args', '--log-level', 'info']
     )
@@ -117,7 +117,9 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'default_depth': 3.0} # default contact depth in mm
+            {'default_depth': 3.0}, # default contact depth in mm
+            {'varying_refs': False},
+            {'verbose': True}
         ],
         arguments=['--ros-args', '--log-level', 'info']
     )

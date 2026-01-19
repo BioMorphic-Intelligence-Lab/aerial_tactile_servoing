@@ -38,6 +38,7 @@ class ATSPlanner(Node):
         # Parameters
         self.declare_parameter('frequency', 10.)
         self.declare_parameter('default_depth', 3.0) # default contact depth in mm
+        self.declare_parameter('varying_refs', False) # RC channel for depth manipulation   
         self.declare_parameter('verbose', True)
         self.verbose = self.get_parameter('verbose').get_parameter_value().bool_value
 
@@ -60,14 +61,6 @@ class ATSPlanner(Node):
         self.sub_rc_channels = self.create_subscription(RcChannels, '/fmu/out/rc_channels', self.rc_callback, px4_qos_profile)
         self.rc_input = RcChannels()
 
-        self.reference_msg = TwistStamped()
-        self.reference_msg.twist.linear.x = 0.0
-        self.reference_msg.twist.linear.y = 0.0
-        self.reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value/1000. # m
-        self.reference_msg.twist.angular.x = 0.0
-        self.reference_msg.twist.angular.y = 0.0
-        self.reference_msg.twist.angular.z = 0.0
-
         # Class data
         self.enable_reference_manipulation = False
         self.offboard = False
@@ -82,9 +75,9 @@ class ATSPlanner(Node):
     Publish the reference end effector velocity
     '''
     def timer_callback(self):
-        self.reference_msg.header.stamp = self.get_clock().now().to_msg()
         # Clean message
         reference_msg = TwistStamped()
+        reference_msg.header.stamp = self.get_clock().now().to_msg()
 
         if self.enable_reference_manipulation and self.offboard: # If the right blue switch is on and we are in offboard mode
             reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value + (self.rc_input.channels[0])*5. # mm
@@ -100,26 +93,29 @@ class ATSPlanner(Node):
             reference_msg.twist.angular.y = 0.0
 
         # Modify the reference msg with time-based references
-        if self.tactile_servoing_active:
+        if self.tactile_servoing_active and self.get_parameter('varying_refs').get_parameter_value().bool_value:
             self.ts_time_elapsed += self.period
             if self.ts_time_elapsed > 30.0 and self.ts_time_elapsed < 60.0:
-                self.get_logger().info(f"Changing x angular reference to 15 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds")
+                self.get_logger().info(f"Changing x angular reference to 15 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
                 reference_msg.twist.angular.x += 15.0 # deg
-                np.clip(reference_msg.twist.angular, -25.0, 25.0, out=reference_msg.twist.angular)
             elif self.ts_time_elapsed >= 60.0 and self.ts_time_elapsed < 90.0:
-                self.get_logger().info(f"Changing y angular reference to 15 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds")
+                self.get_logger().info(f"Changing y angular reference to 15 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
                 reference_msg.twist.angular.x += 15.0 # deg
                 reference_msg.twist.angular.y += 15.0 # deg
             elif self.ts_time_elapsed >= 90.0:
-                self.get_logger().info(f"Returning angular references to 0 deg after {self.ts_time_elapsed:.1f} seconds")
+                self.get_logger().info(f"Returning angular references to 0 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
                 reference_msg.twist.angular.x = 0.0
                 reference_msg.twist.angular.y = 0.0
                 self.ts_time_elapsed = 0.0
         
-        np.clip(reference_msg.twist.linear, -8.0, 8.0, out=reference_msg.twist.linear)
-        np.clip(reference_msg.twist.angular, -25.0, 25.0, out=reference_msg.twist.angular)
-
-        self.ee_velocity_publisher_.publish(self.reference_msg)
+        
+        reference_msg.twist.linear.x = np.clip(reference_msg.twist.linear.x, -5.0, 5.0)
+        reference_msg.twist.linear.y = np.clip(reference_msg.twist.linear.y, -5.0, 5.0)
+        reference_msg.twist.linear.z = np.clip(reference_msg.twist.linear.z, -8.0, 8.0)
+        reference_msg.twist.angular.x = np.clip(reference_msg.twist.angular.x, -25.0, 25.0)
+        reference_msg.twist.angular.y = np.clip(reference_msg.twist.angular.y, -25.0, 25.0)
+        reference_msg.twist.angular.z = np.clip(reference_msg.twist.angular.z, -25.0, 25.0)
+        self.ee_velocity_publisher_.publish(reference_msg)
 
     def rc_callback(self, msg):
         self.rc_input = msg
