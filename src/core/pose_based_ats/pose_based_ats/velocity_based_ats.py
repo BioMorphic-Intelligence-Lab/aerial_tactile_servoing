@@ -177,7 +177,9 @@ class VelocityBasedATS(Node):
         self.P_Cref = self.evaluate_P_CS(
             np.deg2rad(msg.twist.angular.x), # received in deg
             np.deg2rad(msg.twist.angular.y), # received in deg
-            msg.twist.linear.z/1000.) # received in mm # TODO Invert to publish transform (sensor in contact to contact in sensor frames)
+            msg.twist.linear.z/1000.) # received in mm 
+            
+        # TODO Invert to publish transform (sensor in contact to contact in sensor frames)
 
     def callback_tactip_contact(self, msg):
         self.contact = msg.data
