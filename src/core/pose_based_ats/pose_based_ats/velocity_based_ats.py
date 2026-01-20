@@ -183,6 +183,7 @@ class VelocityBasedATS(Node):
 
     def callback_tactip_contact(self, msg):
         self.contact = msg.data
+        self.accumulate_integrator = bool(msg.data)
 
     def callback_servo_feedback(self, msg):
         self.servo_state = msg
