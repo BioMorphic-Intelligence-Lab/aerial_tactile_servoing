@@ -439,7 +439,7 @@ bool DXLDriver::write_profile_velocity(const uint8_t id)
     }
     else
     {
-        RCLCPP_ERROR(this->get_logger(), "[ID: %i] Failed to set max velocity, result %i, error %i", servodata_[i].id, dxl_comm_result, dxl_error);
+        RCLCPP_ERROR(this->get_logger(), "[ID: %i] Failed to set max profile velocity, result %i, error %i", servodata_[i].id, dxl_comm_result, dxl_error);
         return false;
     }
 
@@ -484,10 +484,11 @@ bool DXLDriver::write_velocity_limit(const uint8_t id)
             static_cast<int>(servodata_[i].id), 
             servodata_[i].max_velocity, 
             velocity_limit);
+        return true;
     }
     else
     {
-        RCLCPP_ERROR(this->get_logger(), "[ID: %i] Failed to set max velocity, result %i, error %i", servodata_[i].id, dxl_comm_result, dxl_error);
+        RCLCPP_ERROR(this->get_logger(), "[ID: %i] Failed to set velocity limit, result %i, error %i", servodata_[i].id, dxl_comm_result, dxl_error);
         return false;
     }
 

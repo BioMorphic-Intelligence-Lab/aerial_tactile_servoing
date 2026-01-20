@@ -56,7 +56,7 @@ def generate_launch_description():
             {'dimension': 5},
             {'verbose': False},
             {'test_model_time': False},
-            {'save_debug_image': False},
+            {'save_debug_image': True},
             {'ssim_contact_threshold': 0.65},
             {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},
             {'zero_when_no_contact': True},

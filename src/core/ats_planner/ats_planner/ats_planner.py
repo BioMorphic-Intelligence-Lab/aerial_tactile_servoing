@@ -27,8 +27,8 @@ class ATSPlanner(Node):
     [9]: Left red 2 position switch - Kill: 1 is killed, -1 is alive
     [10]: Right blue 3 position switch - not used
     [11]: Right pink 2 position button switch - not used
-    [12]: S1 dial - not used
-    [13]: S2 dial - not used
+    [12]: S1 dial - Shear x reference
+    [13]: S2 dial - Shear y reference
     [14]: Left side dial - not used
     [15]: Right side dial - not used
     '''
@@ -87,8 +87,8 @@ class ATSPlanner(Node):
             reference_msg.twist.angular.y = (self.rc_input.channels[3])*25. # deg
             reference_msg.twist.angular.z = 0.0 # deg
             if self.verbose:
-                self.get_logger().info(f"Feeding RC to references: Depth: {(reference_msg.twist.linear.z):.3f} mm"
-                                    f", Shear X: {reference_msg.twist.linear.x:.2f} mm, "
+                self.get_logger().info(f"Feeding RC to references: Depth: {(reference_msg.twist.linear.z):.3f} mm, "
+                                    f"Shear X: {reference_msg.twist.linear.x:.2f} mm, "
                                     f"Shear Y: {reference_msg.twist.linear.y:.2f} mm, "
                                     f"Pitch: {reference_msg.twist.angular.x:.2f} deg, "
                                     f"Roll: {reference_msg.twist.angular.y:.2f} deg", throttle_duration_sec=1.0)

@@ -57,7 +57,7 @@ class MissionDirector(UAMStateMachine):
 
             case "pre_contact_arm_position":
                 q_right = [np.pi/3, 0.0, np.pi/6] # put some position here
-                self.state_move_arms(q_des=q_right, next_state="approach") # TODO Fix for flight test
+                self.state_move_arms(q_des=q_right, next_state="approach")
 
             case "approach": # Better way is to command a negative z velocity on the end-effector and run it through the inverse kinematics
                 self.state_approach_wall_position(approach_speed=0.05, transition=self.contact, next_state="tactile_servoing")
@@ -89,7 +89,7 @@ class MissionDirector(UAMStateMachine):
                     self.get_logger().info('Lost contact, returning to approach state.')
                     self.ts_no_contact_counter = 0
                     self.transition_to_state('pre_contact_uam_position')
-                elif (datetime.datetime.now() - self.state_start_time).seconds > 300. or self.input_state==1:
+                elif (datetime.datetime.now() - self.state_start_time).seconds > 62. or self.input_state==1:
                     self.transition_to_state('land_position')
                 elif not self.offboard and self.fcu_on:
                     self.transition_to_state('emergency')
