@@ -73,13 +73,12 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'Kp_linear': 40.0},
-            {'Kp_angular': 0.5},
+            {'Kp_linear': 30.0},
+            {'Kp_angular': 0.3},
             {'Ki_linear': 0.2},
-            {'Ki_angular': 0.01},
+            {'Ki_angular': 0.0},
             {'windup_clip': 0.1},
             {'publish_log': False},
-            {'regularization_weight': 0.001},
             {'test_execution_time': False}
         ],
         arguments=['--ros-args', '--log-level', 'info']
@@ -93,7 +92,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'default_depth': 3.0}, # default contact depth in mm
+            {'default_depth': 2.5}, # default contact depth in mm
             {'varying_refs': True},
             {'verbose': True}
         ],

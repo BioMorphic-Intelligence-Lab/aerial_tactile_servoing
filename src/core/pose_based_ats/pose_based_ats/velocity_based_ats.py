@@ -28,11 +28,9 @@ class VelocityBasedATS(Node):
         self.declare_parameter('Ki_angular', 0.1)
         self.declare_parameter('windup_clip', 10.)
         self.declare_parameter('publish_log', True)
-        self.declare_parameter('regularization_weight', 0.001)
         self.declare_parameter('test_execution_time', False)
         self.integrator = np.zeros(6)
         self.windup = self.get_parameter('windup_clip').get_parameter_value().double_value
-        self.reg_weight = self.get_parameter('regularization_weight').get_parameter_value().double_value
 
         # Subscribers
         self.subscription_tactip = self.create_subscription(TwistStamped, '/tactip/pose', self.callback_tactip, 10)
@@ -119,13 +117,14 @@ class VelocityBasedATS(Node):
         # Check for contact through SSIM
         if self.accumulate_integrator: # If contact, accumulate integrator
             self.integrator += self.Ki @ e_sr
+            self.integrator = np.clip(self.integrator, -self.windup, self.windup)
         else: # If not contact, reset integrator    
             self.integrator = np.zeros(6)
 
-        u_ss = -self.Kp@e_sr - np.clip(self.integrator,-self.windup, self.windup) # u_ss is in sensor frame, transform to inertial frame
+        u_ss = -self.Kp@e_sr - self.integrator # u_ss is in sensor frame, transform to inertial frame
         self.publish_twist(u_ss, self.pub_u_ss) # Publish u_ss for logging
         self.publish_twist(-self.Kp@e_sr, self.pub_proportional) # Publish proportional term for logging
-        self.publish_twist(-np.clip(self.integrator, -self.windup, self.windup), self.pub_integrator) # Publish integrator for logging
+        self.publish_twist(-self.integrator, self.pub_integrator) # Publish integrator for logging
 
         # Rotate u_ss from sensor frame to inertial frame
         R_S = self.evaluate_P_S(state)[0:3, 0:3]
