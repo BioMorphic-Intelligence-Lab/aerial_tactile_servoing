@@ -21,8 +21,10 @@ class MissionDirector(UAMStateMachine):
         # Tactip interfaces
         self.sub_tactip = self.create_subscription(TwistStamped, '/tactip/pose', self.tactip_callback, 10)
         self.sub_tactip_contact = self.create_subscription(Int8, '/tactip/contact', self.tactip_contact_callback, 10)
-        self.tactip_data = TwistStamped()
+        self.tactip_data = None
         self.contact = False
+        self.tactip_update_time = None
+        self.last_tactip_update_time = None
 
         # Controller interfaces
         self.sub_controller = self.create_subscription(TrajectorySetpoint, '/controller/out/trajectory_setpoint', self.controller_callback, 10)
@@ -119,7 +121,11 @@ class MissionDirector(UAMStateMachine):
     # Tactile servoing specific callbacks
     # ------------------------------------------------------------------------------------
     def tactip_callback(self, msg):
+        # if self.last_tactip_update_time is not None: # IF we have a previous timestamp, compute the update time
+        #     self.tactip_update_time = msg.header.stamp - self.last_tactip_update_time
         self.tactip_data = msg
+        # self.last_tactip_update_time = msg.header.stamp # Update the last update time
+            
     
     def tactip_contact_callback(self, msg):
         self.contact = bool(msg.data)
