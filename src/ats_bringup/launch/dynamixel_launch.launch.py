@@ -13,7 +13,7 @@ The package can be launched with 'ros2 launch ats_bringup dxl_example_config.lau
 
 logging = False
 log_path = '/ros2_ws/aerial_tactile_servoing/rosbags/'
-config_name = 'dxl_ros2_vbats.yaml'
+config_name = 'dxl_ros2_onearm.yaml'
 
 def generate_launch_description():
     ld = LaunchDescription()
