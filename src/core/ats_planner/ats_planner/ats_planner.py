@@ -119,7 +119,12 @@ class ATSPlanner(Node):
                 reference_msg.twist.angular.y = 0.0
                 self.ts_time_elapsed = 0.0
         
-        
+        self.get_logger().info(f"Publishing reference contact poses: "
+                               f"Depth Vel: {reference_msg.twist.linear.z:.2f} mm/s, "
+                               f"Shear X Vel: {reference_msg.twist.linear.x:.2f} mm/s, "
+                               f"Shear Y Vel: {reference_msg.twist.linear.y:.2f} mm/s, "
+                               f"Pitch Vel: {reference_msg.twist.angular.x:.2f} deg/s, "
+                               f"Roll Vel: {reference_msg.twist.angular.y:.2f} deg/s", throttle_duration_sec=1.0)
         reference_msg.twist.linear.x = np.clip(reference_msg.twist.linear.x, -5.0, 5.0)
         reference_msg.twist.linear.y = np.clip(reference_msg.twist.linear.y, -5.0, 5.0)
         reference_msg.twist.linear.z = np.clip(reference_msg.twist.linear.z, -8.0, 8.0)
