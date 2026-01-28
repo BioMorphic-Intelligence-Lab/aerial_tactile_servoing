@@ -33,6 +33,7 @@ class MissionDirector(UAMStateMachine):
         # Tactile servoing specific variables
         self.vehicle_trajectory_setpoint = TrajectorySetpoint()
         self.servo_reference = JointState()
+        self.tactile_servoing_time = 180.
 
         # Timer -- always last
         self.counter = 0
@@ -86,12 +87,12 @@ class MissionDirector(UAMStateMachine):
                 )
 
                 self.publish_servo_velocity_references(self.servo_reference.velocity)
-                self.get_logger().info(f'Contact depth: {self.tactip_data.twist.linear.z} mm', throttle_duration_sec=1)
+                self.get_logger().info(f'Contact depth: {self.tactip_data.twist.linear.z} mm, time: {((datetime.datetime.now() - self.state_start_time).seconds):.1f}/{self}', throttle_duration_sec=1)
                 if self.ts_no_contact_counter > self.ts_no_contact_max_cycles: # If no contact for 10 cycles, go back to approach
                     self.get_logger().info('Lost contact, returning to approach state.')
                     self.ts_no_contact_counter = 0
                     self.transition_to_state('pre_contact_uam_position')
-                elif (datetime.datetime.now() - self.state_start_time).seconds > 120. or self.input_state==1:
+                elif (datetime.datetime.now() - self.state_start_time).seconds > self.tactile_servoing_time or self.input_state==1:
                     self.transition_to_state('land_position')
                 elif not self.offboard and self.fcu_on:
                     self.transition_to_state('emergency')

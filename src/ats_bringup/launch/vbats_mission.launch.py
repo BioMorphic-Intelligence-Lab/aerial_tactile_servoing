@@ -93,7 +93,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'default_depth': 2.7}, # default contact depth in mm
+            {'default_depth': 3.0}, # default contact depth in mm
             {'varying_refs': False},
             {'verbose': False}
         ],
