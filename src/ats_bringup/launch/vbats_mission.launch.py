@@ -74,8 +74,8 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'Kp_linear': 40.0},
-            {'Kp_angular': 0.6},
+            {'Kp_linear': 30.0},
+            {'Kp_angular': 1.},
             {'Ki_linear': 0.0},
             {'Ki_angular': 0.0},
             {'windup_clip': 0.03},
@@ -94,8 +94,8 @@ def generate_launch_description():
         parameters=[
             {'frequency': 100.},
             {'default_depth': 2.7}, # default contact depth in mm
-            {'varying_refs': True},
-            {'verbose': True}
+            {'varying_refs': False},
+            {'verbose': False}
         ],
     )
     ld.add_action(planner)
