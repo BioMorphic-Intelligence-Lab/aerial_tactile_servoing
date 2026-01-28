@@ -1,0 +1,5 @@
+Image number, contact, shear_x, shear_y, pose_z, pose_Rx, pose_Ry, shear_Rz 
+1, False, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00 
+2, True, -0.89, 1.50, 2.04, -0.63, 1.32, 0.00 
+3, True, -0.55, 1.62, 2.02, -0.86, 0.77, 0.00 
+4, True, -0.42, 1.59, 2.03, -1.37, 0.71, 0.00 

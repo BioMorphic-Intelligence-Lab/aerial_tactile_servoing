@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 import time
+import datetime
 import os
 
 import numpy as np
@@ -51,18 +52,20 @@ class TactipDriver(Node):
 
         # Set up period image saving if enabled in launch
         if self.get_parameter('save_debug_image').get_parameter_value().bool_value and not self.fake_data:
-            self.image_outfile_path = self.get_parameter('save_directory').get_parameter_value().string_value
+            # Set up image save directory and make if it does not exist
+            self.image_outfile_path = os.path.join(self.get_parameter('save_directory').get_parameter_value().string_value, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
             self.get_logger().info(f'Saving debug images in {self.image_outfile_path}')
             if not os.path.exists(self.image_outfile_path):
                 os.makedirs(self.image_outfile_path)
             self.img_counter = 0
             if len(os.listdir(self.image_outfile_path)) != 0: # If directory is not empty, exit to avoid overwriting data
+                self.get_logger().info(os.listdir(self.image_outfile_path))
                 self.get_logger().error("Directory not empty. Please delete or move data before proceeding.")
                 self.get_logger().error("Node will now exit. Please kill stack with  Ctrl+C.")
                 return
             else:
-                with open(os.path.join(self.get_parameter('save_directory').get_parameter_value().string_value, 'image_list.csv'), 'w') as f:
-                    f.writelines([f"Image number, shear_x, shear_y, pose_z, pose_Rx, pose_Ry, shear_Rz \n"]) # Create empty csv file to log images
+                with open(os.path.join(self.image_outfile_path, 'image_list.csv'), 'w') as f:
+                    f.writelines([f"Image number, contact, shear_x, shear_y, pose_z, pose_Rx, pose_Ry, shear_Rz \n"]) # Create empty csv file to log images
 
         # publishers
         self.publisher_pose_ = self.create_publisher(TwistStamped, '/tactip/pose', 10)
@@ -95,6 +98,8 @@ class TactipDriver(Node):
             raw_outfile = os.path.join(self.image_outfile_path,'raw_image'+str(self.img_counter)+'.png')
             proc_outfile = os.path.join(self.image_outfile_path,'sensor_image'+str(self.img_counter)+'.png')
             sensor_image = self.sensor.process(raw_outfile=raw_outfile, proc_outfile=proc_outfile)
+            if self.get_parameter('verbose').get_parameter_value().bool_value:
+                self.get_logger().info(f"Saving image number {self.img_counter} in location {raw_outfile}")
             self.img_counter += 1
             self.cycle_counter = 0
         
@@ -111,25 +116,25 @@ class TactipDriver(Node):
         # Deduce contact, if contact, publish real data
         if ssim_score < self.ssim_threshold:
             contact = True
-            self.publish_real_data(sensor_image)
+            self.publish_real_data(sensor_image, contact)
         else:
             contact = False
             if self.get_parameter('zero_when_no_contact').get_parameter_value().bool_value:
                 self.publish_zero_data()
             else:
-                self.publish_real_data(sensor_image)
+                self.publish_real_data(sensor_image, contact)
         msg = Int8()
         msg.data = contact
         self.publisher_contact_.publish(msg)
 
         self.cycle_counter +=1
 
-    def publish_real_data(self, sensor_image):
+    def publish_real_data(self, sensor_image, contact:bool):
         data = self.sensor.predict(sensor_image)
 
         if self.get_parameter('save_debug_image').get_parameter_value().bool_value and self.cycle_counter%int(self.frequency*self.image_save_interval) == 0:
-            with open(os.path.join(self.get_parameter('save_directory').get_parameter_value().string_value, 'image_list.csv'), 'a') as f:
-                f.writelines([f"{self.img_counter}, {data[6]:.2f}, {data[7]:.2f}, {data[2]:.2f}, {data[3]:.2f}, {data[4]:.2f}, {data[11]:.2f} \n"]) # Log image data
+            with open(os.path.join(self.image_outfile_path, 'image_list.csv'), 'a') as f:
+                f.writelines([f"{self.img_counter}, {contact}, {data[6]:.2f}, {data[7]:.2f}, {data[2]:.2f}, {data[3]:.2f}, {data[4]:.2f}, {data[11]:.2f} \n"]) # Log image data
 
 
         data[2] = -data[2]  # Invert Z to comply with convention
@@ -194,8 +199,8 @@ class TactipDriver(Node):
             self.get_logger().info(f"[P_SC] X (mm): 0.00 \t Y (mm): 0.00 \t Z (mm): 0.00 \t Rx (deg): 0.00 \t Ry (deg): 0.00 (no contact)")
 
         if self.get_parameter('save_debug_image').get_parameter_value().bool_value and self.cycle_counter%int(self.frequency*self.image_save_interval) == 0:
-            with open(os.path.join(self.get_parameter('save_directory').get_parameter_value().string_value, 'image_list.csv'), 'a') as f:
-                f.writelines([f"{self.img_counter}, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00 \n"]) # Log image data
+            with open(os.path.join(self.image_outfile_path, 'image_list.csv'), 'a') as f:
+                f.writelines([f"{self.img_counter}, {False}, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00 \n"]) # Log image data
 
         msg = TwistStamped()
         msg.header.stamp = self.get_clock().now().to_msg()

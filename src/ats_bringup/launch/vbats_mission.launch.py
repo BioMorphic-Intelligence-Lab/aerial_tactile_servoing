@@ -56,9 +56,10 @@ def generate_launch_description():
             {'dimension': 5},
             {'verbose': False},
             {'test_model_time': False},
-            {'save_debug_image': False},
+            {'save_debug_image': True},
+            {'save_interval': 10.0},
             {'ssim_contact_threshold': 0.65},
-            {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},
+            {'save_directory': os.path.join('/ros2_ws','aerial_tactile_servoing','data','tactip_images')},
             {'zero_when_no_contact': True},
             {'fake_data': False}
         ],
@@ -93,7 +94,7 @@ def generate_launch_description():
         parameters=[
             {'frequency': 100.},
             {'default_depth': 2.7}, # default contact depth in mm
-            {'varying_refs': False},
+            {'varying_refs': True},
             {'verbose': True}
         ],
     )
