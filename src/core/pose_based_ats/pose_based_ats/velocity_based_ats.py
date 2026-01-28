@@ -70,7 +70,7 @@ class VelocityBasedATS(Node):
         self.Ki[4,4] = self.get_parameter('Ki_angular').get_parameter_value().double_value
         self.Ki[5,5] = self.get_parameter('Ki_angular').get_parameter_value().double_value
 
-        self.P_Cref = self.evaluate_P_CS(0., 0., 0.) # Initial contact frame at zero angles and zero depth
+        self.P_Cref = self.evaluate_P_CS(0., 0., 0., 0., 0.) # Initial contact frame at zero angles and zero depth
 
         self.tactip = TwistStamped()
         self.tactip.twist.linear.x = 0.0
@@ -176,6 +176,8 @@ class VelocityBasedATS(Node):
         self.P_Cref = self.evaluate_P_CS(
             np.deg2rad(msg.twist.angular.x), # received in deg
             np.deg2rad(msg.twist.angular.y), # received in deg
+            msg.twist.linear.x/1000., # received in mm
+            msg.twist.linear.y/1000., # received in mm
             msg.twist.linear.z/1000.) # received in mm 
             
         # TODO Invert to publish transform (sensor in contact to contact in sensor frames)
@@ -247,20 +249,20 @@ class VelocityBasedATS(Node):
     ''' Evaluate transformation matrix of sensor frame in contact frame
     This is the alpha and beta that is the output of the TacTip
     '''
-    def evaluate_P_CS(self, alpha, beta, d):
+    def evaluate_P_CS(self, alpha, beta, x, y, z):
         P_CS = np.zeros((4,4))
         P_CS[0,0] = np.cos(beta)
         P_CS[0,1] = np.sin(alpha)*np.sin(beta)
         P_CS[0,2] = np.sin(beta)*np.cos(alpha)
-        P_CS[0,3] = 0
+        P_CS[0,3] = x
         P_CS[1,0] = 0
         P_CS[1,1] = np.cos(alpha)
         P_CS[1,2] = -np.sin(alpha)
-        P_CS[1,3] = 0
+        P_CS[1,3] = y
         P_CS[2,0] = -np.sin(beta)
         P_CS[2,1] = np.sin(alpha)*np.cos(beta)
         P_CS[2,2] = np.cos(alpha)*np.cos(beta)
-        P_CS[2,3] = d
+        P_CS[2,3] = z
         P_CS[3,0] = 0
         P_CS[3,1] = 0
         P_CS[3,2] = 0
