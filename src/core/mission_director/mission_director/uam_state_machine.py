@@ -99,7 +99,7 @@ class UAMStateMachine(Node):
             y_clipped = np.clip(y, -self.position_clip, self.position_clip)
             z_clipped = np.clip(z, -self.position_clip, 0.0) # Negative up
             if (x != x_clipped) or (y != y_clipped) or (z != z_clipped):
-                self.get_logger().warn(f"Position setpoint clipped to ({x_clipped}, {y_clipped}, {z_clipped}) from ({x}, {y}, {z})")
+                self.get_logger().warn(f"Position setpoint clipped to ({x_clipped}, {y_clipped}, {z_clipped}) from ({x}, {y}, {z})", throttle_duration_sec=1)
         else:
             x_clipped = x
             y_clipped = y

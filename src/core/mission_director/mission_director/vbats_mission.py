@@ -91,7 +91,7 @@ class MissionDirector(UAMStateMachine):
                     self.get_logger().info('Lost contact, returning to approach state.')
                     self.ts_no_contact_counter = 0
                     self.transition_to_state('pre_contact_uam_position')
-                elif (datetime.datetime.now() - self.state_start_time).seconds > 62. or self.input_state==1:
+                elif (datetime.datetime.now() - self.state_start_time).seconds > 120. or self.input_state==1:
                     self.transition_to_state('land_position')
                 elif not self.offboard and self.fcu_on:
                     self.transition_to_state('emergency')

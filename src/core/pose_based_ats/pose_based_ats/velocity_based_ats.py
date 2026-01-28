@@ -177,7 +177,7 @@ class VelocityBasedATS(Node):
             np.deg2rad(msg.twist.angular.x), # received in deg
             np.deg2rad(msg.twist.angular.y), # received in deg
             msg.twist.linear.x/1000., # received in mm
-            msg.twist.linear.y/1000., # received in mm
+            -msg.twist.linear.y/1000., # received in mm
             msg.twist.linear.z/1000.) # received in mm 
             
         # TODO Invert to publish transform (sensor in contact to contact in sensor frames)
