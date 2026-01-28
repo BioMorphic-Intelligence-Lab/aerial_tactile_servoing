@@ -86,12 +86,11 @@ class ATSPlanner(Node):
             reference_msg.twist.angular.x = (self.rc_input.channels[2])*25. # deg
             reference_msg.twist.angular.y = (self.rc_input.channels[3])*25. # deg
             reference_msg.twist.angular.z = 0.0 # deg
-            if self.verbose:
-                self.get_logger().info(f"Feeding RC to references: Depth: {(reference_msg.twist.linear.z):.3f} mm, "
-                                    f"Shear X: {reference_msg.twist.linear.x:.2f} mm, "
-                                    f"Shear Y: {reference_msg.twist.linear.y:.2f} mm, "
-                                    f"Pitch: {reference_msg.twist.angular.x:.2f} deg, "
-                                    f"Roll: {reference_msg.twist.angular.y:.2f} deg", throttle_duration_sec=1.0)
+            self.get_logger().info(f"Feeding RC to references: Depth: {(reference_msg.twist.linear.z):.3f} mm, "
+                                f"Shear X: {reference_msg.twist.linear.x:.2f} mm, "
+                                f"Shear Y: {reference_msg.twist.linear.y:.2f} mm, "
+                                f"Pitch: {reference_msg.twist.angular.x:.2f} deg, "
+                                f"Roll: {reference_msg.twist.angular.y:.2f} deg", throttle_duration_sec=1.0)
         else:
             reference_msg.twist.linear.x = 0.0
             reference_msg.twist.linear.y = 0.0
