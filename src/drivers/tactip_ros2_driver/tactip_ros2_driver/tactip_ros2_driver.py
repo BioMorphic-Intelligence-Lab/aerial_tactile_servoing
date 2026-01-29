@@ -136,12 +136,12 @@ class TactipDriver(Node):
             with open(os.path.join(self.image_outfile_path, 'image_list.csv'), 'a') as f:
                 f.writelines([f"{self.img_counter}, {contact}, {data[6]:.2f}, {data[7]:.2f}, {data[2]:.2f}, {data[3]:.2f}, {data[4]:.2f}, {data[11]:.2f} \n"]) # Log image data
 
-
+        # Convention: Tactip outputs own pose in the contact frame (P_CS)
         data[2] = -data[2]  # Invert Z to comply with convention
-        data[3] = -data[3]  # Invert Rx to comply with
-        data[4] = data[4]  # 
-        data[6] = data[6]  # Invert shear x
-        data[7] = -data[7]  #
+        data[3] = -data[3]  # Invert Rx to comply with convention
+        data[4] = data[4]  # Invert Ry to comply with convention
+        data[6] = data[6]  # Invert shear x to comply with convention
+        data[7] = -data[7]  # Invert shear y to comply with convention 
 
         # Rotation from output frame (P_CS - sensor frame in contact frame) to desired frame (P_SC - contact frame in sensor frame)
         if self.dimension == 3:
@@ -158,7 +158,7 @@ class TactipDriver(Node):
         
         elif self.get_parameter('verbose').get_parameter_value().bool_value and self.dimension == 5:
             self.get_logger().info(f"[P_SC] X (mm): {rot_pred_pose[0]:.2f} \t Y (mm): {rot_pred_pose[1]:.2f} \t Z (mm): {rot_pred_pose[2]:.2f} \t Rx (deg): {rot_pred_pose[3]:.2f} \t Ry (deg): {rot_pred_pose[4]:.2f}")
-
+            #self.get_logger().info(f"[P_CS] X (mm): {data[6]:.2f} \t Y (mm): {data[7]:.2f} \t Z (mm): {data[2]:.2f} \t Rx (deg): {data[3]:.2f} \t Ry (deg): {data[4]:.2f} \t Rz (deg): {data[11]:.2f}")
         # publish the data
         # The model outputs are in mm and deg, so convert to SI
         msg = TwistStamped()
