@@ -271,20 +271,20 @@ class VelocityBasedATS(Node):
     ''' Evaluate transformation matrix of sensor frame in contact frame
     This is the alpha and beta that is the output of the TacTip
     '''
-    def evaluate_P_CS(self, alpha, beta, x, y, z):
+    def evaluate_P_CS(self, alpha, beta, x_CS, y_CS, z_CS):
         P_CS = np.zeros((4,4))
         P_CS[0,0] = np.cos(beta)
         P_CS[0,1] = np.sin(alpha)*np.sin(beta)
         P_CS[0,2] = np.sin(beta)*np.cos(alpha)
-        P_CS[0,3] = x
+        P_CS[0,3] = x_CS
         P_CS[1,0] = 0
         P_CS[1,1] = np.cos(alpha)
         P_CS[1,2] = -np.sin(alpha)
-        P_CS[1,3] = y
+        P_CS[1,3] = y_CS
         P_CS[2,0] = -np.sin(beta)
         P_CS[2,1] = np.sin(alpha)*np.cos(beta)
         P_CS[2,2] = np.cos(alpha)*np.cos(beta)
-        P_CS[2,3] = z
+        P_CS[2,3] = z_CS
         P_CS[3,0] = 0
         P_CS[3,1] = 0
         P_CS[3,2] = 0

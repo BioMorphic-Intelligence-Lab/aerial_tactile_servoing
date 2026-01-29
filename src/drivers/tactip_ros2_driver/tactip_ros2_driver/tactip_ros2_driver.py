@@ -149,26 +149,26 @@ class TactipDriver(Node):
         elif self.dimension == 5:
             P_SC = self.evaluate_P_SC(data[6], data[7], data[2], data[3], data[4]) # Input pose elements as rad and meter, set sign to comply with convention
         
-        rot_pred_pos = P_SC[0:3,3]
-        rot_pred_ang = np.rad2deg(R.from_matrix(P_SC[0:3, 0:3]).as_euler('xyz'))
-        rot_pred_pose = np.concatenate([rot_pred_pos, rot_pred_ang])
+        # rot_pred_pos = P_SC[0:3,3]
+        # rot_pred_ang = np.rad2deg(R.from_matrix(P_SC[0:3, 0:3]).as_euler('xyz'))
+        # rot_pred_pose = np.concatenate([rot_pred_pos, rot_pred_ang])
 
         if self.get_parameter('verbose').get_parameter_value().bool_value and self.dimension == 3:
-            self.get_logger().info(f"[P_SC] Z (mm): {rot_pred_pose[2]:.2f} \t Rx (deg): {rot_pred_pose[3]:.2f} \t Ry (deg): {rot_pred_pose[4]:.2f}")
+            self.get_logger().info(f"[P_CS] Z (mm): {data[2]:.2f} \t Rx (deg): {data[3]:.2f} \t Ry (deg): {data[4]:.2f}")
         
         elif self.get_parameter('verbose').get_parameter_value().bool_value and self.dimension == 5:
-            self.get_logger().info(f"[P_SC] X (mm): {rot_pred_pose[0]:.2f} \t Y (mm): {rot_pred_pose[1]:.2f} \t Z (mm): {rot_pred_pose[2]:.2f} \t Rx (deg): {rot_pred_pose[3]:.2f} \t Ry (deg): {rot_pred_pose[4]:.2f}")
+            self.get_logger().info(f"[P_CS] X (mm): {data[6]:.2f} \t Y (mm): {data[7]:.2f} \t Z (mm): {data[2]:.2f} \t Rx (deg): {data[3]:.2f} \t Ry (deg): {data[4]:.2f}")
             #self.get_logger().info(f"[P_CS] X (mm): {data[6]:.2f} \t Y (mm): {data[7]:.2f} \t Z (mm): {data[2]:.2f} \t Rx (deg): {data[3]:.2f} \t Ry (deg): {data[4]:.2f} \t Rz (deg): {data[11]:.2f}")
         # publish the data
         # The model outputs are in mm and deg, so convert to SI
         msg = TwistStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.twist.linear.x = rot_pred_pose[0] # in mm
-        msg.twist.linear.y = rot_pred_pose[1] # in mm
-        msg.twist.linear.z = rot_pred_pose[2] # in mm
-        msg.twist.angular.x = rot_pred_pose[3] # in deg
-        msg.twist.angular.y = rot_pred_pose[4] # in deg
-        msg.twist.angular.z = rot_pred_pose[5] # in deg
+        msg.twist.linear.x = data[6] # in mm
+        msg.twist.linear.y = data[7] # in mm
+        msg.twist.linear.z = data[2] # in mm
+        msg.twist.angular.x = data[3] # in deg
+        msg.twist.angular.y = data[4] # in deg
+        msg.twist.angular.z = 0.0 # in deg
         self.publisher_pose_.publish(msg)
         #self.get_logger().info(f"Published data: {msg}")
 
