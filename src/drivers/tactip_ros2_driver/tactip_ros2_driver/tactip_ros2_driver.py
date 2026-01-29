@@ -294,7 +294,7 @@ class TactipDriver(Node):
         t = time.time()
         msg.twist.linear.x = 0.0 # in mm
         msg.twist.linear.y = 0.0 # in mm
-        msg.twist.linear.z = 3.0 # in mm
+        msg.twist.linear.z = 0.0 # in mm
         msg.twist.angular.x = 0.0 # in deg
         msg.twist.angular.y = 0.0 # in deg
         msg.twist.angular.z = 0.0 # in deg

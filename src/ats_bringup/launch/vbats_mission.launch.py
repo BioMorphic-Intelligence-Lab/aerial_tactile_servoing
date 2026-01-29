@@ -78,6 +78,9 @@ def generate_launch_description():
             {'Kp_angular': 1.},
             {'Ki_linear': 0.0},
             {'Ki_angular': 0.0},
+            {'Kd_linear': 0.05},
+            {'Kd_angular': 0.05},
+            {'alpha': 0.2},
             {'windup_clip': 0.03},
             {'publish_log': False},
             {'test_execution_time': False}

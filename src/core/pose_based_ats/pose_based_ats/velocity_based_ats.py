@@ -26,6 +26,9 @@ class VelocityBasedATS(Node):
         self.declare_parameter('Kp_angular', 3.0)
         self.declare_parameter('Ki_linear', 0.1)
         self.declare_parameter('Ki_angular', 0.1)
+        self.declare_parameter('Kd_linear', 0.1)
+        self.declare_parameter('Kd_angular', 0.1)
+        self.declare_parameter('alpha', 1.0)
         self.declare_parameter('windup_clip', 10.)
         self.declare_parameter('publish_log', True)
         self.declare_parameter('test_execution_time', False)
@@ -69,6 +72,17 @@ class VelocityBasedATS(Node):
         self.Ki[3,3] = self.get_parameter('Ki_angular').get_parameter_value().double_value
         self.Ki[4,4] = self.get_parameter('Ki_angular').get_parameter_value().double_value
         self.Ki[5,5] = self.get_parameter('Ki_angular').get_parameter_value().double_value
+
+        self.Kd = np.eye(6)
+        self.Kd[0,0] = self.get_parameter('Kd_linear').get_parameter_value().double_value
+        self.Kd[1,1] = self.get_parameter('Kd_linear').get_parameter_value().double_value
+        self.Kd[2,2] = self.get_parameter('Kd_linear').get_parameter_value().double_value
+        self.Kd[3,3] = self.get_parameter('Kd_angular').get_parameter_value().double_value
+        self.Kd[4,4] = self.get_parameter('Kd_angular').get_parameter_value().double_value
+        self.Kd[5,5] = self.get_parameter('Kd_angular').get_parameter_value().double_value
+
+        self.alpha = self.get_parameter('alpha').get_parameter_value().double_value
+        self.e_sr_previous = np.zeros(6)
 
         self.P_Cref = self.evaluate_P_CS(0., 0., 0., 0., 0.) # Initial contact frame at zero angles and zero depth
 
@@ -114,14 +128,22 @@ class VelocityBasedATS(Node):
         E_Sref = P_SC @ self.P_Cref
         e_sr = self.transformation_to_vector(E_Sref)
 
+        # Use a filtered error for the derivative term to reduce noise
+        e_sr_filtered = self.alpha * e_sr + (1-self.alpha) * self.e_sr_previous
+
+        # Derivative term
+        self.derivative = self.Kd @ ((e_sr_filtered - self.e_sr_previous) / self.period)
+
+        self.e_sr_previous = e_sr_filtered
+
         # Check for contact through SSIM
         if self.accumulate_integrator: # If contact, accumulate integrator
-            self.integrator += self.Ki @ e_sr
+            self.integrator += (self.Ki @ e_sr) * self.period
             self.integrator = np.clip(self.integrator, -self.windup, self.windup)
         else: # If not contact, reset integrator    
             self.integrator = np.zeros(6)
 
-        u_ss = -self.Kp@e_sr - self.integrator # u_ss is in sensor frame, transform to inertial frame
+        u_ss = - (self.Kp@e_sr + self.integrator - self.derivative) # u_ss is in sensor frame, transform to inertial frame
         self.publish_twist(u_ss, self.pub_u_ss) # Publish u_ss for logging
         self.publish_twist(-self.Kp@e_sr, self.pub_proportional) # Publish proportional term for logging
         self.publish_twist(-self.integrator, self.pub_integrator) # Publish integrator for logging
@@ -177,7 +199,7 @@ class VelocityBasedATS(Node):
             np.deg2rad(msg.twist.angular.x), # received in deg
             np.deg2rad(msg.twist.angular.y), # received in deg
             msg.twist.linear.x/1000., # received in mm
-            -msg.twist.linear.y/1000., # received in mm
+            msg.twist.linear.y/1000., # received in mm
             msg.twist.linear.z/1000.) # received in mm 
             
         # TODO Invert to publish transform (sensor in contact to contact in sensor frames)
