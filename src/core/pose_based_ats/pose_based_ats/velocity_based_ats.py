@@ -30,7 +30,6 @@ class VelocityBasedATS(Node):
         self.declare_parameter('Kd_angular', 0.1)
         self.declare_parameter('alpha', 1.0)
         self.declare_parameter('windup_clip', 10.)
-        self.declare_parameter('publish_log', True)
         self.declare_parameter('test_execution_time', False)
         self.integrator = np.zeros(6)
         self.windup = self.get_parameter('windup_clip').get_parameter_value().double_value
@@ -133,7 +132,7 @@ class VelocityBasedATS(Node):
         p_sc_vector = self.transformation_to_vector(P_SC) # If using subtraction to find the error, have poses in the same frame
         p_sref_vector = self.transformation_to_vector(self.P_Sref)
         e_sr = p_sref_vector - p_sc_vector
-        self.get_logger().info(f"Error vector (e_sr) in sensor frame: {e_sr[0]*1000.:.2f}, {e_sr[1]*1000.:.2f}, {e_sr[2]*1000.:.2f}, {e_sr[3]:.2f}, {e_sr[4]:.2f}", throttle_duration_sec=1.0)
+        #self.get_logger().info(f"Error vector (e_sr) in sensor frame: {e_sr[0]*1000.:.2f}, {e_sr[1]*1000.:.2f}, {e_sr[2]*1000.:.2f}, {e_sr[3]:.2f}, {e_sr[4]:.2f}", throttle_duration_sec=1.0)
         self.publish_twist(e_sr, self.pub_e_sr) # Publish error for logging
         # E_Sref = P_SC @ self.P_Cref
         # e_sr = self.transformation_to_vector(E_Sref)
