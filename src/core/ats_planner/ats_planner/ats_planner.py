@@ -103,19 +103,16 @@ class ATSPlanner(Node):
         if self.tactile_servoing_active and self.get_parameter('varying_refs').get_parameter_value().bool_value:
             self.ts_time_elapsed += self.period
             if self.ts_time_elapsed > 15.0 and self.ts_time_elapsed < 30.0:
-                self.get_logger().info(f"Changing x angular reference to 15 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
+                self.get_logger().info(f"Changing Rx reference to 15 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
                 reference_msg.twist.angular.x += 15.0 # deg
             elif self.ts_time_elapsed >= 30.0 and self.ts_time_elapsed < 45.0:
-                self.get_logger().info(f"Changing y angular reference to 15 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
+                self.get_logger().info(f"Changing Ry reference to 15 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
                 reference_msg.twist.angular.y += 15.0 # deg
             elif self.ts_time_elapsed >= 45.0 and self.ts_time_elapsed < 60.0:
-                self.get_logger().info(f"Changing x angular reference to -15 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
-                reference_msg.twist.angular.x += 15.0
-                reference_msg.twist.angular.y += 15.0
+                self.get_logger().info(f"Shear X ref 2.0 mm after {self.ts_time_elapsed:.1f} seconds", once=True)
+                reference_msg.twist.angular.x += 15.0 # deg
+                reference_msg.twist.angular.y += 15.0 # deg
             elif self.ts_time_elapsed >= 60.0:
-                self.get_logger().info(f"Returning angular references to 0 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
-                reference_msg.twist.angular.x = 0.0
-                reference_msg.twist.angular.y = 0.0
                 self.ts_time_elapsed = 0.0
         
         if self.verbose:

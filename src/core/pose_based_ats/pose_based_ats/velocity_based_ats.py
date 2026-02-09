@@ -23,10 +23,10 @@ class VelocityBasedATS(Node):
         # Parameters
         self.declare_parameter('frequency', 10.)
         self.declare_parameter('Kp_linear', 3.0)
-        self.declare_parameter('Kp_angular', 3.0)
         self.declare_parameter('Ki_linear', 0.1)
-        self.declare_parameter('Ki_angular', 0.1)
         self.declare_parameter('Kd_linear', 0.1)
+        self.declare_parameter('Kp_angular', 3.0)
+        self.declare_parameter('Ki_angular', 0.1)
         self.declare_parameter('Kd_angular', 0.1)
         self.declare_parameter('alpha', 1.0)
         self.declare_parameter('windup_clip', 10.)
@@ -49,9 +49,11 @@ class VelocityBasedATS(Node):
 
         # Publishers (for logging and debugging of IK)
         self.pub_u_s = self.create_publisher(TwistStamped, '/controller/log/us', 10)
+        self.pub_e_sr = self.create_publisher(TwistStamped, '/controller/log/e_sr', 10)
         self.pub_u_ss = self.create_publisher(TwistStamped, '/controller/log/uss', 10)
         self.pub_proportional = self.create_publisher(TwistStamped, '/controller/log/proportional', 10)
         self.pub_integrator = self.create_publisher(TwistStamped, '/controller/log/integrator', 10)
+        self.pub_derivative = self.create_publisher(TwistStamped, '/controller/log/derivative', 10)
 
         # Broadcasters
         self.broadcaster_tf2 = TransformBroadcaster(self)
@@ -85,6 +87,7 @@ class VelocityBasedATS(Node):
         self.e_sr_previous = np.zeros(6)
 
         self.P_Cref = self.evaluate_P_CS(0., 0., 0., 0., 0.) # Initial contact frame at zero angles and zero depth
+        self.P_Sref = self.evaluate_P_SC(0., 0., 0., 0., 0.) # Initial sensor frame at zero angles and zero depth
 
         self.tactip = TwistStamped()
         self.tactip.twist.linear.x = 0.0
@@ -125,8 +128,15 @@ class VelocityBasedATS(Node):
         # Evaluate the error
         P_SC = self.evaluate_P_SC(np.deg2rad(self.tactip.twist.angular.x), np.deg2rad(self.tactip.twist.angular.y),
                                   self.tactip.twist.linear.x/1000., self.tactip.twist.linear.y/1000., self.tactip.twist.linear.z/1000.)
-        E_Sref = P_SC @ self.P_Cref
-        e_sr = self.transformation_to_vector(E_Sref)
+        P_CS = self.evaluate_P_CS(np.deg2rad(self.tactip.twist.angular.x), np.deg2rad(self.tactip.twist.angular.y),
+                                  self.tactip.twist.linear.x/1000., self.tactip.twist.linear.y/1000., self.tactip.twist.linear.z/1000.)
+        p_sc_vector = self.transformation_to_vector(P_SC) # If using subtraction to find the error, have poses in the same frame
+        p_sref_vector = self.transformation_to_vector(self.P_Sref)
+        e_sr = p_sref_vector - p_sc_vector
+        self.get_logger().info(f"Error vector (e_sr) in sensor frame: {e_sr[0]*1000.:.2f}, {e_sr[1]*1000.:.2f}, {e_sr[2]*1000.:.2f}, {e_sr[3]:.2f}, {e_sr[4]:.2f}", throttle_duration_sec=1.0)
+        self.publish_twist(e_sr, self.pub_e_sr) # Publish error for logging
+        # E_Sref = P_SC @ self.P_Cref
+        # e_sr = self.transformation_to_vector(E_Sref)
 
         # Use a filtered error for the derivative term to reduce noise
         e_sr_filtered = self.alpha * e_sr + (1-self.alpha) * self.e_sr_previous
@@ -147,6 +157,7 @@ class VelocityBasedATS(Node):
         self.publish_twist(u_ss, self.pub_u_ss) # Publish u_ss for logging
         self.publish_twist(-self.Kp@e_sr, self.pub_proportional) # Publish proportional term for logging
         self.publish_twist(-self.integrator, self.pub_integrator) # Publish integrator for logging
+        self.publish_twist(self.derivative, self.pub_derivative) # Publish derivative for logging
 
         # Rotate u_ss from sensor frame to inertial frame
         R_S = self.evaluate_P_S(state)[0:3, 0:3]
@@ -201,7 +212,13 @@ class VelocityBasedATS(Node):
             msg.twist.linear.x/1000., # received in mm
             msg.twist.linear.y/1000., # received in mm
             msg.twist.linear.z/1000.) # received in mm 
-            
+        self.P_Sref = self.evaluate_P_SC(
+            np.deg2rad(msg.twist.angular.x), # received in deg
+            np.deg2rad(msg.twist.angular.y), # received in deg
+            msg.twist.linear.x/1000., # received in mm
+            msg.twist.linear.y/1000., # received in mm
+            msg.twist.linear.z/1000.
+        )
         # TODO Invert to publish transform (sensor in contact to contact in sensor frames)
 
     def callback_tactip_contact(self, msg):

@@ -137,28 +137,22 @@ class TactipDriver(Node):
                 f.writelines([f"{self.img_counter}, {contact}, {data[6]:.2f}, {data[7]:.2f}, {data[2]:.2f}, {data[3]:.2f}, {data[4]:.2f}, {data[11]:.2f} \n"]) # Log image data
 
         # Convention: Tactip outputs own pose in the contact frame (P_CS)
-        data[2] = -data[2]  # Invert Z to comply with convention
-        data[3] = -data[3]  # Invert Rx to comply with convention
+        data[2] = -data[2]  # Invert Z to comply with convention -
+        data[3] = -data[3]  # Invert Rx to comply with convention -
         data[4] = data[4]  # Invert Ry to comply with convention
         data[6] = data[6]  # Invert shear x to comply with convention
-        data[7] = -data[7]  # Invert shear y to comply with convention 
+        data[7] = -data[7]  # Invert shear y to comply with convention -
 
-        # Rotation from output frame (P_CS - sensor frame in contact frame) to desired frame (P_SC - contact frame in sensor frame)
-        if self.dimension == 3:
-            P_SC = self.evaluate_P_SC(0., 0., data[2], data[3], data[4]) # Input pose elements as rad and meter, set sign to comply with convention
-        elif self.dimension == 5:
-            P_SC = self.evaluate_P_SC(data[6], data[7], data[2], data[3], data[4]) # Input pose elements as rad and meter, set sign to comply with convention
+        # Alternative convention: Tactip outputs pose of contact in sensor frame (P_SC)
+        # data[2] = data[2]  # Invert Z to comply with convention
         
-        # rot_pred_pos = P_SC[0:3,3]
-        # rot_pred_ang = np.rad2deg(R.from_matrix(P_SC[0:3, 0:3]).as_euler('xyz'))
-        # rot_pred_pose = np.concatenate([rot_pred_pos, rot_pred_ang])
 
         if self.get_parameter('verbose').get_parameter_value().bool_value and self.dimension == 3:
             self.get_logger().info(f"[P_CS] Z (mm): {data[2]:.2f} \t Rx (deg): {data[3]:.2f} \t Ry (deg): {data[4]:.2f}")
         
         elif self.get_parameter('verbose').get_parameter_value().bool_value and self.dimension == 5:
             self.get_logger().info(f"[P_CS] X (mm): {data[6]:.2f} \t Y (mm): {data[7]:.2f} \t Z (mm): {data[2]:.2f} \t Rx (deg): {data[3]:.2f} \t Ry (deg): {data[4]:.2f}")
-            #self.get_logger().info(f"[P_CS] X (mm): {data[6]:.2f} \t Y (mm): {data[7]:.2f} \t Z (mm): {data[2]:.2f} \t Rx (deg): {data[3]:.2f} \t Ry (deg): {data[4]:.2f} \t Rz (deg): {data[11]:.2f}")
+
         # publish the data
         # The model outputs are in mm and deg, so convert to SI
         msg = TwistStamped()
@@ -294,7 +288,7 @@ class TactipDriver(Node):
         t = time.time()
         msg.twist.linear.x = 0.0 # in mm
         msg.twist.linear.y = 0.0 # in mm
-        msg.twist.linear.z = 0.0 # in mm
+        msg.twist.linear.z = -1.0 # in mm
         msg.twist.angular.x = 0.0 # in deg
         msg.twist.angular.y = 0.0 # in deg
         msg.twist.angular.z = 0.0 # in deg
