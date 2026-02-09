@@ -239,9 +239,7 @@ class UAMStateMachine(Node):
         self.home_position[2] = self.vehicle_local_position.z
         self.home_position[3] = self.vehicle_local_position.heading        
         
-        if self.first_state_loop:
-            self.get_logger().info("Waiting for position fix")
-            self.first_state_loop = False
+        self.get_logger().info(f"[ENTRYPOINT] Waiting for position fix!")
 
         # State transition
         if (self.home_position[0] != 0.0 and self.home_position[1] != 0.0 and len(self.servo_state.position)>0):
