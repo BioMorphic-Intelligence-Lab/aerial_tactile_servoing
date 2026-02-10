@@ -155,7 +155,7 @@ class VelocityBasedATS(Node):
         else: # If not contact, reset integrator    
             self.integrator = np.zeros(6)
 
-        u_ss = - (self.Kp@e_sr + self.integrator - self.derivative) # u_ss is in sensor frame, transform to inertial frame
+        u_ss = - (self.Kp@e_sr + self.integrator + self.derivative) # u_ss is in sensor frame, transform to inertial frame
         self.publish_twist(u_ss, self.pub_u_ss) # Publish u_ss for logging
         self.publish_twist(-self.Kp@e_sr, self.pub_proportional) # Publish proportional term for logging
         self.publish_twist(-self.integrator, self.pub_integrator) # Publish integrator for logging
