@@ -56,7 +56,7 @@ def generate_launch_description():
             {'dimension': 5},
             {'verbose': False},
             {'test_model_time': False},
-            {'save_debug_image': True},
+            {'save_debug_image': False},
             {'save_interval': 10.0},
             {'ssim_contact_threshold': 0.65},
             {'save_directory': os.path.join('/ros2_ws','aerial_tactile_servoing','data','tactip_images')},
