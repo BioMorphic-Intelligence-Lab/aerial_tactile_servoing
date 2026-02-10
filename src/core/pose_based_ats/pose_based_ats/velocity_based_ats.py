@@ -49,6 +49,7 @@ class VelocityBasedATS(Node):
         # Publishers (for logging and debugging of IK)
         self.pub_u_s = self.create_publisher(TwistStamped, '/controller/log/us', 10)
         self.pub_e_sr = self.create_publisher(TwistStamped, '/controller/log/e_sr', 10)
+        self.pub_e_sr_filtered = self.create_publisher(TwistStamped, '/controller/log/e_sr_filtered', 10)
         self.pub_u_ss = self.create_publisher(TwistStamped, '/controller/log/uss', 10)
         self.pub_proportional = self.create_publisher(TwistStamped, '/controller/log/proportional', 10)
         self.pub_integrator = self.create_publisher(TwistStamped, '/controller/log/integrator', 10)
@@ -139,6 +140,8 @@ class VelocityBasedATS(Node):
 
         # Use a filtered error for the derivative term to reduce noise
         e_sr_filtered = self.alpha * e_sr + (1-self.alpha) * self.e_sr_previous
+
+        self.publish_twist(e_sr_filtered, self.pub_e_sr_filtered) # Publish filtered error for logging
 
         # Derivative term
         self.derivative = self.Kd @ ((e_sr_filtered - self.e_sr_previous) / self.period)
