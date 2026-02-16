@@ -159,7 +159,7 @@ class VelocityBasedATS(Node):
         self.publish_twist(u_ss, self.pub_u_ss) # Publish u_ss for logging
         self.publish_twist(-self.Kp@e_sr, self.pub_proportional) # Publish proportional term for logging
         self.publish_twist(-self.integrator, self.pub_integrator) # Publish integrator for logging
-        self.publish_twist(self.derivative, self.pub_derivative) # Publish derivative for logging
+        self.publish_twist(-self.derivative, self.pub_derivative) # Publish derivative for logging
 
         # Rotate u_ss from sensor frame to inertial frame
         R_S = self.evaluate_P_S(state)[0:3, 0:3]

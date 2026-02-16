@@ -33,7 +33,7 @@ class MissionDirector(UAMStateMachine):
         # Tactile servoing specific variables
         self.vehicle_trajectory_setpoint = TrajectorySetpoint()
         self.servo_reference = JointState()
-        self.tactile_servoing_time = 180.
+        self.tactile_servoing_time = 85.
 
         # Timer -- always last
         self.counter = 0

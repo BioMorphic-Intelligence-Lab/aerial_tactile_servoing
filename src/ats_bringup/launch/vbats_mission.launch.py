@@ -79,7 +79,7 @@ def generate_launch_description():
             {'Kd_linear': 1.0},
             {'Kp_angular': 0.8},
             {'Ki_angular': 0.0},
-            {'Kd_angular': 0.15},
+            {'Kd_angular': 0.25},
             {'alpha': 0.1},
             {'windup_clip': 0.1},
             {'test_execution_time': False}
@@ -95,7 +95,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'default_depth': -2.3}, # default contact depth in mm
+            {'default_depth': -2.5}, # default contact depth in mm
             {'varying_refs': True},
             {'verbose': False}
         ],
