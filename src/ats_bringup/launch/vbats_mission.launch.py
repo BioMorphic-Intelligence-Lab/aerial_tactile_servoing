@@ -39,7 +39,8 @@ def generate_launch_description():
             {'sm.position_clip': 3.0},
             {'sm.fcu_on': True},
             {'sm.sim': False},
-            {'sm.manipulator_mode': 'velocity'}
+            {'sm.manipulator_mode': 'velocity'},
+            {'im.tactile_servoing_time': 65.0}
         ],
         arguments=["--ros-args", "--log-level", "info"]
     )
@@ -77,7 +78,7 @@ def generate_launch_description():
             {'Kp_linear': 30.0},
             {'Ki_linear': 2.5},
             {'Kd_linear': 1.0},
-            {'Kp_angular': 0.8},
+            {'Kp_angular': 0.7},
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
             {'alpha': 0.1},

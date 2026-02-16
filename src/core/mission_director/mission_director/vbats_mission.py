@@ -18,6 +18,10 @@ class MissionDirector(UAMStateMachine):
         self.ts_no_contact_max_seconds = 10  # Max cycles without contact before aborting tactile servoing
         self.ts_no_contact_max_cycles = int(self.ts_no_contact_max_seconds * self.frequency)
 
+        # Get tactile servoing time from parameters
+        self.declare_parameter('im.tactile_servoing_time', 65.0) # seconds
+        self.tactile_servoing_time = self.get_parameter('im.tactile_servoing_time').get_parameter_value().double_value
+
         # Tactip interfaces
         self.sub_tactip = self.create_subscription(TwistStamped, '/tactip/pose', self.tactip_callback, 10)
         self.sub_tactip_contact = self.create_subscription(Int8, '/tactip/contact', self.tactip_contact_callback, 10)
@@ -33,7 +37,6 @@ class MissionDirector(UAMStateMachine):
         # Tactile servoing specific variables
         self.vehicle_trajectory_setpoint = TrajectorySetpoint()
         self.servo_reference = JointState()
-        self.tactile_servoing_time = 85.
 
         # Timer -- always last
         self.counter = 0
