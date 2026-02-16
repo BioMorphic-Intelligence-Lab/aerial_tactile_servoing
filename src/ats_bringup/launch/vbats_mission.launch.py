@@ -76,9 +76,9 @@ def generate_launch_description():
         parameters=[
             {'frequency': 100.},
             {'Kp_linear': 30.0},
-            {'Ki_linear': 2.5},
-            {'Kd_linear': 1.0},
-            {'Kp_angular': 0.7},
+            {'Ki_linear': 2.0},
+            {'Kd_linear': 4.5},
+            {'Kp_angular': 0.75},
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
             {'alpha': 0.1},
