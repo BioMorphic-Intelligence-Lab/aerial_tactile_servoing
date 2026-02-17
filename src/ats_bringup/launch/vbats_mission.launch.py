@@ -75,14 +75,14 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'Kp_linear': 30.0},
-            {'Ki_linear': 6.0},
+            {'Kp_linear': 35.0},
+            {'Ki_linear': 4.0},
             {'Kd_linear': 2.0},
             {'Kp_angular': 0.75},
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
             {'alpha': 0.1},
-            {'windup_clip': 0.15},
+            {'windup_clip': 0.1},
             {'altitude_anchoring': True},
             {'test_execution_time': False}
         ],
