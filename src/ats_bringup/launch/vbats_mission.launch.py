@@ -75,9 +75,10 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'Kp_linear': 40.0},
-            {'Ki_linear': 2.5},
-            {'Kd_linear': 2.0},
+            {'Kp_depth': 40.0},
+            {'Ki_depth': 2.5},
+            {'Kd_depth': 2.0},
+            {'Kp_shear': 40.0},
             {'Kp_angular': 0.75},
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},

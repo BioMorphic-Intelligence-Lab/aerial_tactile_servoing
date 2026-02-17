@@ -25,6 +25,7 @@ class VelocityBasedATS(Node):
         self.declare_parameter('Kp_linear', 3.0)
         self.declare_parameter('Ki_linear', 0.1)
         self.declare_parameter('Kd_linear', 0.1)
+        self.declare_parameter('Kp_depth', 5.0)
         self.declare_parameter('Kp_angular', 3.0)
         self.declare_parameter('Ki_angular', 0.1)
         self.declare_parameter('Kd_angular', 0.1)
@@ -66,25 +67,25 @@ class VelocityBasedATS(Node):
 
         # Gains
         self.Kp = np.eye(6)
-        self.Kp[0,0] = self.get_parameter('Kp_linear').get_parameter_value().double_value
-        self.Kp[1,1] = self.get_parameter('Kp_linear').get_parameter_value().double_value
-        self.Kp[2,2] = self.get_parameter('Kp_linear').get_parameter_value().double_value
+        self.Kp[0,0] = self.get_parameter('Kp_shear').get_parameter_value().double_value
+        self.Kp[1,1] = self.get_parameter('Kp_shear').get_parameter_value().double_value
+        self.Kp[2,2] = self.get_parameter('Kp_depth').get_parameter_value().double_value
         self.Kp[3,3] = self.get_parameter('Kp_angular').get_parameter_value().double_value
         self.Kp[4,4] = self.get_parameter('Kp_angular').get_parameter_value().double_value
         self.Kp[5,5] = self.get_parameter('Kp_angular').get_parameter_value().double_value
 
         self.Ki = np.eye(6)
-        self.Ki[0,0] = self.get_parameter('Ki_linear').get_parameter_value().double_value
-        self.Ki[1,1] = self.get_parameter('Ki_linear').get_parameter_value().double_value
-        self.Ki[2,2] = self.get_parameter('Ki_linear').get_parameter_value().double_value
+        self.Ki[0,0] = self.get_parameter('Ki_depth').get_parameter_value().double_value
+        self.Ki[1,1] = self.get_parameter('Ki_depth').get_parameter_value().double_value
+        self.Ki[2,2] = self.get_parameter('Ki_depth').get_parameter_value().double_value
         self.Ki[3,3] = self.get_parameter('Ki_angular').get_parameter_value().double_value
         self.Ki[4,4] = self.get_parameter('Ki_angular').get_parameter_value().double_value
         self.Ki[5,5] = self.get_parameter('Ki_angular').get_parameter_value().double_value
 
         self.Kd = np.eye(6)
-        self.Kd[0,0] = self.get_parameter('Kd_linear').get_parameter_value().double_value
-        self.Kd[1,1] = self.get_parameter('Kd_linear').get_parameter_value().double_value
-        self.Kd[2,2] = self.get_parameter('Kd_linear').get_parameter_value().double_value
+        self.Kd[0,0] = self.get_parameter('Kd_depth').get_parameter_value().double_value
+        self.Kd[1,1] = self.get_parameter('Kd_depth').get_parameter_value().double_value
+        self.Kd[2,2] = self.get_parameter('Kd_depth').get_parameter_value().double_value
         self.Kd[3,3] = self.get_parameter('Kd_angular').get_parameter_value().double_value
         self.Kd[4,4] = self.get_parameter('Kd_angular').get_parameter_value().double_value
         self.Kd[5,5] = self.get_parameter('Kd_angular').get_parameter_value().double_value
