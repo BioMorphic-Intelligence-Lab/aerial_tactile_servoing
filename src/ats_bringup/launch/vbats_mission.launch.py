@@ -83,6 +83,7 @@ def generate_launch_description():
             {'Kd_angular': 0.45},
             {'alpha': 0.1},
             {'windup_clip': 0.1},
+            {'altitude_anchoring': True},
             {'test_execution_time': False}
         ],
         arguments=['--ros-args', '--log-level', 'info']

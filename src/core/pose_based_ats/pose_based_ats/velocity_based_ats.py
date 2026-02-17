@@ -30,8 +30,10 @@ class VelocityBasedATS(Node):
         self.declare_parameter('Kd_angular', 0.1)
         self.declare_parameter('alpha', 1.0)
         self.declare_parameter('windup_clip', 10.)
+        self.declare_parameter('altitude_anchoring', False)
         self.declare_parameter('test_execution_time', False)
         self.integrator = np.zeros(6)
+        self.anchor_altitude = self.get_parameter('altitude_anchoring').get_parameter_value().bool_value
         self.windup = self.get_parameter('windup_clip').get_parameter_value().double_value
 
         # Subscribers
@@ -85,6 +87,7 @@ class VelocityBasedATS(Node):
 
         self.alpha = self.get_parameter('alpha').get_parameter_value().double_value
         self.e_sr_previous = np.zeros(6)
+        self.ee_alt_ref = None
 
         self.P_Cref = self.evaluate_P_CS(0., 0., 0., 0., 0.) # Initial contact frame at zero angles and zero depth
         self.P_Sref = self.evaluate_P_SC(0., 0., 0., 0., 0.) # Initial sensor frame at zero angles and zero depth
@@ -128,8 +131,6 @@ class VelocityBasedATS(Node):
         # Evaluate the error
         P_SC = self.evaluate_P_SC(np.deg2rad(self.tactip.twist.angular.x), np.deg2rad(self.tactip.twist.angular.y),
                                   self.tactip.twist.linear.x/1000., self.tactip.twist.linear.y/1000., self.tactip.twist.linear.z/1000.)
-        P_CS = self.evaluate_P_CS(np.deg2rad(self.tactip.twist.angular.x), np.deg2rad(self.tactip.twist.angular.y),
-                                  self.tactip.twist.linear.x/1000., self.tactip.twist.linear.y/1000., self.tactip.twist.linear.z/1000.)
         p_sc_vector = self.transformation_to_vector(P_SC) # If using subtraction to find the error, have poses in the same frame
         p_sref_vector = self.transformation_to_vector(self.P_Sref)
         e_sr = p_sref_vector - p_sc_vector
@@ -162,7 +163,14 @@ class VelocityBasedATS(Node):
         self.publish_twist(-self.derivative, self.pub_derivative) # Publish derivative for logging
 
         # Rotate u_ss from sensor frame to inertial frame
-        R_S = self.evaluate_P_S(state)[0:3, 0:3]
+        P_S = self.evaluate_P_S(state)
+        # Calculate control action for altitude anchoring if enabled
+        if self.anchor_altitude and self.ee_alt_ref is not None:
+            altitude_error = self.ee_alt_ref - P_S[2,3] # Z coordinate of the sensor frame in the inertial frame
+            u_ss[2] += self.Kp[2,2] * altitude_error # Add proportional control for altitude error to the z component of u_ss
+            self.get_logger().info(f"Altitude anchoring active. Altitude error: {altitude_error:.3f} m", throttle_duration_sec=1.0)
+
+        R_S = P_S[0:3, 0:3]
         u_s = np.concatenate((R_S @ u_ss[0:3], R_S @ u_ss[3:]), axis=0)
         self.publish_twist(u_s, self.pub_u_s) # Publish u_s for log
 
@@ -224,6 +232,14 @@ class VelocityBasedATS(Node):
         # TODO Invert to publish transform (sensor in contact to contact in sensor frames)
 
     def callback_tactip_contact(self, msg):
+        if not self.contact and msg.data: # If we just made contact, save the EE altitude (z coord)
+            # Run forward kinematics
+            self.ee_alt_ref = self.evaluate_P_S(self.get_state())[2,3] # Z coordinate of the sensor frame in the inertial frame
+            self.get_logger().info(f"Contact made, EE altitude: {self.ee_alt_ref:.3f} m")
+        if self.contact and not msg.data: # If we just lost contact, reset the EE altitude
+            self.ee_alt_ref = None
+            self.get_logger().info(f"Contact lost, resetting EE altitude.")
+
         self.contact = msg.data
         self.accumulate_integrator = bool(msg.data)
 
