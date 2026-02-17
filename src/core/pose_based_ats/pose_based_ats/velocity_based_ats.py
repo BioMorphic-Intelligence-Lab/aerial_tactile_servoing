@@ -54,7 +54,7 @@ class VelocityBasedATS(Node):
         self.pub_e_sr = self.create_publisher(TwistStamped, '/controller/log/e_sr', 10)
         self.pub_e_sr_filtered = self.create_publisher(TwistStamped, '/controller/log/e_sr_filtered', 10)
         self.pub_u_ss = self.create_publisher(TwistStamped, '/controller/log/uss', 10)
-        self.pub_u_ss_anchor = self.create_publisher(TwistStamped, '/controller/log/uss_anchor', 10)
+        self.pub_u_s_anchor = self.create_publisher(TwistStamped, '/controller/log/us_anchor', 10)
         self.pub_proportional = self.create_publisher(TwistStamped, '/controller/log/proportional', 10)
         self.pub_integrator = self.create_publisher(TwistStamped, '/controller/log/integrator', 10)
         self.pub_derivative = self.create_publisher(TwistStamped, '/controller/log/derivative', 10)
@@ -169,14 +169,14 @@ class VelocityBasedATS(Node):
         # Rotate u_ss from sensor frame to inertial frame
         P_S = self.evaluate_P_S(state)
         # Calculate control action for altitude anchoring if enabled
-        if self.anchor_altitude and self.ee_alt_ref is not None:
-            altitude_error = self.ee_alt_ref - P_S[2,3] # Z coordinate of the sensor frame in the inertial frame
-            u_ss[2] -=  self.Kp_alt * altitude_error # Add proportional control for altitude error to the z component of u_ss
-            self.get_logger().info(f"Altitude anchoring active. Altitude error: {altitude_error:.3f} m", throttle_duration_sec=1.0)
-            self.publish_twist(u_ss, self.pub_u_ss_anchor) # Publish u_ss with altitude anchoring for logging
 
         R_S = P_S[0:3, 0:3]
         u_s = np.concatenate((R_S @ u_ss[0:3], R_S @ u_ss[3:]), axis=0)
+        if self.anchor_altitude and self.ee_alt_ref is not None:
+            altitude_error = self.ee_alt_ref - P_S[2,3] # Z coordinate of the sensor frame in the inertial frame
+            u_s[2] -=  self.Kp_alt * altitude_error # Add proportional control for altitude error to the z component of u_ss
+            self.get_logger().info(f"Altitude anchoring active. Altitude error: {altitude_error:.3f} m", throttle_duration_sec=1.0)
+            self.publish_twist(u_s, self.pub_u_s_anchor) # Publish u_ss with altitude anchoring for logging
         self.publish_twist(u_s, self.pub_u_s) # Publish u_s for log
 
         # Secondary objective: move servos to nominal position and away from the singularity
