@@ -32,9 +32,11 @@ class VelocityBasedATS(Node):
         self.declare_parameter('alpha', 1.0)
         self.declare_parameter('windup_clip', 10.)
         self.declare_parameter('altitude_anchoring', False)
+        self.declare_parameter('altitude_damping', False)
         self.declare_parameter('test_execution_time', False)
         self.integrator = np.zeros(6)
         self.anchor_altitude = self.get_parameter('altitude_anchoring').get_parameter_value().bool_value
+        self.damp_altitude = self.get_parameter('altitude_damping').get_parameter_value().bool_value
         self.windup = self.get_parameter('windup_clip').get_parameter_value().double_value
 
         # Subscribers
@@ -196,6 +198,9 @@ class VelocityBasedATS(Node):
             + J_null @ q_secondary # Secondary objective velocities
         
         # TODO: convert controlled state reference from euler angle rates to angular velocities in the body frame
+
+        if self.damp_altitude:
+            controlled_state_reference[2] -= self.Kp_alt * self.vehicle_odometry.velocity[2]
 
         # Broadcast the sensor frame in the body frame
         P_BS = self.evaluate_P_BS(state[6], state[7], state[8])
