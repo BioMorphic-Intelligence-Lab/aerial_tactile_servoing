@@ -168,7 +168,7 @@ class VelocityBasedATS(Node):
         # Calculate control action for altitude anchoring if enabled
         if self.anchor_altitude and self.ee_alt_ref is not None:
             altitude_error = self.ee_alt_ref - P_S[2,3] # Z coordinate of the sensor frame in the inertial frame
-            u_ss[2] += self.Kp[2,2] * altitude_error # Add proportional control for altitude error to the z component of u_ss
+            u_ss[2] -= self.Kp[2,2] * altitude_error # Add proportional control for altitude error to the z component of u_ss
             self.get_logger().info(f"Altitude anchoring active. Altitude error: {altitude_error:.3f} m", throttle_duration_sec=1.0)
             self.publish_twist(u_ss, self.pub_u_ss_anchor) # Publish u_ss with altitude anchoring for logging
 
