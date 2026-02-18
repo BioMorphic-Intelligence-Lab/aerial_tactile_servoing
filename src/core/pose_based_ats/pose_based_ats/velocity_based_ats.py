@@ -179,9 +179,9 @@ class VelocityBasedATS(Node):
 
         if self.anchor_altitude and self.ee_alt_ref is not None:
             altitude_error = self.ee_alt_ref - P_S[2,3] # Z coordinate of the sensor frame in the inertial frame
-            u_s[2] -=  self.Kp_alt * altitude_error # Add proportional control for altitude error to the z component of u_ss
+            u_s[2] +=  self.Kp_alt * altitude_error # Add proportional control for altitude error to the z component of u_ss
             self.get_logger().info(f"Altitude anchoring active. Altitude error: {altitude_error:.3f} m", throttle_duration_sec=1.0)
-            self.publish_twist(u_s, self.pub_u_s_anchor) # Publish u_ss with altitude anchoring for logging
+            self.publish_twist(u_s, self.pub_u_s_anchor) # Publish u_s with altitude anchoring for logging
 
         # Secondary objective: move servos to nominal position and away from the singularity
         q_secondary = np.zeros(7) 
