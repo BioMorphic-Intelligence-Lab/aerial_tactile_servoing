@@ -78,14 +78,14 @@ def generate_launch_description():
             {'Kp_depth': 40.0},
             {'Ki_depth': 2.5},
             {'Kd_depth': 2.0},
-            {'Kp_shear': 40.0},
+            {'Kp_shear': 20.0},
             {'Kp_angular': 0.75},
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
             {'alpha': 0.1},
             {'windup_clip': 0.1},
             {'altitude_anchoring': False}, # Don't turn with altitude damping
-            {'altitude_damping': True}, # Don't turn with altitude anchoring
+            {'altitude_damping': False}, # Don't turn with altitude anchoring
             {'Kp_alt': 0.5},
             {'test_execution_time': False}
         ],

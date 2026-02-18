@@ -104,9 +104,9 @@ class ATSPlanner(Node):
             self.ts_time_elapsed += self.period
             if self.ts_time_elapsed > 20.0 and self.ts_time_elapsed < 40.0:
                 self.get_logger().info(f"Changing Rx reference to 10 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
-                reference_msg.twist.angular.x += 10.0 # deg
+                reference_msg.twist.angular.y += 10.0 # deg
             elif self.ts_time_elapsed >= 40.0 and self.ts_time_elapsed < 60.0:
-                reference_msg.twist.angular.x += -15.0 # deg
+                reference_msg.twist.angular.y += -15.0 # deg
             elif self.ts_time_elapsed >= 60.0:
                 reference_msg.twist.angular.x += 0.0 # deg
             # elif self.ts_time_elapsed >= 30.0 and self.ts_time_elapsed < 45.0:
