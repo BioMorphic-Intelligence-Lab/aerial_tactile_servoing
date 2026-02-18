@@ -22,10 +22,10 @@ class VelocityBasedATS(Node):
 
         # Parameters
         self.declare_parameter('frequency', 10.)
-        self.declare_parameter('Kp_linear', 3.0)
-        self.declare_parameter('Ki_linear', 0.1)
-        self.declare_parameter('Kd_linear', 0.1)
-        self.declare_parameter('Kp_depth', 5.0)
+        self.declare_parameter('Kp_depth', 3.0)
+        self.declare_parameter('Ki_depth', 0.1)
+        self.declare_parameter('Kd_depth', 0.1)
+        self.declare_parameter('Kp_shear', 5.0)
         self.declare_parameter('Kp_angular', 3.0)
         self.declare_parameter('Ki_angular', 0.1)
         self.declare_parameter('Kd_angular', 0.1)
@@ -175,12 +175,13 @@ class VelocityBasedATS(Node):
 
         R_S = P_S[0:3, 0:3]
         u_s = np.concatenate((R_S @ u_ss[0:3], R_S @ u_ss[3:]), axis=0)
+        self.publish_twist(u_s, self.pub_u_s) # Publish u_s for log
+
         if self.anchor_altitude and self.ee_alt_ref is not None:
             altitude_error = self.ee_alt_ref - P_S[2,3] # Z coordinate of the sensor frame in the inertial frame
             u_s[2] -=  self.Kp_alt * altitude_error # Add proportional control for altitude error to the z component of u_ss
             self.get_logger().info(f"Altitude anchoring active. Altitude error: {altitude_error:.3f} m", throttle_duration_sec=1.0)
             self.publish_twist(u_s, self.pub_u_s_anchor) # Publish u_ss with altitude anchoring for logging
-        self.publish_twist(u_s, self.pub_u_s) # Publish u_s for log
 
         # Secondary objective: move servos to nominal position and away from the singularity
         q_secondary = np.zeros(7) 
