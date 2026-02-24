@@ -64,6 +64,7 @@ def generate_launch_description():
             {'sm.fcu_on': False},
             {'sm.sim': True},
             {'sm.manipulator_mode': 'velocity'},
+            {'im.tactile_servoing_time': 10.0}
         ],
         arguments=["--ros-args", "--log-level", "info"]
     )
@@ -81,6 +82,7 @@ def generate_launch_description():
             {'verbose': False},
             {'test_model_time': False},
             {'save_debug_image': False},
+            {'save_interval': 10.0},
             {'ssim_contact_threshold': 0.65},
             {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},
             {'zero_when_no_contact': True},
@@ -97,14 +99,18 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'Kp_linear': 30.0},
-            {'Ki_linear': 1.0},
-            {'Kd_linear': 0.5},
-            {'Kp_angular': 1.},
-            {'Ki_angular': 0.1},
-            {'Kd_angular': 0.05},
-            {'alpha': 0.2},
+            {'Kp_depth': 40.0},
+            {'Ki_depth': 2.5},
+            {'Kd_depth': 2.0},
+            {'Kp_shear': 20.0},
+            {'Kp_angular': 0.75},
+            {'Ki_angular': 0.0},
+            {'Kd_angular': 0.45},
+            {'alpha': 0.1},
             {'windup_clip': 0.1},
+            {'altitude_anchoring': False}, # Don't turn on with altitude damping
+            {'altitude_damping': False}, # Don't turn on with altitude anchoring
+            {'Kp_alt': 0.5},
             {'test_execution_time': False}
         ],
         arguments=['--ros-args', '--log-level', 'info']
@@ -119,7 +125,7 @@ def generate_launch_description():
         parameters=[
             {'frequency': 100.},
             {'default_depth': -2.3}, # default contact depth in mm
-            {'varying_refs': True},
+            {'mission_preset': 'default'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
             {'verbose': False}
         ],
         arguments=['--ros-args', '--log-level', 'info']

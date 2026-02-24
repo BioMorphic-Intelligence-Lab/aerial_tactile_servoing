@@ -38,9 +38,10 @@ class ATSPlanner(Node):
         # Parameters
         self.declare_parameter('frequency', 10.)
         self.declare_parameter('default_depth', 3.0) # default contact depth in mm
-        self.declare_parameter('varying_refs', False) # RC channel for depth manipulation   
+        self.declare_parameter('mission_preset', 'blockref_x') # RC channel for depth manipulation   
         self.declare_parameter('verbose', True)
         self.verbose = self.get_parameter('verbose').get_parameter_value().bool_value
+        self.mission_preset = self.get_parameter('mission_preset').get_parameter_value().string_value
 
         # Initialization log message
         self.get_logger().info("Planner node initialized")
@@ -78,46 +79,64 @@ class ATSPlanner(Node):
         # Clean message
         reference_msg = TwistStamped()
         reference_msg.header.stamp = self.get_clock().now().to_msg()
+        reference_msg.twist.linear.x = 0.0 # mm
+        reference_msg.twist.linear.y = 0.0 # mm
+        reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value # mm
+        reference_msg.twist.angular.x = 0.0 # deg
+        reference_msg.twist.angular.y = 0.0 # deg
+        reference_msg.twist.angular.z = 0.0 # deg
 
+        # Count the time if tactile servoing is active, reset if not. This is used for time-based reference manipulation in the planner.
+        if self.tactile_servoing_active:
+            self.ts_time_elapsed += self.period
+        else:
+            self.ts_time_elapsed = 0.0
+
+        # Modify the reference message based on the mission preset
+        match self.mission_preset:
+            case 'default':
+                pass # don't modify the references, just use the defaults
+            case 'blockref_x':
+                if self.ts_time_elapsed > 20.0 and self.ts_time_elapsed < 40.0:
+                    self.get_logger().info(f"Changing Rx reference to 10 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
+                    reference_msg.twist.angular.x = 10.0 # deg
+                elif self.ts_time_elapsed >= 40.0 and self.ts_time_elapsed < 60.0:
+                    reference_msg.twist.angular.x = -15.0 # deg
+                elif self.ts_time_elapsed >= 60.0:
+                    reference_msg.twist.angular.x = 0.0 # deg
+            case 'blockref_y':
+                if self.ts_time_elapsed > 20.0 and self.ts_time_elapsed < 40.0:
+                    self.get_logger().info(f"Changing Ry reference to 10 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
+                    reference_msg.twist.angular.y = 10.0 # deg
+                elif self.ts_time_elapsed >= 40.0 and self.ts_time_elapsed < 60.0:
+                    self.get_logger().info(f"Changing Ry reference to -15 deg from 10 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
+                    reference_msg.twist.angular.y = -15.0 # deg
+                elif self.ts_time_elapsed >= 60.0:
+                    self.get_logger().info(f"Changing Ry reference to 0 deg from -15 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
+                    reference_msg.twist.angular.y = 0.0 # deg
+            case 'slide_x':
+                if self.ts_time_elapsed > 10.0 and self.ts_time_elapsed < 100.:
+                    self.get_logger().info(f"Changing shear x reference to 3.0 mm from 0 mm after {self.ts_time_elapsed:.1f} seconds", once=True)
+                    reference_msg.twist.linear.x = 3.0 # mm
+                else:
+                    reference_msg.twist.linear.x = 0.0 # mm
+            case _:
+                self.get_logger().warning(f"Mission preset not recognized", throttle_duration_sec=1.0)
+
+
+        # Add to the references in case of RC input
         if self.enable_reference_manipulation and self.offboard: # If the right blue switch is on and we are in offboard mode
-            reference_msg.twist.linear.x = (self.rc_input.channels[12])*3. # mm
-            reference_msg.twist.linear.y = (self.rc_input.channels[13])*3. # mm
-            reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value + (self.rc_input.channels[0])*5. # mm
-            reference_msg.twist.angular.x = (self.rc_input.channels[2])*25. # deg
-            reference_msg.twist.angular.y = (self.rc_input.channels[3])*25. # deg
-            reference_msg.twist.angular.z = 0.0 # deg
+            reference_msg.twist.linear.x += (self.rc_input.channels[12])*3. # mm
+            reference_msg.twist.linear.y += (self.rc_input.channels[13])*3. # mm
+            reference_msg.twist.linear.z += self.get_parameter('default_depth').get_parameter_value().double_value - (self.rc_input.channels[0])*5. # mm
+            reference_msg.twist.angular.x += (self.rc_input.channels[2])*25. # deg
+            reference_msg.twist.angular.y += (self.rc_input.channels[3])*25. # deg
+            reference_msg.twist.angular.z += 0.0 # deg
             self.get_logger().info(f"Feeding RC to references: Depth: {(reference_msg.twist.linear.z):.3f} mm, "
                                 f"Shear X: {reference_msg.twist.linear.x:.2f} mm, "
                                 f"Shear Y: {reference_msg.twist.linear.y:.2f} mm, "
                                 f"Pitch: {reference_msg.twist.angular.x:.2f} deg, "
                                 f"Roll: {reference_msg.twist.angular.y:.2f} deg", throttle_duration_sec=1.0)
-        else:
-            reference_msg.twist.linear.x = 0.0
-            reference_msg.twist.linear.y = 0.0
-            reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value # mm
-            reference_msg.twist.angular.x = 0.0
-            reference_msg.twist.angular.y = 0.0
-            reference_msg.twist.angular.z = 0.0
-
-        # Modify the reference msg with time-based references
-        if self.tactile_servoing_active and self.get_parameter('varying_refs').get_parameter_value().bool_value:
-            self.ts_time_elapsed += self.period
-            if self.ts_time_elapsed > 20.0 and self.ts_time_elapsed < 40.0:
-                self.get_logger().info(f"Changing Rx reference to 10 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
-                reference_msg.twist.angular.y += 10.0 # deg
-            elif self.ts_time_elapsed >= 40.0 and self.ts_time_elapsed < 60.0:
-                reference_msg.twist.angular.y += -15.0 # deg
-            elif self.ts_time_elapsed >= 60.0:
-                reference_msg.twist.angular.x += 0.0 # deg
-            # elif self.ts_time_elapsed >= 30.0 and self.ts_time_elapsed < 45.0:
-            #     self.get_logger().info(f"Changing Ry reference to 15 deg from 0 deg after {self.ts_time_elapsed:.1f} seconds", once=True)
-            #     reference_msg.twist.angular.y += 15.0 # deg
-            # elif self.ts_time_elapsed >= 45.0 and self.ts_time_elapsed < 60.0:
-            #     self.get_logger().info(f"Shear X ref 2.0 mm after {self.ts_time_elapsed:.1f} seconds", once=True)
-            #     reference_msg.twist.angular.x += 15.0 # deg
-            #     reference_msg.twist.angular.y += 15.0 # deg
-            # elif self.ts_time_elapsed >= 60.0:
-            #     self.ts_time_elapsed = 0.0
         
         if self.verbose:
             self.get_logger().info(f"Publishing reference contact poses: "

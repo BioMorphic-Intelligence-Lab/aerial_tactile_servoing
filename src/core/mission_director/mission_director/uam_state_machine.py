@@ -239,7 +239,7 @@ class UAMStateMachine(Node):
         self.home_position[2] = self.vehicle_local_position.z
         self.home_position[3] = self.vehicle_local_position.heading        
         
-        self.get_logger().info(f"[ENTRYPOINT] Waiting for position fix!")
+        self.get_logger().info(f"[ENTRYPOINT] Waiting for position fix!", throttle_duration_sec=1)
 
         # State transition
         if (self.home_position[0] != 0.0 and self.home_position[1] != 0.0 and len(self.servo_state.position)>0):
@@ -384,6 +384,11 @@ class UAMStateMachine(Node):
         elif (error < epsilon) or self.input_state == 1: # If error is small enough or input state is 1
             self.transition_to_state(new_state=next_state)
 
+    """ Move the UAM to a specified position using position control mode until a transition condition is met.
+    Args:
+        target_position (list): Target position as [x, y, z, heading]. Heading is optional and will be kept constant if not provided.
+        next_state (str, optional): Next state to transition to after completion. Defaults to 'emergency'.
+    """
     def state_move_uam_to_position(self, target_position: list, next_state='emergency'):
         self.handle_state(state_number=12)
 
@@ -395,8 +400,9 @@ class UAMStateMachine(Node):
             target_position.append(self.vehicle_local_position.heading)  # Keep current heading if not provided
         self.publish_trajectory_position_setpoint(*target_position)
         # Calculate euclidean distance between current and target positions
-        current_position = np.array([self.vehicle_local_position.x, self.vehicle_local_position.y, self.vehicle_local_position.z])
-        target_pos = np.array(target_position[:3])  # x, y, z
+        current_position = np.array([self.vehicle_local_position.x, self.vehicle_local_position.y, self.vehicle_local_position.z, 
+                                     self.vehicle_local_position.heading])
+        target_pos = np.array(target_position)  # x, y, z
         error = np.linalg.norm(current_position - target_pos)
         self.get_logger().info(f'Current position: {current_position}, Target position: {target_pos}, Error: {error:.4f}', throttle_duration_sec=1)
 
@@ -461,6 +467,35 @@ class UAMStateMachine(Node):
         if not self.offboard and self.fcu_on:
             self.transition_to_state('emergency')
         elif transition or self.input_state==1:
+            self.transition_to_state(new_state=next_state)
+    
+    """ Disengage from the wall by commanding a velocity away from the wall until a transition condition is met.
+    Args:
+        disengage_speed (float): Speed at which to disengage from the wall (m/s). Applied on body Y-axis.
+        transition (bool): Condition to trigger state transition. Defaults to False.
+        next_state (str, optional): Next state to transition to after completion. Defaults to 'emergency'.
+    """
+    def state_disengage_wall_velocity(self, disengage_speed: float, duration_sec: float=1.0, next_state='emergency'):
+        self.handle_state(state_number=23)
+        
+        # First state loop
+        if self.first_state_loop:
+            self.get_logger().info(f'[23] Disengaging from contact surface at {disengage_speed} (body Y-axis) m/s')
+            self.first_state_loop = False
+        
+        # Update position setpoint
+        self.get_logger().info(f'Disengaging... ', throttle_duration_sec=1)
+        self.publish_trajectory_velocity_setpoint(
+            np.sin(self.vehicle_local_position.heading)*disengage_speed,
+            -np.cos(self.vehicle_local_position.heading)*disengage_speed,
+            0.0,
+            0.0
+        )
+
+        # State transition
+        if not self.offboard and self.fcu_on:
+            self.transition_to_state('emergency')
+        elif (datetime.datetime.now()-self.state_start_time).seconds > duration_sec or self.input_state==1:
             self.transition_to_state(new_state=next_state)
 
     def state_emergency(self):

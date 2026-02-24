@@ -56,7 +56,7 @@ class MissionDirector(UAMStateMachine):
                 self.state_wait_for_arming(next_state="takeoff")
 
             case "takeoff":
-                self.state_takeoff(target_altitude=1.7, next_state="hover")
+                self.state_takeoff(target_altitude=1.0, next_state="hover")
 
             case "hover":
                 self.state_hover(duration_sec=1, next_state="pre_contact_arm_position")
@@ -96,12 +96,12 @@ class MissionDirector(UAMStateMachine):
                     self.ts_no_contact_counter = 0
                     self.transition_to_state('pre_contact_uam_position')
                 elif (datetime.datetime.now() - self.state_start_time).seconds > self.tactile_servoing_time or self.input_state==1:
-                    self.transition_to_state('land_position')
+                    self.transition_to_state('disengage')
                 elif not self.offboard and self.fcu_on:
                     self.transition_to_state('emergency')
             
-            case "land_position":
-                self.state_move_uam_to_position([0.0, 0.0, -1.0, 0.0], next_state="land_arms_position")
+            case "disengage":
+                self.state_disengage_wall_velocity(disengage_speed=0.15, duration_sec=5.0, next_state="land_arms_position")
 
             case "land_arms_position":
                 q_right = [1.57, 0.0, -1.57] # put some position here

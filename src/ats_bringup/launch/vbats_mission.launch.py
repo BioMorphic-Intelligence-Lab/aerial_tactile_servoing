@@ -40,7 +40,7 @@ def generate_launch_description():
             {'sm.fcu_on': True},
             {'sm.sim': False},
             {'sm.manipulator_mode': 'velocity'},
-            {'im.tactile_servoing_time': 65.0}
+            {'im.tactile_servoing_time': 105.0}
         ],
         arguments=["--ros-args", "--log-level", "info"]
     )
@@ -84,8 +84,8 @@ def generate_launch_description():
             {'Kd_angular': 0.45},
             {'alpha': 0.1},
             {'windup_clip': 0.1},
-            {'altitude_anchoring': False}, # Don't turn with altitude damping
-            {'altitude_damping': False}, # Don't turn with altitude anchoring
+            {'altitude_anchoring': False}, # Don't turn on with altitude damping
+            {'altitude_damping': False}, # Don't turn on with altitude anchoring
             {'Kp_alt': 0.5},
             {'test_execution_time': False}
         ],
@@ -101,7 +101,7 @@ def generate_launch_description():
         parameters=[
             {'frequency': 100.},
             {'default_depth': -2.3}, # default contact depth in mm
-            {'varying_refs': True},
+            {'mission_preset': 'slide_x'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
             {'verbose': False}
         ],
     )
