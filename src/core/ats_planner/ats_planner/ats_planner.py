@@ -128,7 +128,7 @@ class ATSPlanner(Node):
         if self.enable_reference_manipulation and self.offboard: # If the right blue switch is on and we are in offboard mode
             reference_msg.twist.linear.x += (self.rc_input.channels[12])*3. # mm
             reference_msg.twist.linear.y += (self.rc_input.channels[13])*3. # mm
-            reference_msg.twist.linear.z += self.get_parameter('default_depth').get_parameter_value().double_value - (self.rc_input.channels[0])*5. # mm
+            reference_msg.twist.linear.z += - (self.rc_input.channels[0])*5. # mm
             reference_msg.twist.angular.x += (self.rc_input.channels[2])*25. # deg
             reference_msg.twist.angular.y += (self.rc_input.channels[3])*25. # deg
             reference_msg.twist.angular.z += 0.0 # deg
