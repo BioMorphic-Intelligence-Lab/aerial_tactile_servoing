@@ -100,7 +100,7 @@ def generate_launch_description():
         parameters=[
             {'frequency': 100.},
             {'Kp_depth': 40.0},
-            {'Ki_depth': 2.5}, # Increase this one
+            {'Ki_depth': 2.5}, # Increase this one for door
             {'Kd_depth': 2.0},
             {'Kp_shear': 20.0},
             {'Ki_shear': 2.5},

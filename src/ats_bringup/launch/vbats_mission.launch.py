@@ -31,7 +31,7 @@ def generate_launch_description():
 
     mission_director = Node(
         package="mission_director",
-        executable="vbats_mission",
+        executable="door_vbats_mission",
         name="vbats_mission",
         output="screen",
         parameters=[
