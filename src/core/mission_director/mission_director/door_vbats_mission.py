@@ -1,6 +1,7 @@
 import rclpy
 import numpy as np
 import datetime
+from scipy.spatial.transform import Rotation as R
 from std_msgs.msg import Int8
 from geometry_msgs.msg import TwistStamped, PoseStamped
 from px4_msgs.msg import TrajectorySetpoint
@@ -102,12 +103,13 @@ class MissionDirector(UAMStateMachine):
                 )
 
                 self.publish_servo_velocity_references(self.servo_reference.velocity)
-                self.get_logger().info(f'Contact depth: {self.tactip_data.twist.linear.z:.2f} mm, door q.z: {self.door_pose.pose.orientation.z:.2f}, door q.w: {self.door_pose.pose.orientation.w:.2f}', throttle_duration_sec=1)
+                door_angle = R.from_quat([self.door_pose.pose.orientation.x, self.door_pose.pose.orientation.y, self.door_pose.pose.orientation.z, self.door_pose.pose.orientation.w]).as_euler('xyz')[2] if self.door_pose else 0.0
+                self.get_logger().info(f'Contact depth: {self.tactip_data.twist.linear.z:.2f} mm, door angle: {door_angle:.2f}', throttle_duration_sec=1)
                 if self.ts_no_contact_counter > self.ts_no_contact_max_cycles: # If no contact for 10 cycles, go back to approach
                     self.get_logger().info('Lost contact, returning to approach state.')
                     self.ts_no_contact_counter = 0
                     self.transition_to_state('pre_contact_uam_position')
-                elif self.door_pose.pose.orientation.w > -0.72 and self.door_pose.pose.orientation.z > 0.69: # If door is open, disengage
+                elif door_angle < -1.5 or door_angle > 1.5: # If door is open, disengage
                     self.get_logger().info('Door opened, transitioning to disengage state.')
                     self.transition_to_state('disengage')
                 elif (datetime.datetime.now() - self.state_start_time).seconds > self.tactile_servoing_time or self.input_state==1:

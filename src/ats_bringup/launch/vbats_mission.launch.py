@@ -76,7 +76,7 @@ def generate_launch_description():
         parameters=[
             {'frequency': 100.},
             {'Kp_depth': 40.0},
-            {'Ki_depth': 8.0},
+            {'Ki_depth': 12.0},
             {'Kd_depth': 2.0},
             {'Kp_shear': 20.0},
             {'Ki_shear': 2.5},
@@ -102,7 +102,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'default_depth': -3.5}, # default contact depth in mm
+            {'default_depth': -3.3}, # default contact depth in mm
             {'mission_preset': 'default'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
             {'verbose': False}
         ],
