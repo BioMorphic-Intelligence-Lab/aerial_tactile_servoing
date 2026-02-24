@@ -6,6 +6,7 @@ from geometry_msgs.msg import TwistStamped, PoseStamped
 from px4_msgs.msg import TrajectorySetpoint
 from sensor_msgs.msg import JointState
 
+from std_srvs.srv import SetBool
 from mission_director.uam_state_machine import UAMStateMachine
 
 class MissionDirector(UAMStateMachine):
@@ -41,6 +42,12 @@ class MissionDirector(UAMStateMachine):
         self.vehicle_trajectory_setpoint = TrajectorySetpoint()
         self.servo_reference = JointState()
 
+        self.cli_set_ssim_ref = self.create_client(SetBool, 'set_ssim_ref')
+
+        self.got_ref = False
+        while not self.cli_set_ssim_ref.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Service not available, waiting...')
+
         # Timer -- always last
         self.counter = 0
         self.timer = self.create_timer(self.timer_period, self.execute)
@@ -52,14 +59,16 @@ class MissionDirector(UAMStateMachine):
                 self.state_entrypoint(next_state="arms_takeoff_position")
 
             case "arms_takeoff_position":
-                q_right = [np.pi/2, 0.0, -np.pi/2] # put some position here
+                q_right = [np.pi/3, 0.0, np.pi/6] # put some position here
                 self.state_move_arms(q_des=q_right, next_state="wait_for_arm_offboard")
 
             case "wait_for_arm_offboard":
+                if not self.got_ref:
+                    self.set_new_ssim_ref(True) # Set the current tactip image as the reference for SSIM-based contact detection
                 self.state_wait_for_arming(next_state="takeoff")
 
             case "takeoff":
-                self.state_takeoff(target_altitude=0.9, next_state="hover")
+                self.state_takeoff(target_altitude=1.3, next_state="hover")
 
             case "hover":
                 self.state_hover(duration_sec=1, next_state="pre_contact_arm_position")
@@ -93,12 +102,12 @@ class MissionDirector(UAMStateMachine):
                 )
 
                 self.publish_servo_velocity_references(self.servo_reference.velocity)
-                self.get_logger().info(f'Contact depth: {self.tactip_data.twist.linear.z} mm, time: {((datetime.datetime.now() - self.state_start_time).seconds):.1f}/{self.tactile_servoing_time}', throttle_duration_sec=1)
+                self.get_logger().info(f'Contact depth: {self.tactip_data.twist.linear.z:.2f} mm, door q.z: {self.door_pose.pose.orientation.z:.2f}, door q.w: {self.door_pose.pose.orientation.w:.2f}', throttle_duration_sec=1)
                 if self.ts_no_contact_counter > self.ts_no_contact_max_cycles: # If no contact for 10 cycles, go back to approach
                     self.get_logger().info('Lost contact, returning to approach state.')
                     self.ts_no_contact_counter = 0
                     self.transition_to_state('pre_contact_uam_position')
-                elif self.door_pose.pose.orientation.w < 0.5: # If door is open, disengage
+                elif self.door_pose.pose.orientation.w > -0.72 and self.door_pose.pose.orientation.z > 0.69: # If door is open, disengage
                     self.get_logger().info('Door opened, transitioning to disengage state.')
                     self.transition_to_state('disengage')
                 elif (datetime.datetime.now() - self.state_start_time).seconds > self.tactile_servoing_time or self.input_state==1:
@@ -148,6 +157,13 @@ class MissionDirector(UAMStateMachine):
     
     def door_callback(self, msg):
         self.door_pose = msg
+
+    def set_new_ssim_ref(self, value: bool):
+        req = SetBool.Request()
+        req.data = value
+
+        self.future = self.cli_set_ssim_ref.call_async(req)
+        self.got_ref = True
 
 def main():
     rclpy.init(args=None)

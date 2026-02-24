@@ -12,6 +12,8 @@ from geometry_msgs.msg import TwistStamped, TransformStamped
 from std_msgs.msg import Float64, Int8
 from tf2_ros import TransformBroadcaster
 
+from std_srvs.srv import SetBool
+
 from .tactip import TacTip
 
 from .dependencies.label_encoder import BASE_MODEL_PATH
@@ -79,6 +81,13 @@ class TactipDriver(Node):
         if self.get_parameter('test_model_time').get_parameter_value().bool_value:
             self.get_logger().info("Testing model execution time. It will run 1000 predictions through the model and print the average time taken.")
             self.test_model_execution_time()
+
+        # Start service
+        self.srv_get_ssim_ref = self.create_service(
+            SetBool,                 # service type
+            'set_ssim_ref',             # service name
+            self.get_ssim_ref_callback           # callback
+        )
 
         # Set up timer
         self.cycle_counter = 0
@@ -238,6 +247,14 @@ class TactipDriver(Node):
         self.get_logger().info(f"Iterations per second: {iterations/(end_time - start_time)} [it/s]")
         self.get_logger().info(f"Average capture time: {sum(capture_time)/iterations} [seconds/it]")
         self.get_logger().info(f"Average predict time: {sum(predict_time)/iterations} [seconds/it]")
+
+    def get_ssim_ref_callback(self, request, response):
+        # This is a dummy service callback. You can implement functionality to update the reference image or return the current reference image's SSIM score.
+        self.get_logger().info("Received request for SSIM reference.")
+        if request.data:
+            self.ref_image_ssim = self.sensor.process().squeeze()
+        response.success = True
+        return response
     
     def evaluate_P_SC(self, x_CS, y_CS, z_CS, alpha, beta):
         alpha = np.deg2rad(alpha)

@@ -11,7 +11,7 @@ Launch file for testing the aerial tactile servoing system with velocity-based c
 The package can be launched with 'ros2 launch ats_bringup vbats_mission.launch.py'
 """
 
-logging = False
+logging = True
 log_path = '/ros2_ws/aerial_tactile_servoing/rosbags/'
 config_name = 'dxl_ros2_vbats.yaml'
 
@@ -40,7 +40,7 @@ def generate_launch_description():
             {'sm.fcu_on': True},
             {'sm.sim': False},
             {'sm.manipulator_mode': 'velocity'},
-            {'im.tactile_servoing_time': 105.0}
+            {'im.tactile_servoing_time': 180.0}
         ],
         arguments=["--ros-args", "--log-level", "info"]
     )
@@ -57,7 +57,7 @@ def generate_launch_description():
             {'dimension': 5},
             {'verbose': False},
             {'test_model_time': False},
-            {'save_debug_image': False},
+            {'save_debug_image': True},
             {'save_interval': 10.0},
             {'ssim_contact_threshold': 0.65},
             {'save_directory': os.path.join('/ros2_ws','aerial_tactile_servoing','data','tactip_images')},
@@ -76,7 +76,7 @@ def generate_launch_description():
         parameters=[
             {'frequency': 100.},
             {'Kp_depth': 40.0},
-            {'Ki_depth': 2.5},
+            {'Ki_depth': 8.0},
             {'Kd_depth': 2.0},
             {'Kp_shear': 20.0},
             {'Ki_shear': 2.5},
@@ -85,7 +85,7 @@ def generate_launch_description():
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
             {'alpha': 0.1},
-            {'windup_clip': 0.1},
+            {'windup_clip': 0.15},
             {'altitude_anchoring': False}, # Don't turn on with altitude damping
             {'altitude_damping': False}, # Don't turn on with altitude anchoring
             {'Kp_alt': 0.5},
@@ -102,15 +102,15 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'default_depth': -1.7}, # default contact depth in mm
-            {'mission_preset': 'slide_x'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
+            {'default_depth': -3.5}, # default contact depth in mm
+            {'mission_preset': 'default'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
             {'verbose': False}
         ],
     )
     ld.add_action(planner)
 
     if logging:
-        rosbag_name = 'new_ros2bag_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        rosbag_name = 'dooropening_ros2bag_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         ros2bag = ExecuteProcess(
             cmd=['ros2', 'bag', 'record', '-o', log_path+rosbag_name, '-a'], 
             output='screen', 
