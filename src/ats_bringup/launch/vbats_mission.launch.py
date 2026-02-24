@@ -11,7 +11,7 @@ Launch file for testing the aerial tactile servoing system with velocity-based c
 The package can be launched with 'ros2 launch ats_bringup vbats_mission.launch.py'
 """
 
-logging = True
+logging = False
 log_path = '/ros2_ws/aerial_tactile_servoing/rosbags/'
 config_name = 'dxl_ros2_vbats.yaml'
 
@@ -79,6 +79,8 @@ def generate_launch_description():
             {'Ki_depth': 2.5},
             {'Kd_depth': 2.0},
             {'Kp_shear': 20.0},
+            {'Ki_shear': 2.5},
+            {'Kd_shear': 2.0},
             {'Kp_angular': 0.75},
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
