@@ -117,7 +117,7 @@ class ATSPlanner(Node):
             case 'slide_x':
                 if self.ts_time_elapsed > 10.0 and self.ts_time_elapsed < 100.:
                     self.get_logger().info(f"Changing shear x reference to 3.0 mm from 0 mm after {self.ts_time_elapsed:.1f} seconds", once=True)
-                    reference_msg.twist.linear.x = -2.0 # mm
+                    reference_msg.twist.linear.x = -3.0 # mm
                 else:
                     reference_msg.twist.linear.x = 0.0 # mm
             case _:
