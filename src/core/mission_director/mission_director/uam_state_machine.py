@@ -446,7 +446,7 @@ class UAMStateMachine(Node):
                 elif transition or self.input_state==1:
                     self.transition_to_state(new_state=next_state)
 
-    def state_approach_wall_velocity(self, approach_speed: float, transition: bool=False, next_state='emergency'): # Better way is to command a negative z velocity on the end-effector and run it through the inverse kinematics
+    def state_approach_wall_velocity(self, approach_speed: list, transition: bool=False, next_state='emergency'): # Better way is to command a negative z velocity on the end-effector and run it through the inverse kinematics
         self.handle_state(state_number=22)
 
         # First state loop
@@ -457,9 +457,9 @@ class UAMStateMachine(Node):
         # Update position setpoint
         self.get_logger().info(f'Approaching... : {self.vehicle_odometry.velocity[1]:.3f}/{approach_speed} m/s, {self.vehicle_odometry.position[1]:.2f}/{self.position_clip} m', throttle_duration_sec=1)
         self.publish_trajectory_velocity_setpoint(
-            0.0,
-            approach_speed,
-            0.0,
+            approach_speed[0],
+            approach_speed[1],
+            approach_speed[2],
             0.0
         )
 

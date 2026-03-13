@@ -318,7 +318,7 @@ class TactipDriver(Node):
 
         contact = ssim_score < self.ssim_threshold
         msg_contact = Int8()
-        msg_contact.data = contact
+        msg_contact.data = False
         self.publisher_contact_.publish(msg_contact)
 
         # Broadcast the TF
