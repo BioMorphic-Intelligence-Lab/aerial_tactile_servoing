@@ -6,6 +6,8 @@ from geometry_msgs.msg import TwistStamped
 from px4_msgs.msg import TrajectorySetpoint
 from sensor_msgs.msg import JointState
 
+from std_srvs.srv import SetBool
+
 from mission_director.uam_state_machine import UAMStateMachine
 
 class MissionDirector(UAMStateMachine):
@@ -38,6 +40,12 @@ class MissionDirector(UAMStateMachine):
         self.vehicle_trajectory_setpoint = TrajectorySetpoint()
         self.servo_reference = JointState()
 
+        self.cli_set_ssim_ref = self.create_client(SetBool, 'set_ssim_ref')
+
+        self.got_ref = False
+        while not self.cli_set_ssim_ref.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Service not available, waiting...')
+
         # Timer -- always last
         self.counter = 0
         self.timer = self.create_timer(self.timer_period, self.execute)
@@ -49,14 +57,16 @@ class MissionDirector(UAMStateMachine):
                 self.state_entrypoint(next_state="arms_takeoff_position")
 
             case "arms_takeoff_position":
-                q_right = [np.pi/2, 0.0, -np.pi/2] # put some position here
+                q_right = [np.pi/3, 0.0, np.pi/6] # put some position here
                 self.state_move_arms(q_des=q_right, next_state="wait_for_arm_offboard")
 
             case "wait_for_arm_offboard":
+                if not self.got_ref and not self.sim:
+                    self.set_new_ssim_ref(True) # Set the current tactip image as the reference for SSIM-based contact detection
                 self.state_wait_for_arming(next_state="takeoff")
 
             case "takeoff":
-                self.state_takeoff(target_altitude=0.9, next_state="hover")
+                self.state_takeoff(target_altitude=1.2, next_state="hover")
 
             case "hover":
                 self.state_hover(duration_sec=1, next_state="pre_contact_arm_position")
@@ -139,6 +149,13 @@ class MissionDirector(UAMStateMachine):
 
     def controller_servo_callback(self, msg):
         self.servo_reference = msg
+
+    def set_new_ssim_ref(self, value: bool):
+        req = SetBool.Request()
+        req.data = value
+
+        self.future = self.cli_set_ssim_ref.call_async(req)
+        self.got_ref = True
 
 def main():
     rclpy.init(args=None)
