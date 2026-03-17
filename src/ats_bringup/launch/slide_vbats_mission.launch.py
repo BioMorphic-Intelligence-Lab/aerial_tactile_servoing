@@ -80,8 +80,8 @@ def generate_launch_description():
             {'Kd_depth': 2.0},
             {'Kp_shear': 20.0},
             {'Ki_shear': 2.5},
-            {'Kd_shear': 2.0},
-            {'Kp_angular': 0.75},
+            {'Kd_shear': 4.0},
+            {'Kp_angular': 0.35},
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
             {'alpha': 0.1},
@@ -110,7 +110,7 @@ def generate_launch_description():
     ld.add_action(planner)
 
     if logging:
-        rosbag_name = 'cartfollowing_ros2bag_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        rosbag_name = 'surfacesliding_ros2bag_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         ros2bag = ExecuteProcess(
             cmd=['ros2', 'bag', 'record', '-o', log_path+rosbag_name, '-a'], 
             output='screen', 
