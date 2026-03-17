@@ -81,7 +81,7 @@ def generate_launch_description():
             {'Kp_shear': 20.0},
             {'Ki_shear': 2.5},
             {'Kd_shear': 4.0},
-            {'Kp_angular': 0.35},
+            {'Kp_angular': 0.25},
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
             {'alpha': 0.1},
