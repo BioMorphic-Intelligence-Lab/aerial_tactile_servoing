@@ -55,8 +55,8 @@ def generate_launch_description():
 
     mission_director = Node(
         package="mission_director",
-        executable="vbats_mission",
-        name="vbats_mission",
+        executable="slide_vbats_mission",
+        name="slide_vbats_mission",
         output="screen",
         parameters=[
             {'sm.frequency': 100.0},
@@ -64,7 +64,7 @@ def generate_launch_description():
             {'sm.fcu_on': False},
             {'sm.sim': True},
             {'sm.manipulator_mode': 'velocity'},
-            {'im.tactile_servoing_time': 30.0}
+            {'im.tactile_servoing_time': 200.0}
         ],
         arguments=["--ros-args", "--log-level", "info"]
     )

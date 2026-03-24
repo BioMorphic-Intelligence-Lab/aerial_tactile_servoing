@@ -415,13 +415,15 @@ class UAMStateMachine(Node):
         elif (error < 0.2) or self.input_state==1: # If error is small enough or input state is 1
             self.transition_to_state(new_state=next_state)
 
-    """ Approach a wall using position control mode until a transition condition is met.
+    """ 
+    Approach a wall using position control mode until a transition condition is met.
     Args:
-        approach_speed (float): Speed at which to approach the wall (m/s). Applied on world Y-axis.
+        approach_speed (float): Speed at which to approach the wall (m/s) defined in world frame.
+        approach_heading (float, optional): Heading to maintain during approach in radians. If None, maintains current heading. Defaults to None.
         transition (bool): Condition to trigger state transition. Defaults to False.
         next_state (str, optional): Next state to transition to after completion. Defaults to 'emergency'.
     """
-    def state_approach_wall_position(self, approach_speed: float, transition: bool=False, next_state='emergency'):
+    def state_approach_wall_position(self, approach_speed: list, approach_heading=None, transition: bool=False, next_state='emergency'):
                 self.handle_state(state_number=21)
 
                 # First state loop
@@ -429,12 +431,21 @@ class UAMStateMachine(Node):
                     self.running_position[0] = self.vehicle_local_position.x
                     self.running_position[1] = self.vehicle_local_position.y
                     self.running_position[2] = self.vehicle_local_position.z
-                    self.running_position[3] = self.vehicle_local_position.heading
+                    if approach_heading is None:
+                        self.running_position[3] = self.vehicle_local_position.heading
+                    else:
+                        self.running_position[3] = approach_heading
                     self.get_logger().info(f'[21] Approaching contact surface at {approach_speed} m/s')
                     self.first_state_loop = False
+
+                    if len(approach_speed) !=3:
+                        self.get_logger().error(f'Approach speed must be a list of 3 (vx, vy, vz). Got {approach_speed}')
+                        self.transition_to_state('emergency')
                 
                 # Update position setpoint
-                self.running_position[1] += approach_speed / self.frequency  # Increase y at approach
+                self.running_position[0] += approach_speed[0] / self.frequency  # Increase x at approach
+                self.running_position[1] += approach_speed[1] / self.frequency  # Increase y at approach
+                self.running_position[2] += approach_speed[2] / self.frequency  # Increase z at approach
                 self.get_logger().info(f'Approaching... Y setpoint: {self.running_position[1]} m', throttle_duration_sec=1)
                 self.publish_trajectory_position_setpoint(
                     self.running_position[0],
