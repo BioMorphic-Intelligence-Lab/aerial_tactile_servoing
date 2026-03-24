@@ -433,9 +433,10 @@ class UAMStateMachine(Node):
                     self.running_position[2] = self.vehicle_local_position.z
                     if approach_heading is None:
                         self.running_position[3] = self.vehicle_local_position.heading
+                        self.get_logger().info(f'[21] Approaching contact surface at {approach_speed} m/s \t {self.running_position[3]:.3f} rad (no heading provided)')
                     else:
                         self.running_position[3] = approach_heading
-                    self.get_logger().info(f'[21] Approaching contact surface at {approach_speed} m/s')
+                        self.get_logger().info(f'[21] Approaching contact surface at {approach_speed} m/s \t {self.running_position[3]:.3f} rad')
                     self.first_state_loop = False
 
                     if len(approach_speed) !=3:

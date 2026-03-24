@@ -60,6 +60,7 @@ class MissionDirector(UAMStateMachine):
         match self.FSM_state:
             case "entrypoint":
                 self.state_entrypoint(next_state="arms_takeoff_position")
+                self.get_logger().info(f'[ENTRYPOINT] Starting slide mission director.', once=True)
 
             case "arms_takeoff_position":
                 q_right = [np.pi/3, 0.0, np.pi/6] # put some position here
@@ -81,8 +82,7 @@ class MissionDirector(UAMStateMachine):
                 self.state_move_arms(q_des=q_right, next_state="approach")
 
             case "approach": # Better way is to command a negative z velocity on the end-effector and run it through the inverse kinematics
-                self.state_approach_wall_position(approach_speed=[0.0, 0.05, 0.0], approach_heading=np.deg2rad(15.0), transition=self.contact, next_state="tactile_servoing")
-                # TODO: Set suitable approach heading based on dry test.
+                self.state_approach_wall_position(approach_speed=[0.0, 0.05, 0.0], approach_heading=np.deg2rad(-25.), transition=self.contact, next_state="tactile_servoing")
 
             case "tactile_servoing":
                 self.handle_state(state_number=30)
@@ -119,7 +119,7 @@ class MissionDirector(UAMStateMachine):
                 elif (datetime.datetime.now() - self.state_start_time).seconds > self.tactile_servoing_time or self.input_state==1:
                     self.transition_to_state('disengage')
                 # Transition condition based on estimated local angle of surface
-                elif position_ee.x < -1.0: # TODO tune this value
+                elif position_ee.x < -0.9: # TODO tune this value
                     self.transition_to_state('disengage')
                 elif not self.offboard and self.fcu_on:
                     self.transition_to_state('emergency')
