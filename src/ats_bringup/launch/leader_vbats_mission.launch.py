@@ -59,7 +59,7 @@ def generate_launch_description():
             {'dimension': 5},
             {'verbose': False},
             {'test_model_time': False},
-            {'save_debug_image': True},
+            {'save_debug_image': False},
             {'save_interval': 10.0},
             {'ssim_contact_threshold': 0.65},
             {'save_directory': os.path.join('/ros2_ws','aerial_tactile_servoing','data','tactip_images')},
@@ -77,15 +77,15 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'Kp_depth': 40.0},
-            {'Ki_depth': 4.0}, # previous 12
+            {'Kp_depth': 20.0},
+            {'Ki_depth': 2.5}, # previous 12, 4
             {'Kd_depth': 2.0},
-            {'Kp_shear': 20.0},
+            {'Kp_shear': 10.0}, # previous 20.0
             {'Ki_shear': 2.5},
             {'Kd_shear': 2.0},
-            {'Kp_angular': 0.35},
+            {'Kp_angular': 0.15},
             {'Ki_angular': 0.0},
-            {'Kd_angular': 0.15},
+            {'Kd_angular': 0.05},
             {'nominal_state': [0., 0., 0., 0., 0., 0., 3*PI/4, 0.0, PI/4]},
             {'alpha': 0.1},
             {'windup_clip': 0.15},
