@@ -82,7 +82,7 @@ class MissionDirector(UAMStateMachine):
                 self.state_move_arms(q_des=q_right, next_state="approach")
 
             case "approach": # Better way is to command a negative z velocity on the end-effector and run it through the inverse kinematics
-                self.state_approach_wall_position(approach_speed=[0.0, 0.05, 0.0], approach_heading=np.deg2rad(-25.), transition=self.contact, next_state="tactile_servoing")
+                self.state_approach_wall_position(approach_speed=[0.0, 0.05, 0.0], approach_heading=np.deg2rad(-15.), transition=self.contact, next_state="tactile_servoing")
 
             case "tactile_servoing":
                 self.handle_state(state_number=30)
