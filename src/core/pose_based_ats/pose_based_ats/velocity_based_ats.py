@@ -31,6 +31,7 @@ class VelocityBasedATS(Node):
         self.declare_parameter('Kp_angular', 3.0)
         self.declare_parameter('Ki_angular', 0.1)
         self.declare_parameter('Kd_angular', 0.1)
+        self.declare_parameter('nominal_state', [0., 0., 0., 0., 0., 0., np.pi/3, 0., np.pi/6]) # nominal state for secondary objective in the null space (default is q1=60deg, q2=0deg, q3=30deg)
         self.declare_parameter('Kp_alt', 0.5)
         self.declare_parameter('alpha', 1.0)
         self.declare_parameter('windup_clip', 10.)
@@ -116,7 +117,7 @@ class VelocityBasedATS(Node):
         self.accumulate_integrator = False
         self.md_state = 0
 
-        self.nominal_state = np.array([0, 0, 0, 0, 0, 0, np.pi/3, 0, np.pi/6])
+        self.nominal_state = np.array(self.get_parameter('nominal_state').get_parameter_value().double_array_value)
 
         self.previous_yaw_cmd = 0.0
 
