@@ -78,14 +78,14 @@ def generate_launch_description():
         parameters=[
             {'frequency': 100.},
             {'Kp_depth': 40.0},
-            {'Ki_depth': 12.0},
+            {'Ki_depth': 4.0}, # previous 12
             {'Kd_depth': 2.0},
             {'Kp_shear': 20.0},
             {'Ki_shear': 2.5},
             {'Kd_shear': 2.0},
-            {'Kp_angular': 0.75},
+            {'Kp_angular': 0.35},
             {'Ki_angular': 0.0},
-            {'Kd_angular': 0.45},
+            {'Kd_angular': 0.15},
             {'nominal_state': [0., 0., 0., 0., 0., 0., 3*PI/4, 0.0, PI/4]},
             {'alpha': 0.1},
             {'windup_clip': 0.15},
