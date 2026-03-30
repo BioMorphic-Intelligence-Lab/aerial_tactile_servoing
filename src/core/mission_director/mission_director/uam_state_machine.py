@@ -240,7 +240,7 @@ class UAMStateMachine(Node):
         self.home_position[3] = self.vehicle_local_position.heading        
 
         if (self.home_position[0] == 0.0 and self.home_position[1] == 0.0):        
-            self.get_logger().info(f"[ENTRYPOINT] Waiting for position fix!, vehicle_x {self.vehicle_local_position.x}, vehicle_y {self.vehicle_local_position.y}", throttle_duration_sec=1)
+            self.get_logger().info(f"[ENTRYPOINT] Waiting for position fix!, vehicle_x {self.vehicle_local_position.x:.4f}, vehicle_y {self.vehicle_local_position.y:.4f}", throttle_duration_sec=1)
         elif len(self.servo_state.position)==0:
             self.get_logger().info(f"[ENTRYPOINT] Got position fix but no servo state yet!", throttle_duration_sec=1)
 
@@ -299,6 +299,7 @@ class UAMStateMachine(Node):
 
         # State transition
         if not self.offboard and self.fcu_on:
+            self.get_logger().info(f'Not in offboard mode, transitioning to emergency state. Offboard {self.offboard}, FCU {self.fcu_on}')
             self.transition_to_state('emergency')
         elif abs(current_altitude)+0.1 > abs(self.home_position[2]) or self.input_state==1:
             self.transition_to_state(new_state=next_state)
