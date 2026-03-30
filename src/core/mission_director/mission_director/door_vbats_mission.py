@@ -46,7 +46,7 @@ class MissionDirector(UAMStateMachine):
         self.cli_set_ssim_ref = self.create_client(SetBool, 'set_ssim_ref')
 
         self.got_ref = False
-        while not self.cli_set_ssim_ref.wait_for_service(timeout_sec=1.0):
+        while not self.cli_set_ssim_ref.wait_for_service(timeout_sec=1.0) and not self.sim:
             self.get_logger().info('Service not available, waiting...')
 
         # Timer -- always last
@@ -64,7 +64,7 @@ class MissionDirector(UAMStateMachine):
                 self.state_move_arms(q_des=q_right, next_state="wait_for_arm_offboard")
 
             case "wait_for_arm_offboard":
-                if not self.got_ref:
+                if not self.got_ref and not self.state_start_time:
                     self.set_new_ssim_ref(True) # Set the current tactip image as the reference for SSIM-based contact detection
                 self.state_wait_for_arming(next_state="takeoff")
 

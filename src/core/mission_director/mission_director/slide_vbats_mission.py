@@ -48,7 +48,7 @@ class MissionDirector(UAMStateMachine):
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
         self.got_ref = False
-        while not self.cli_set_ssim_ref.wait_for_service(timeout_sec=1.0):
+        while not self.cli_set_ssim_ref.wait_for_service(timeout_sec=1.0) and not self.sim:
             self.get_logger().info('Service not available, waiting...')
 
         # Timer -- always last

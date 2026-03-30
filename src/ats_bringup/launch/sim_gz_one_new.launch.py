@@ -55,8 +55,8 @@ def generate_launch_description():
 
     mission_director = Node(
         package="mission_director",
-        executable="slide_vbats_mission",
-        name="slide_vbats_mission",
+        executable="door_vbats_mission",
+        name="door_vbats_mission",
         output="screen",
         parameters=[
             {'sm.frequency': 100.0},
