@@ -72,7 +72,7 @@ class MissionDirector(UAMStateMachine):
                 self.state_takeoff(target_altitude=1.3, next_state="hover")
 
             case "hover":
-                self.state_hover(duration_sec=1, next_state="pre_contact_uam_position")
+                self.state_hover(duration_sec=1., next_state="pre_contact_arm_position") # TODO fix state transition
 
             case "pre_contact_uam_position":
                 self.state_move_uam_to_position(target_position=[0.0, 1.0, -1.3, 0.0], next_state="pre_contact_arm_position")

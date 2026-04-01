@@ -69,10 +69,10 @@ class MissionDirector(UAMStateMachine):
                 self.state_wait_for_arming(next_state="takeoff")
 
             case "takeoff":
-                self.state_takeoff(target_altitude=1.8, next_state="hover")
+                self.state_takeoff(target_altitude=1.5, next_state="hover")
 
             case "hover":
-                self.state_hover(duration_sec=5., next_state="pre_contact_arm_position")
+                self.state_hover(duration_sec=1., next_state="pre_contact_arm_position")
 
             case "pre_contact_arm_position":
                 q_right = [np.pi/3, 0.0, np.pi/6] # put some position here
