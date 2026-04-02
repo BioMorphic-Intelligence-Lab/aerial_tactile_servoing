@@ -28,8 +28,9 @@ setup(
             'ymca_md=mission_director.ymca_mission_director:main',
             'vbats_mission=mission_director.vbats_mission:main',
             'door_vbats_mission=mission_director.door_vbats_mission:main',
-            'leader_vbats_mission=mission_director.leader_vbats_mission:main',
+            'leaderfollow_vbats_mission=mission_director.leaderfollow_vbats_mission:main',
             'slide_vbats_mission=mission_director.slide_vbats_mission:main',
+            'wallfollow_vbats_mission=mission_director.wallfollow_vbats_mission:main',
         ],
     },
 )

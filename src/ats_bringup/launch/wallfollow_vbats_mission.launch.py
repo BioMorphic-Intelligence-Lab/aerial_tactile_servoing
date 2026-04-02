@@ -15,6 +15,8 @@ logging = True
 log_path = '/ros2_ws/aerial_tactile_servoing/rosbags/'
 config_name = 'dxl_ros2_vbats.yaml'
 
+PI = 3.141592653589793
+
 def generate_launch_description():
     ld = LaunchDescription()
 
@@ -31,7 +33,7 @@ def generate_launch_description():
 
     mission_director = Node(
         package="mission_director",
-        executable="door_vbats_mission",
+        executable="wallfollow_vbats_mission",
         name="vbats_mission",
         output="screen",
         parameters=[
@@ -40,7 +42,7 @@ def generate_launch_description():
             {'sm.fcu_on': True},
             {'sm.sim': False},
             {'sm.manipulator_mode': 'velocity'},
-            {'im.tactile_servoing_time': 60.0}
+            {'im.tactile_servoing_time': 180.0}
         ],
         arguments=["--ros-args", "--log-level", "info"]
     )
@@ -75,15 +77,16 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'Kp_depth': 40.0},
-            {'Ki_depth': 4.0},
+            {'Kp_depth': 20.0},
+            {'Ki_depth': 2.5}, # previous 12, 4
             {'Kd_depth': 2.0},
-            {'Kp_shear': 20.0},
+            {'Kp_shear': 10.0}, # previous 20.0
             {'Ki_shear': 2.5},
             {'Kd_shear': 2.0},
-            {'Kp_angular': 0.75},
+            {'Kp_angular': 0.15},
             {'Ki_angular': 0.0},
-            {'Kd_angular': 0.45},
+            {'Kd_angular': 0.05},
+            {'nominal_state': [0., 0., 0., 0., 0., 0., 3*PI/4, 0.0, PI/4]},
             {'alpha': 0.1},
             {'windup_clip': 0.15},
             {'altitude_anchoring': False}, # Don't turn on with altitude damping
@@ -102,7 +105,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'default_depth': -3.0}, # default contact depth in mm
+            {'default_depth': -2.5}, # default contact depth in mm TODO fix
             {'mission_preset': 'default'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
             {'verbose': False}
         ],
@@ -110,7 +113,7 @@ def generate_launch_description():
     ld.add_action(planner)
 
     if logging:
-        rosbag_name = 'wallfollow_ros2bag_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        rosbag_name = 'leaderfollowing_ros2bag_prelim_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         ros2bag = ExecuteProcess(
             cmd=['ros2', 'bag', 'record', '-o', log_path+rosbag_name, '-a'], 
             output='screen', 

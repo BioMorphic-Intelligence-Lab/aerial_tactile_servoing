@@ -305,7 +305,7 @@ class TactipDriver(Node):
         t = time.time()
         msg.twist.linear.x = 0.0 # in mm
         msg.twist.linear.y = 0.0 # in mm
-        msg.twist.linear.z = -1.0 # in mm
+        msg.twist.linear.z = -3.0 # in mm
         msg.twist.angular.x = 0.0 # in deg
         msg.twist.angular.y = 0.0 # in deg
         msg.twist.angular.z = 0.0 # in deg
@@ -328,7 +328,7 @@ class TactipDriver(Node):
         t.child_frame_id = "present_contact_frame_tactipdriver_fake"
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.0
+        t.transform.translation.z = -3.0
         t.transform.rotation.x = 0.0
         t.transform.rotation.y = 0.0
         t.transform.rotation.z = 0.0

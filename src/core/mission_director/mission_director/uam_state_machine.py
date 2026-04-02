@@ -113,7 +113,7 @@ class UAMStateMachine(Node):
         msg.timestamp = int(self.get_clock().now().nanoseconds/1000)
         self.pub_vehicle_trajectory_setpoint.publish(msg)
 
-    def publish_trajectory_velocity_setpoint(self, vx: float, vy: float, vz: float, yawspeed: float):
+    def publish_trajectory_velocity_setpoint(self, vx: float, vy: float, vz: float, yawspeed: float, acceleration: list = None):
         # If clipping is not zero, clip the position
         vx_max = min(self.max_speed, max(0.0, self.position_clip - abs(self.vehicle_odometry.position[0])))
         vy_max = min(self.max_speed, max(0.0, self.position_clip - abs(self.vehicle_odometry.position[1])))
@@ -124,6 +124,10 @@ class UAMStateMachine(Node):
         msg.velocity[0] = np.clip(vx, -vx_max, vx_max)
         msg.velocity[1] = np.clip(vy, -vy_max, vy_max)
         msg.velocity[2] = np.clip(vz, -vz_max, vz_max)
+        if acceleration is not None:
+            msg.acceleration[0] = acceleration[0]
+            msg.acceleration[1] = acceleration[1]
+            msg.acceleration[2] = acceleration[2]
         msg.yaw = np.nan
         msg.yawspeed = yawspeed
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)

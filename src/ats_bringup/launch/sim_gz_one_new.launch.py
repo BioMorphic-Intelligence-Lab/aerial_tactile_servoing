@@ -55,8 +55,8 @@ def generate_launch_description():
 
     mission_director = Node(
         package="mission_director",
-        executable="door_vbats_mission",
-        name="door_vbats_mission",
+        executable="leaderfollow_vbats_mission",
+        name="leaderfollow_vbats_mission",
         output="screen",
         parameters=[
             {'sm.frequency': 100.0},
@@ -64,7 +64,8 @@ def generate_launch_description():
             {'sm.fcu_on': False},
             {'sm.sim': True},
             {'sm.manipulator_mode': 'velocity'},
-            {'im.tactile_servoing_time': 200.0}
+            {'im.tactile_servoing_time': 200.0},
+            {'im.feedforward_gain': 0.5}
         ],
         arguments=["--ros-args", "--log-level", "info"]
     )
@@ -119,6 +120,24 @@ def generate_launch_description():
     )
     ld.add_action(controller)
 
+    # Torque estimator
+    torque_observer = Node(
+        package='wrench_observer',
+        executable='torque_observer',
+        name='torque_observer',
+        output='screen',
+        parameters=[
+            {'frequency': 100.0},
+            {'gain_torque': 1.0}, # Should be unity following the dynamics
+            {'alpha_torque': 0.15}, # 1 is no filtering
+            {'alpha_angular_velocity': 0.2},
+            {'alpha_accelerometer': 0.2},
+            {'alpha_motor_inputs': 0.2}, # 1 is no filtering
+        ],
+        arguments=["--ros-args", "--log-level", "error"] # Log level info
+    )
+    ld.add_action(torque_observer)
+
     planner = Node(
         package='ats_planner',
         executable='ats_planner',
@@ -126,7 +145,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'default_depth': -2.3}, # default contact depth in mm
+            {'default_depth': -3.0}, # default contact depth in mm
             {'mission_preset': 'slide_x'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
             {'verbose': False}
         ],
