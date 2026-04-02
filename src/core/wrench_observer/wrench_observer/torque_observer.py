@@ -14,7 +14,7 @@ from px4_msgs.msg import SensorCombined, ActuatorMotors
 
 L_1 = 0.118
 L_2 = 0.326 
-L_3 = 0.273 # 0.330 with tactip
+L_3 = 0.330 # 0.330 with tactip
 
 class TorqueObserver(Node):
     def __init__(self):
