@@ -202,8 +202,8 @@ class VelocityBasedATS(Node):
         feedforward_acceleration = [0., 0., 0.]
         if self.external_torque is not None:
             feedforward_acceleration = [
-                -self.feedforward_gain * self.external_torque.vector.y, 
-                self.feedforward_gain * self.external_torque.vector.x, 
+                self.feedforward_gain * self.external_torque.vector.y, 
+                -self.feedforward_gain * self.external_torque.vector.x, 
                 0.0]
             #self.get_logger().info(f'FF accleration: x {feedforward_acceleration[0]:.2f} y {feedforward_acceleration[1]:.2f}', throttle_duration_sec=1.0)
 
