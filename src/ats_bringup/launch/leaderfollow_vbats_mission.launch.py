@@ -33,7 +33,7 @@ def generate_launch_description():
     mission_director = Node(
         package="mission_director",
         executable="leaderfollow_vbats_mission",
-        name="vbats_mission",
+        name="MD",
         output="screen",
         parameters=[
             {'sm.frequency': 100.0},
@@ -51,7 +51,7 @@ def generate_launch_description():
     tactip_driver = Node(
         package='tactip_ros2_driver',
         executable='tactip_ros2_driver',
-        name='tactip_driver',
+        name='tactip',
         output='screen',
         parameters=[
             {'source': 0},
@@ -73,7 +73,7 @@ def generate_launch_description():
     controller = Node(
         package='pose_based_ats',
         executable='velocity_based_ats',
-        name='controller',
+        name='contr',
         output='screen',
         parameters=[
             {'frequency': 100.},
@@ -100,7 +100,7 @@ def generate_launch_description():
     torque_observer = Node(
         package='wrench_observer',
         executable='torque_observer',
-        name='torque_observer',
+        name='obs',
         output='screen',
         parameters=[
             {'frequency': 100.0},
@@ -109,10 +109,10 @@ def generate_launch_description():
             {'alpha_angular_velocity': 0.2},
             {'alpha_accelerometer': 0.2},
             {'alpha_motor_inputs': 0.2}, # 1 is no filtering
-            {'model_mass': 4.239}, # [kg] with 6000 mAh batteries
+            {'model_mass': 4.231}, # [kg] with 6000 mAh batteries
             {'torque_bias': [0.0, 0.0, 0.0]}
         ],
-        arguments=["--ros-args", "--log-level", "error"] # Log level info
+        arguments=["--ros-args", "--log-level", "info"] # Log level info
     )
     ld.add_action(torque_observer)
 
@@ -131,7 +131,7 @@ def generate_launch_description():
     ld.add_action(planner)
 
     if logging:
-        rosbag_name = 'wallfollow_ros2bag_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        rosbag_name = 'leaderfollow_ros2bag_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         ros2bag = ExecuteProcess(
             cmd=['ros2', 'bag', 'record', '-o', log_path+rosbag_name, '-a'], 
             output='screen', 

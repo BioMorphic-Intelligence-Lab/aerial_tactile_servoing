@@ -68,7 +68,7 @@ class MissionDirector(UAMStateMachine):
                 self.state_entrypoint(next_state="arms_takeoff_position")
 
             case "arms_takeoff_position":
-                q_right = [np.pi/3, 0.0, np.pi/6] # put some position here
+                q_right = [np.pi/3, 0.0, np.pi/2] # put some position here
                 self.state_move_arms(q_des=q_right, next_state="wait_for_arm_offboard")
 
             case "wait_for_arm_offboard":
@@ -93,7 +93,7 @@ class MissionDirector(UAMStateMachine):
                 self.state_move_arms(q_des=q_right, next_state="approach")
 
             case "approach": # Better way is to command a negative z velocity on the end-effector and run it through the inverse kinematics
-                self.state_approach_wall_position(approach_speed=[0.0, 0.0, 0.05], transition=False, next_state="tactile_servoing") # TODO set transition to self.contact when we have a reliable contact detection, currently just transition after a fixed time to ensure we get into the tactile servoing state
+                self.state_approach_wall_position(approach_speed=[0.0, 0.0, 0.05], transition=self.contact, next_state="tactile_servoing") # TODO set transition to self.contact when we have a reliable contact detection, currently just transition after a fixed time to ensure we get into the tactile servoing state
             
             case "tactile_servoing":
                 self.handle_state(state_number=30)
