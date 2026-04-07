@@ -133,8 +133,10 @@ def generate_launch_description():
             {'alpha_angular_velocity': 0.2},
             {'alpha_accelerometer': 0.2},
             {'alpha_motor_inputs': 0.2}, # 1 is no filtering
+            {'model_mass': 4.239}, # [kg] with 6000 mAh batteries
+            {'torque_bias': [0.0, 0.0, 0.0]},
         ],
-        arguments=["--ros-args", "--log-level", "error"] # Log level info
+        arguments=["--ros-args", "--log-level", "info"] # Log level info
     )
     ld.add_action(torque_observer)
 
@@ -146,7 +148,7 @@ def generate_launch_description():
         parameters=[
             {'frequency': 100.},
             {'default_depth': -3.0}, # default contact depth in mm
-            {'mission_preset': 'slide_x'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
+            {'mission_preset': 'default'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
             {'verbose': False}
         ],
         arguments=['--ros-args', '--log-level', 'info']

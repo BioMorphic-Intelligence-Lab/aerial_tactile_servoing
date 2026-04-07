@@ -1,3 +1,7 @@
+from platform import node
+
+from skimage import future
+
 import rclpy
 import numpy as np
 import datetime
@@ -24,9 +28,6 @@ class MissionDirector(UAMStateMachine):
         self.declare_parameter('im.tactile_servoing_time', 65.0) # seconds
         self.tactile_servoing_time = self.get_parameter('im.tactile_servoing_time').get_parameter_value().double_value
 
-        self.declare_parameter('im.feedforward_gain', 0.5)
-        self.feedforward_gain = self.get_parameter('im.feedforward_gain').get_parameter_value().double_value
-
         # Tactip interfaces
         self.sub_tactip = self.create_subscription(TwistStamped, '/tactip/pose', self.tactip_callback, 10)
         self.sub_tactip_contact = self.create_subscription(Int8, '/tactip/contact', self.tactip_contact_callback, 10)
@@ -43,11 +44,18 @@ class MissionDirector(UAMStateMachine):
         self.vehicle_trajectory_setpoint = TrajectorySetpoint()
         self.servo_reference = JointState()
 
+        # Service clients
+        # Set new SSIM reference on Tactip client
         self.cli_set_ssim_ref = self.create_client(SetBool, 'set_ssim_ref')
-
         self.got_ref = False
         while not self.cli_set_ssim_ref.wait_for_service(timeout_sec=1.0) and not self.sim:
-            self.get_logger().info('Service not available, waiting...')
+            self.get_logger().info('Waiting for set_ssim_ref service to become available...')
+
+        # Calibrate thrust coefficient client
+        self.cli_calibrate_thrust = self.create_client(SetBool, 'calibrate_thrust_coefficient')
+        self.calibrate_thrust_coeff = False
+        while not self.cli_calibrate_thrust.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Waiting for calibrate_thrust_coefficient service to become available...')
 
         # Timer -- always last
         self.counter = 0
@@ -72,14 +80,20 @@ class MissionDirector(UAMStateMachine):
                 self.state_takeoff(target_altitude=1.5, next_state="hover")
 
             case "hover":
-                self.state_hover(duration_sec=1., next_state="pre_contact_arm_position")
+                self.state_hover(duration_sec=3., next_state="calibrate_thrust_coefficient")
+            
+            case "calibrate_thrust_coefficient":
+                self.state_hover(duration_sec=1., next_state="pre_contact_arm_position") # Hover for a while to collect data for thrust coefficient calibration, then transition to pre-contact arm position
+                if not self.calibrate_thrust_coeff:
+                    self.calibrate_thrust_coefficient(True)
+                    self.calibrate_thrust_coeff = True
 
             case "pre_contact_arm_position":
                 q_right = [3*np.pi/4, 0.0, np.pi/4] # put some position here
                 self.state_move_arms(q_des=q_right, next_state="approach")
 
             case "approach": # Better way is to command a negative z velocity on the end-effector and run it through the inverse kinematics
-                self.state_approach_wall_position(approach_speed=[0.0, 0.0, 0.05], transition=self.contact, next_state="tactile_servoing")
+                self.state_approach_wall_position(approach_speed=[0.0, 0.0, 0.05], transition=False, next_state="tactile_servoing") # TODO set transition to self.contact when we have a reliable contact detection, currently just transition after a fixed time to ensure we get into the tactile servoing state
             
             case "tactile_servoing":
                 self.handle_state(state_number=30)
@@ -93,16 +107,6 @@ class MissionDirector(UAMStateMachine):
                 if self.first_state_loop:
                     self.get_logger().info(f'[22] Tactile servoing initiated.')
                     self.first_state_loop = False
-                
-                # Compute feedforward acceleration based on external torque observer
-                # Torque about x is compensated by sideways acceleration (body y), torque about y is compensated by forward/backward acceleration (body x)
-                if self.external_torque is not None:
-                    feedforward_acceleration = [
-                        self.feedforward_gain * self.external_torque.vector.y, 
-                        self.feedforward_gain * self.external_torque.vector.x, 
-                        0.0]
-                else:
-                    feedforward_acceleration = [0.0, 0.0, 0.0]
 
                 # Pass through controller setpoints
                 self.publish_trajectory_velocity_setpoint(
@@ -114,7 +118,7 @@ class MissionDirector(UAMStateMachine):
                 )
 
                 self.publish_servo_velocity_references(self.servo_reference.velocity)
-                self.get_logger().info(f'[22] Contact depth: {self.tactip_data.twist.linear.z:.2f} mm, FF acceleration: x {feedforward_acceleration[0]:.2f} y {feedforward_acceleration[1]:.2f} z {feedforward_acceleration[2]:.2f}', throttle_duration_sec=1)
+                self.get_logger().info(f'[22] Contact depth: {self.tactip_data.twist.linear.z:.2f} mm, FF acceleration: x {self.vehicle_trajectory_setpoint.acceleration[0]:.2f} y {self.vehicle_trajectory_setpoint.acceleration[1]:.2f} z {self.vehicle_trajectory_setpoint.acceleration[2]:.2f}', throttle_duration_sec=1)
                 if self.ts_no_contact_counter > self.ts_no_contact_max_cycles: # If no contact for x cycles, go back to approach
                     self.get_logger().info('Lost contact, returning to approach state.')
                     self.ts_no_contact_counter = 0
@@ -172,6 +176,13 @@ class MissionDirector(UAMStateMachine):
 
         self.future = self.cli_set_ssim_ref.call_async(req)
         self.got_ref = True
+    
+    def calibrate_thrust_coefficient(self, value: bool):
+        req = SetBool.Request()
+        req.data = value
+        self.get_logger().info('Calibrating thrust coefficient...')
+        self.future = self.cli_calibrate_thrust.call_async(req)
+        self.calibrate_thrust_coeff = True
 
 def main():
     rclpy.init(args=None)

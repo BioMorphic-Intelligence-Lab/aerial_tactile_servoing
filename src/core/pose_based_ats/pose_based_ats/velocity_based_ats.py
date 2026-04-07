@@ -118,7 +118,7 @@ class VelocityBasedATS(Node):
         self.previous_yaw_cmd = 0.0
 
         # Timer
-        self.get_logger().info("Starting pose-based ATS controller...")
+        self.get_logger().info("Starting velocity-based ATS controller...")
         self.period = 1./self.get_parameter('frequency').get_parameter_value().double_value
         self.timer = self.create_timer(self.period, self.callback_timer)
 
@@ -205,7 +205,7 @@ class VelocityBasedATS(Node):
                 -self.feedforward_gain * self.external_torque.vector.y, 
                 self.feedforward_gain * self.external_torque.vector.x, 
                 0.0]
-            self.get_logger().info(f'FF accleration: x {feedforward_acceleration[0]:.2f} y {feedforward_acceleration[1]:.2f}', throttle_duration_sec=1.0)
+            #self.get_logger().info(f'FF accleration: x {feedforward_acceleration[0]:.2f} y {feedforward_acceleration[1]:.2f}', throttle_duration_sec=1.0)
 
         # Publish velocity commands
         servo_cmd = JointState()

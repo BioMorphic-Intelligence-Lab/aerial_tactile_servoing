@@ -6,11 +6,15 @@ from rclpy.parameter import Parameter
 
 import numpy as np
 import datetime
+import time
+from collections import deque
 
 from std_msgs.msg import Float64
 from geometry_msgs.msg import Vector3Stamped
 from sensor_msgs.msg import JointState
 from px4_msgs.msg import SensorCombined, ActuatorMotors
+
+from std_srvs.srv import SetBool
 
 L_1 = 0.118
 L_2 = 0.326 
@@ -27,6 +31,8 @@ class TorqueObserver(Node):
         self.declare_parameter('alpha_angular_velocity', 0.7)
         self.declare_parameter('alpha_accelerometer', 0.7)
         self.declare_parameter('alpha_motor_inputs', 0.7)
+        self.declare_parameter('model_mass', 4.239) # [kg] with 6000 mAh batteries
+        self.declare_parameter('torque_bias', [0.0, 0.0, 0.0])
 
         self.frequency = self.get_parameter('frequency').get_parameter_value().double_value
         self.gain_torque = self.get_parameter('gain_torque').get_parameter_value().double_value * np.eye(3)
@@ -34,6 +40,8 @@ class TorqueObserver(Node):
         self.alpha_angular_velocity = self.get_parameter('alpha_angular_velocity').get_parameter_value().double_value
         self.alpha_accelerometer = self.get_parameter('alpha_accelerometer').get_parameter_value().double_value
         self.alpha_motor_inputs = self.get_parameter('alpha_motor_inputs').get_parameter_value().double_value
+        self.model_mass = self.get_parameter('model_mass').get_parameter_value().double_value
+        self.torque_bias = np.array(self.get_parameter('torque_bias').get_parameter_value().double_array_value)
 
         # Register parameter change callback
         self.add_on_set_parameters_callback(self.param_callback)
@@ -52,6 +60,7 @@ class TorqueObserver(Node):
 
         # Actuators
         self.subscriber_actuators = self.create_subscription(ActuatorMotors, '/fmu/out/actuator_motors', self.actuator_callback, qos_profile)
+        self.actuator_control = deque(maxlen=200) # Store the most recent 2 seconds of control data at 100 Hz
         self.actuator_thrust = None
 
         self.subscriber_servos = self.create_subscription(JointState, '/servo/out/state', self.servo_callback, 10)
@@ -69,7 +78,6 @@ class TorqueObserver(Node):
         # Model parameters
         self.thrust_coefficient = 21.0 # Obtained through experimental data previous value 19.468 18.538 21.0 with new batteries
         self.propeller_incline_angle = 5. # [deg] propeller incline in degreess
-        self.model_mass = 4.239 # [kg] with 6000 mAh batteries
         self.acceleration_gravity = np.array([0., 0., 9.81])
         self.linear_allocation_matrix = np.array([[-np.sin(np.deg2rad(60.))*np.sin(np.deg2rad(self.propeller_incline_angle)), np.sin(np.deg2rad(60.))*np.sin(np.deg2rad(self.propeller_incline_angle)), -np.sin(np.deg2rad(60.))*np.sin(np.deg2rad(self.propeller_incline_angle)), np.sin(np.deg2rad(60.))*np.sin(np.deg2rad(self.propeller_incline_angle))],
                                                  [-np.sin(np.deg2rad(30.))*np.sin(np.deg2rad(self.propeller_incline_angle)), np.sin(np.deg2rad(30.))*np.sin(np.deg2rad(self.propeller_incline_angle)), np.sin(np.deg2rad(30.))*np.sin(np.deg2rad(self.propeller_incline_angle)), -np.sin(np.deg2rad(30.))*np.sin(np.deg2rad(self.propeller_incline_angle))],
@@ -86,16 +94,19 @@ class TorqueObserver(Node):
         self.rotational_allocation_matrix = np.array([[-arm_y*np.cos(np.deg2rad(self.propeller_incline_angle)), arm_y*np.cos(np.deg2rad(self.propeller_incline_angle)), arm_y*np.cos(np.deg2rad(self.propeller_incline_angle)), -arm_y*np.cos(np.deg2rad(self.propeller_incline_angle))], # Roll moment
                                                      [-arm_x*np.cos(np.deg2rad(self.propeller_incline_angle)), arm_x*np.cos(np.deg2rad(self.propeller_incline_angle)), -arm_x*np.cos(np.deg2rad(self.propeller_incline_angle)), arm_x*np.cos(np.deg2rad(self.propeller_incline_angle))], # Pitch moment
                                                      [np.sin(np.deg2rad(self.propeller_incline_angle))*yaw_moment_arm+drag_coeff, np.sin(np.deg2rad(self.propeller_incline_angle))*yaw_moment_arm+drag_coeff, -np.sin(np.deg2rad(self.propeller_incline_angle))*yaw_moment_arm+drag_coeff, -np.sin(np.deg2rad(self.propeller_incline_angle))*yaw_moment_arm+drag_coeff]]) # Yaw moment
-
-        self.R_accelerometer = np.array([[-1., 0., 0.],
-                                         [0., -1., 0.],
-                                         [0., 0., -1.]])
         
         # Initial values for updating member variables
-        self.most_recent_force_estimate = np.array([0., 0., 0.])
         self.most_recent_torque_estimate = np.array([0., 0., 0.])
         self.momentum_integral = np.array([0., 0., 0.])
-        self.torque_bias = np.array([0.25, 0.06, 0.13])
+        self.torque_bias = np.array([0., 0., 0.]) #np.array([0.25, 0.06, 0.13])
+
+        # Start self-calibaration service
+        self.srv_calibrate_thrust_coefficient = self.create_service(
+            SetBool,                                    # service type
+            'calibrate_thrust_coefficient',             # service name
+            self.calibrate_thrust_coefficient_callback  # callback
+        )
+        self.collect_control_data = False # Set to true to collect actuator control data for thrust coefficient calibration
 
         # Timer -- always last
         self.previous_time = datetime.datetime.now()
@@ -130,7 +141,7 @@ class TorqueObserver(Node):
             (1. - self.alpha_torque) * self.most_recent_torque_estimate)
         self.publish_estimated_torque(self.most_recent_torque_estimate)
         self.publish_estimated_torque_magnitude(np.linalg.norm(self.most_recent_torque_estimate))
-        self.get_logger().info(f'Torque estimate [{self.most_recent_torque_estimate[0]:.2f}, {self.most_recent_torque_estimate[1]:.2f}, {self.most_recent_torque_estimate[2]:.2f}] [Nm]', throttle_duration_sec=1)
+        self.get_logger().debug(f'Torque estimate [{self.most_recent_torque_estimate[0]:.2f}, {self.most_recent_torque_estimate[1]:.2f}, {self.most_recent_torque_estimate[2]:.2f}] [Nm]', throttle_duration_sec=1)
 
     def publish_estimated_torque(self, torque):
         msg = Vector3Stamped()
@@ -180,6 +191,7 @@ class TorqueObserver(Node):
     def actuator_callback(self, msg):
         if self.actuator_thrust is None:
             self.actuator_thrust = np.array([0., 0., 0., 0.])
+        self.actuator_control.append(np.array([msg.control[0], msg.control[1], msg.control[2], msg.control[3]]))
         smoothed_0 = self.alpha_motor_inputs*msg.control[0]*self.thrust_coefficient + (1.-self.alpha_motor_inputs)*self.actuator_thrust[0]
         smoothed_1 = self.alpha_motor_inputs*msg.control[1]*self.thrust_coefficient + (1.-self.alpha_motor_inputs)*self.actuator_thrust[1]
         smoothed_2 = self.alpha_motor_inputs*msg.control[2]*self.thrust_coefficient + (1.-self.alpha_motor_inputs)*self.actuator_thrust[2]
@@ -208,8 +220,42 @@ class TorqueObserver(Node):
             elif param.name == 'alpha_motor_inputs' and param.type_ == Parameter.Type.DOUBLE:
                 self.get_logger().info(f"Param updated from {self.alpha_motor_inputs} to {param.value}")
                 self.alpha_motor_inputs = param.value
+            elif param.name == 'model_mass' and param.type_ == Parameter.Type.DOUBLE:
+                self.get_logger().info(f"Param updated from {self.model_mass} to {param.value}")
+                self.model_mass = param.value
+            elif param.name == 'torque_bias' and param.type_ == Parameter.Type.DOUBLE_ARRAY:
+                self.get_logger().info(f"Param updated from {self.torque_bias} to {param.value}")
+                self.torque_bias = np.array(param.value)
         # Returning successful result allows the change
         return SetParametersResult(successful=True)
+    
+    def calibrate_thrust_coefficient_callback(self, request, response):
+        # This service can be called to calibrate the thrust coefficient based on current actuator control data. 
+        # The drone should be hovering in place while calling this service, and it will collect actuator control data for a few seconds to compute the 
+        # average control input, which is then used to calibrate the thrust coefficient based on the known mass and gravity
+        self.get_logger().info("Received request for recalibrating thrust coefficients")
+        response.success = True
+        if request.data:
+            self.get_logger().info("Started collecting actuator control data for thrust coefficient calibration. Please hover the drone in place for a few seconds.")
+            if len(self.actuator_control) > 0:
+                # Compute the averages per column
+                average_control = np.mean(self.actuator_control, axis=0)
+                den = np.sum(average_control)
+
+                # Check if the average control is too small to avoid division by zero or very large thrust coefficient
+                if abs(den) < 1e-3:
+                    self.get_logger().error("Average control too small for calibration")
+                    response.success = False
+                    return response
+
+                prev_thrust_coefficient = self.thrust_coefficient
+                self.thrust_coefficient = self.model_mass * self.acceleration_gravity[2] / den
+                self.get_logger().info(f'Calibrated thrust coefficient: {self.thrust_coefficient:.3f}, was {prev_thrust_coefficient:.3f}')
+                response.success = True
+            else:
+                self.get_logger().warn("No control data collected for thrust coefficient calibration.")
+
+        return response
 
     def position_forward_kinematics(self, q_1, q_2, q_3):
         x_BS = -L_2*np.sin(q_2) - L_3*np.sin(q_2)*np.cos(q_3)

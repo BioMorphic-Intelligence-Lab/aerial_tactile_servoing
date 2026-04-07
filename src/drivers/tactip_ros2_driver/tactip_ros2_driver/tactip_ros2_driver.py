@@ -84,9 +84,9 @@ class TactipDriver(Node):
 
         # Start service
         self.srv_get_ssim_ref = self.create_service(
-            SetBool,                 # service type
+            SetBool,                    # service type
             'set_ssim_ref',             # service name
-            self.get_ssim_ref_callback           # callback
+            self.get_ssim_ref_callback  # callback
         )
 
         # Set up timer
