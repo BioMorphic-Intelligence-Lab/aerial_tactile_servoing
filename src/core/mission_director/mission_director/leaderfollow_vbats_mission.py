@@ -110,7 +110,7 @@ class MissionDirector(UAMStateMachine):
                     self.vehicle_trajectory_setpoint.velocity[1],
                     self.vehicle_trajectory_setpoint.velocity[2],
                     self.vehicle_trajectory_setpoint.yawspeed,
-                    acceleration = feedforward_acceleration
+                    acceleration = self.vehicle_trajectory_setpoint.acceleration, # Pass through feedforward acceleration from the controller if available
                 )
 
                 self.publish_servo_velocity_references(self.servo_reference.velocity)

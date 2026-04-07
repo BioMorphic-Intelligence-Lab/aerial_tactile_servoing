@@ -32,13 +32,13 @@ class VelocityBasedATS(Node):
         self.declare_parameter('Ki_angular', 0.1)
         self.declare_parameter('Kd_angular', 0.1)
         self.declare_parameter('nominal_state', [0., 0., 0., 0., 0., 0., np.pi/3, 0., np.pi/6]) # nominal state for secondary objective in the null space (default is q1=60deg, q2=0deg, q3=30deg)
-        self.declare_parameter('torque_feedforward_gain', 0.5)
+        self.declare_parameter('torque_feedforward_gain', 0.0)
         self.declare_parameter('alpha', 1.0)
         self.declare_parameter('windup_clip', 10.)
         self.declare_parameter('test_execution_time', False)
         self.integrator = np.zeros(6)
         self.windup = self.get_parameter('windup_clip').get_parameter_value().double_value
-        self.feedforward_gain = self.get_parameter('im.feedforward_gain').get_parameter_value().double_value
+        self.feedforward_gain = self.get_parameter('torque_feedforward_gain').get_parameter_value().double_value
 
         # Subscribers
         self.subscription_tactip = self.create_subscription(TwistStamped, '/tactip/pose', self.callback_tactip, 10)
@@ -197,6 +197,15 @@ class VelocityBasedATS(Node):
         self.broadcast_tf2(P_BS, "present_body_frame", "present_sensor_frame")
         self.broadcast_tf2(P_SC, "present_sensor_frame", "present_contact_frame")
 
+        # Compute FF acceleration based on external torque observer
+        # Torque about x is compensated by sideways acceleration (body y), torque about y is compensated by forward/backward acceleration (body x)
+        feedforward_acceleration = [0., 0., 0.]
+        if self.external_torque is not None:
+            feedforward_acceleration = [
+                self.feedforward_gain * self.external_torque.vector.y, 
+                self.feedforward_gain * self.external_torque.vector.x, 
+                0.0]
+
         # Publish velocity commands
         servo_cmd = JointState()
         servo_cmd.name = ['q1', 'q2', 'q3']
@@ -207,6 +216,7 @@ class VelocityBasedATS(Node):
         drone_cmd = TrajectorySetpoint()
         drone_cmd.position = [np.nan, np.nan, np.nan]  # Position is not controlled
         drone_cmd.velocity = [float(controlled_state_reference[0]), float(controlled_state_reference[1]), float(controlled_state_reference[2])]
+        drone_cmd.acceleration = feedforward_acceleration # Feedforward acceleration can be added here if desired, currently set to zero
         drone_cmd.yaw = np.nan  # Yaw position is not controlled
         drone_cmd.yawspeed = float(controlled_state_reference[3])
         drone_cmd.timestamp = int(self.get_clock().now().nanoseconds / 1000)

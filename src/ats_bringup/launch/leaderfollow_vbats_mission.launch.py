@@ -87,11 +87,9 @@ def generate_launch_description():
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
             {'nominal_state': [0., 0., 0., 0., 0., 0.,3*PI/4, 0.0, PI/4]},
+            {'torque_feedforward_gain': 0.5},
             {'alpha': 0.1},
             {'windup_clip': 0.15},
-            {'altitude_anchoring': False}, # Don't turn on with altitude damping
-            {'altitude_damping': False}, # Don't turn on with altitude anchoring
-            {'Kp_alt': 0.5},
             {'test_execution_time': False}
         ],
         arguments=['--ros-args', '--log-level', 'info']
