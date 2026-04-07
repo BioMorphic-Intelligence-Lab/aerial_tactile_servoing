@@ -7,8 +7,8 @@ from scipy.optimize import minimize
 from scipy.spatial.transform import Rotation as R
 
 from tf2_ros import TransformBroadcaster
-from std_msgs.msg import Int8, Int32, Float64
-from geometry_msgs.msg import TwistStamped, TransformStamped
+from std_msgs.msg import Int8, Int32
+from geometry_msgs.msg import TwistStamped, TransformStamped, Vector3Stamped
 from sensor_msgs.msg import JointState
 from px4_msgs.msg import VehicleOdometry, TrajectorySetpoint
 
@@ -32,16 +32,13 @@ class VelocityBasedATS(Node):
         self.declare_parameter('Ki_angular', 0.1)
         self.declare_parameter('Kd_angular', 0.1)
         self.declare_parameter('nominal_state', [0., 0., 0., 0., 0., 0., np.pi/3, 0., np.pi/6]) # nominal state for secondary objective in the null space (default is q1=60deg, q2=0deg, q3=30deg)
-        self.declare_parameter('Kp_alt', 0.5)
+        self.declare_parameter('torque_feedforward_gain', 0.5)
         self.declare_parameter('alpha', 1.0)
         self.declare_parameter('windup_clip', 10.)
-        self.declare_parameter('altitude_anchoring', False)
-        self.declare_parameter('altitude_damping', False)
         self.declare_parameter('test_execution_time', False)
         self.integrator = np.zeros(6)
-        self.anchor_altitude = self.get_parameter('altitude_anchoring').get_parameter_value().bool_value
-        self.damp_altitude = self.get_parameter('altitude_damping').get_parameter_value().bool_value
         self.windup = self.get_parameter('windup_clip').get_parameter_value().double_value
+        self.feedforward_gain = self.get_parameter('im.feedforward_gain').get_parameter_value().double_value
 
         # Subscribers
         self.subscription_tactip = self.create_subscription(TwistStamped, '/tactip/pose', self.callback_tactip, 10)
@@ -50,6 +47,8 @@ class VelocityBasedATS(Node):
         self.subscription_fmu = self.create_subscription(VehicleOdometry, '/fmu/in/vehicle_visual_odometry', self.callback_fmu, 10)
         self.subscription_md = self.create_subscription(Int32, '/md/state', self.md_callback, 10)
         self.sub_reference = self.create_subscription(TwistStamped, '/references/sensor_in_contact', self.callback_reference, 10)
+        self.sub_external_torque = self.create_subscription(Vector3Stamped, '/wrench_observer/out/estimated_torque', self.external_torque_callback, 10)
+        self.external_torque = None
 
         # Publishers (necessary)
         self.publisher_servo_state = self.create_publisher(JointState, '/controller/out/servo_state', 10)
@@ -60,10 +59,10 @@ class VelocityBasedATS(Node):
         self.pub_e_sr = self.create_publisher(TwistStamped, '/controller/log/e_sr', 10)
         self.pub_e_sr_filtered = self.create_publisher(TwistStamped, '/controller/log/e_sr_filtered', 10)
         self.pub_u_ss = self.create_publisher(TwistStamped, '/controller/log/uss', 10)
-        self.pub_u_s_anchor = self.create_publisher(TwistStamped, '/controller/log/us_anchor', 10)
         self.pub_proportional = self.create_publisher(TwistStamped, '/controller/log/proportional', 10)
         self.pub_integrator = self.create_publisher(TwistStamped, '/controller/log/integrator', 10)
         self.pub_derivative = self.create_publisher(TwistStamped, '/controller/log/derivative', 10)
+
 
         # Broadcasters
         self.broadcaster_tf2 = TransformBroadcaster(self)
@@ -93,11 +92,8 @@ class VelocityBasedATS(Node):
         self.Kd[4,4] = self.get_parameter('Kd_angular').get_parameter_value().double_value
         self.Kd[5,5] = self.get_parameter('Kd_angular').get_parameter_value().double_value
 
-        self.Kp_alt = self.get_parameter('Kp_alt').get_parameter_value().double_value
-
         self.alpha = self.get_parameter('alpha').get_parameter_value().double_value
         self.e_sr_previous = np.zeros(6)
-        self.ee_alt_ref = None
 
         self.P_Cref = self.evaluate_P_CS(0., 0., 0., 0., 0.) # Initial contact frame at zero angles and zero depth
         self.P_Sref = self.evaluate_P_SC(0., 0., 0., 0., 0.) # Initial sensor frame at zero angles and zero depth
@@ -174,17 +170,9 @@ class VelocityBasedATS(Node):
 
         # Rotate u_ss from sensor frame to inertial frame
         P_S = self.evaluate_P_S(state)
-        # Calculate control action for altitude anchoring if enabled
-
         R_S = P_S[0:3, 0:3]
         u_s = np.concatenate((R_S @ u_ss[0:3], R_S @ u_ss[3:]), axis=0)
         self.publish_twist(u_s, self.pub_u_s) # Publish u_s for log
-
-        if self.anchor_altitude and self.ee_alt_ref is not None:
-            altitude_error = self.ee_alt_ref - P_S[2,3] # Z coordinate of the sensor frame in the inertial frame
-            u_s[2] +=  self.Kp_alt * altitude_error # Add proportional control for altitude error to the z component of u_ss
-            self.get_logger().info(f"Altitude anchoring active. Altitude error: {altitude_error:.3f} m", throttle_duration_sec=1.0)
-            self.publish_twist(u_s, self.pub_u_s_anchor) # Publish u_s with altitude anchoring for logging
 
         # Secondary objective: move servos to nominal position and away from the singularity
         q_secondary = np.zeros(7) 
@@ -203,9 +191,6 @@ class VelocityBasedATS(Node):
             + J_null @ q_secondary # Secondary objective velocities
         
         # TODO: convert controlled state reference from euler angle rates to angular velocities in the body frame
-
-        if self.damp_altitude:
-            controlled_state_reference[2] -= self.Kp_alt * self.vehicle_odometry.velocity[2]
 
         # Broadcast the sensor frame in the body frame
         P_BS = self.evaluate_P_BS(state[6], state[7], state[8])
@@ -247,14 +232,6 @@ class VelocityBasedATS(Node):
         # TODO Invert to publish transform (sensor in contact to contact in sensor frames)
 
     def callback_tactip_contact(self, msg):
-        if not self.contact and msg.data: # If we just made contact, save the EE altitude (z coord)
-            # Run forward kinematics
-            self.ee_alt_ref = self.evaluate_P_S(self.get_state())[2,3] # Z coordinate of the sensor frame in the inertial frame
-            self.get_logger().info(f"Contact made, EE altitude: {self.ee_alt_ref:.3f} m")
-        if self.contact and not msg.data: # If we just lost contact, reset the EE altitude
-            self.ee_alt_ref = None
-            self.get_logger().info(f"Contact lost, resetting EE altitude.")
-
         self.contact = msg.data
         self.accumulate_integrator = bool(msg.data)
 
@@ -266,6 +243,9 @@ class VelocityBasedATS(Node):
 
     def md_callback(self, msg):
         self.md_state = msg.data
+
+    def external_torque_callback(self, msg):
+        self.external_torque = msg
 
     ''' Evaluate transformation matrix of body frame in inertial frame
     '''

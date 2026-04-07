@@ -39,9 +39,6 @@ class MissionDirector(UAMStateMachine):
         self.sub_controller = self.create_subscription(TrajectorySetpoint, '/controller/out/trajectory_setpoint', self.controller_callback, 10)
         self.sub_controller_servo = self.create_subscription(JointState, '/controller/out/servo_state', self.controller_servo_callback, 10)
 
-        self.sub_external_torque = self.create_subscription(Vector3Stamped, '/wrench_observer/out/estimated_torque', self.external_torque_callback, 10)
-        self.external_torque = None
-
         # Tactile servoing specific variables
         self.vehicle_trajectory_setpoint = TrajectorySetpoint()
         self.servo_reference = JointState()

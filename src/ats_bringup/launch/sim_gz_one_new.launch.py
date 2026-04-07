@@ -7,6 +7,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
 import os
 import datetime
+from math import pi as PI
 
 """
 Launch simulation with one arm. Corresponds to the implementation after refactoring.
@@ -109,6 +110,7 @@ def generate_launch_description():
             {'Kp_angular': 0.75},
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
+            {'nominal_state': [0., 0., 0., 0., 0., 0.,3*PI/4, 0.0, PI/4]},
             {'alpha': 0.1},
             {'windup_clip': 0.1},
             {'altitude_anchoring': False}, # Don't turn on with altitude damping
