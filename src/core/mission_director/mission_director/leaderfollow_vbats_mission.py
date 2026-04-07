@@ -72,7 +72,7 @@ class MissionDirector(UAMStateMachine):
                 self.state_move_arms(q_des=q_right, next_state="wait_for_arm_offboard")
 
             case "wait_for_arm_offboard":
-                if not self.got_ref and not self.state_start_time:
+                if not self.got_ref and not self.sim:
                     self.set_new_ssim_ref(True) # Set the current tactip image as the reference for SSIM-based contact detection
                 self.state_wait_for_arming(next_state="takeoff")
 
