@@ -42,7 +42,7 @@ def generate_launch_description():
             {'sm.fcu_on': True},
             {'sm.sim': False},
             {'sm.manipulator_mode': 'velocity'},
-            {'im.tactile_servoing_time': 180.0}
+            {'im.tactile_servoing_time': 600.0}
         ],
         arguments=["--ros-args", "--log-level", "info"]
     )
