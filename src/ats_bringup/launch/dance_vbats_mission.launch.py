@@ -111,7 +111,7 @@ def generate_launch_description():
     ld.add_action(planner)
 
     if logging:
-        rosbag_name = 'wallfollowing_ros2bag_prelim_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        rosbag_name = 'dance_ros2bag_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         ros2bag = ExecuteProcess(
             cmd=['ros2', 'bag', 'record', '-o', log_path+rosbag_name, '-a'], 
             output='screen', 
