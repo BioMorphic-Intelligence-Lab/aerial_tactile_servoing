@@ -150,6 +150,7 @@ private:
     bool write_torque_enable(int8_t torque_enable);
     bool write_profile_velocity(const uint8_t id);
     bool write_velocity_limit(const uint8_t id);
+    bool write_return_delay_times(const std::vector<int64_t> return_delay_times);
 
     void check_parameter_sizes(size_t num_servos) const;
 

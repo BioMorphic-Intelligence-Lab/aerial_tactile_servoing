@@ -38,6 +38,7 @@ DXLDriver::DXLDriver(dynamixel::GroupSyncRead *positionReader, dynamixel::GroupS
     this->declare_parameter("servos.min_angles", std::vector<double>(0.0));
     this->declare_parameter("servos.max_angles", std::vector<double>(0.0));
     this->declare_parameter("servos.start_offsets", std::vector<double>(0.0));
+    this->declare_parameter("servos.return_delay_times", std::vector<int>(0));
 
     // Generate uint8_t vector of ids
     std::vector<int64_t> int_ids = this->get_parameter("servos.ids").as_integer_array();
@@ -543,7 +544,14 @@ void DXLDriver::configure_servos()
         {
             RCLCPP_ERROR(this->get_logger(), "[ID: %i] Failed to set velocity limit", servodata_[i].id);
         }
-    }
+
+        // Write return delay times
+        std::vector<int64_t> return_delay_times = this->get_parameter("servos.return_delay_times").as_integer_array();
+        if(!std::reduce(return_delay_times.begin(), return_delay_times.end())==0) // If the return delay times are not zero
+        {
+            write_return_delay_times(return_delay_times);
+        }
+    } 
 
 }
 
@@ -622,6 +630,35 @@ bool DXLDriver::write_velocity_limit(const uint8_t id)
         RCLCPP_ERROR(this->get_logger(), "[ID: %i] Failed to set velocity limit, result %i, error %i", servodata_[i].id, dxl_comm_result, dxl_error);
         return false;
     }
+}
+
+bool DXLDriver::write_return_delay_times(const std::vector<int64_t> return_delay_times)
+{
+    bool result = true;
+    int dxl_comm_result = COMM_TX_FAIL;
+    for (int i=0; i<num_servos_; i++)
+    {
+        uint8_t ret_time = static_cast<uint8_t>(return_delay_times[i]);
+        dxl_comm_result = packetHandler->read1ByteTxRx(
+            portHandler,
+            servodata_[i].id,
+            DXLREGISTER::RETURN_DELAY,
+            &ret_time,
+            &dxl_error
+        );
+        if (dxl_comm_result == COMM_SUCCESS)
+        {
+            RCLCPP_INFO(this->get_logger(), "[ID: %i] Set return delay time %lu us", 
+                static_cast<int>(servodata_[i].id), 
+                return_delay_times[i]*2);
+        }
+        else
+        {
+            RCLCPP_ERROR(this->get_logger(), "[ID: %i] Failed to set return delay time, result %i, error %i", servodata_[i].id, dxl_comm_result, dxl_error);
+            result = false;
+        }
+    }
+    return result;
 }
 
 bool DXLDriver::write_home_position_at_current_position()
