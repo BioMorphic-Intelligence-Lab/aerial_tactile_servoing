@@ -34,6 +34,7 @@ namespace DXLREGISTER
     uint8_t const VELOCITY_LIMIT    = 0x2C; // Size: 4 bytes
     uint8_t const MAX_POSITION      = 0x30; // Size: 4 bytes
     uint8_t const MIN_POSITION      = 0x34; // Size: 4 bytes
+    uint8_t const SHUTDOWN          = 0x3F; // Size: 1 byte
     uint8_t const TORQUE_ENABLE     = 0x40; // Size: 1 byte
     uint8_t const LED               = 0x41; // Size: 1 byte
     uint8_t const HARDWARE_ERROR    = 0x46; // Size: 1 byte
@@ -47,6 +48,8 @@ namespace DXLREGISTER
     uint8_t const PRESENT_CURRENT   = 0x7E; // Size: 2 bytes, read-only
     uint8_t const PRESENT_VELOCITY  = 0x80; // Size: 4 bytes, read-only
     uint8_t const PRESENT_POSITION  = 0x84; // Size: 4 bytes, read-only
+    uint8_t const PRESENT_VOLTAGE   = 0x90; // Size: 2 bytes, read-only
+    uint8_t const PRESENT_TEMPERATURE=0x92; // Size: 1 byte, read-only
 };
 
 enum DXLMode{
@@ -129,12 +132,17 @@ private:
     int32_t pos_rad2int(uint8_t id, double position_rads);
     double vel_int2rad(uint8_t id, int32_t velocity_ticks);
     int32_t vel_rad2int(uint8_t id, double velocity_rads); 
-    double cur_int2amp(uint16_t current_ticks);
+    double cur_int2amp(int16_t current_ticks);
 
     int read_present_positions();
     int read_present_velocities();
     int read_present_currents();
     int read_present_pwms();
+    void read_present_temperature();
+    void read_present_voltage();
+    void read_torque_enable_status();
+    void read_shutdown_conditions();
+    void read_hardware_error_status();
 
     void configure_servos();
 

@@ -13,7 +13,6 @@ dynamixel::PacketHandler * packetHandler;
 
 uint8_t dxl_error = 0;
 uint32_t goal_position = 0;
-int dxl_comm_result = COMM_TX_FAIL;
 
 DXLDriver::DXLDriver(dynamixel::GroupSyncRead *positionReader, dynamixel::GroupSyncRead *velocityReader,
     dynamixel::GroupSyncRead *currentReader, dynamixel::GroupSyncRead *PWMReader, 
@@ -211,6 +210,7 @@ void DXLDriver::write_goal_positions()
         }
     }
 
+    int dxl_comm_result = COMM_TX_FAIL;
     dxl_comm_result = gswPosition->txPacket();
     if (dxl_comm_result != COMM_SUCCESS) {
         RCLCPP_INFO(this->get_logger(), "%s", packetHandler->getTxRxResult(dxl_comm_result));
@@ -258,6 +258,8 @@ void DXLDriver::write_goal_velocities()
                 );
         }
     }
+
+    int dxl_comm_result = COMM_TX_FAIL;
     dxl_comm_result = gswVelocity->txPacket();
     if (dxl_comm_result != COMM_SUCCESS) {
         RCLCPP_INFO(this->get_logger(), "%s", packetHandler->getTxRxResult(dxl_comm_result));
@@ -273,7 +275,10 @@ int DXLDriver::read_all_servo_data()
     res += read_present_positions();
     res += read_present_velocities();
     res += read_present_currents();
-    res += read_present_pwms();
+
+    // read_present_temperature();
+    // read_present_voltage();
+    // read_torque_enable_status();
     return res;
 }
 
@@ -302,6 +307,7 @@ void DXLDriver::publish_all_servo_data()
 
 int DXLDriver::read_present_positions()
 {
+    int dxl_comm_result = COMM_TX_FAIL;
     dxl_comm_result = gsrPosition->txRxPacket();
     if (dxl_comm_result == COMM_SUCCESS)
     {
@@ -319,12 +325,14 @@ int DXLDriver::read_present_positions()
     else
     {
         RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Failed to get present positions with GroupSyncRead. Error code %d", dxl_comm_result);
+        read_hardware_error_status();
     }
     return dxl_comm_result;
 }
 
 int DXLDriver::read_present_velocities()
 {
+    int dxl_comm_result = COMM_TX_FAIL;
     dxl_comm_result = gsrVelocity->txRxPacket();
     if (dxl_comm_result == COMM_SUCCESS)
     {
@@ -336,46 +344,167 @@ int DXLDriver::read_present_velocities()
     else
     {
         RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Failed to get present velocities with GroupSyncRead. Error code %d", dxl_comm_result);
+        read_hardware_error_status();
     }
     return dxl_comm_result;
 }
 
 int DXLDriver::read_present_currents()
 {
+    int dxl_comm_result = COMM_TX_FAIL;
     dxl_comm_result = gsrCurrent->txRxPacket();
     if (dxl_comm_result == COMM_SUCCESS)
     {
         for (int i=0; i<num_servos_; i++)
         {
-            servodata_[i].present_current = cur_int2amp(gsrCurrent->getData(ids_[i], DXLREGISTER::PRESENT_CURRENT, 4));
+            servodata_[i].present_current = cur_int2amp(gsrCurrent->getData(ids_[i], DXLREGISTER::PRESENT_CURRENT, 2));
         }
     }
     else
     {
         RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Failed to get present currents with GroupSyncRead. Error code %d", dxl_comm_result);
+        read_hardware_error_status();
     }
     return dxl_comm_result;
 }
 
 int DXLDriver::read_present_pwms()
 {
+    int dxl_comm_result = COMM_TX_FAIL;
     dxl_comm_result = gsrPWM->txRxPacket();
     if (dxl_comm_result == COMM_SUCCESS)
     {
         for (int i=0; i<num_servos_; i++)
         {
-            servodata_[i].present_pwm = gsrPWM->getData(ids_[i], DXLREGISTER::PRESENT_PWM, 4);
+            servodata_[i].present_pwm = gsrPWM->getData(ids_[i], DXLREGISTER::PRESENT_PWM, 2);
         }
     }
     else
     {
         RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Failed to get present pwms with GroupSyncRead. Error code %d", dxl_comm_result);
+        read_hardware_error_status();
     }
     return dxl_comm_result;
 }
 
+void DXLDriver::read_torque_enable_status()
+{
+    int dxl_comm_result = COMM_TX_FAIL;
+    uint8_t data;
+    for (int i=0; i<num_servos_; i++)
+    {
+        dxl_comm_result = packetHandler->read1ByteTxRx(
+            portHandler,
+            servodata_[i].id,
+            DXLREGISTER::TORQUE_ENABLE,
+            &data,
+            &dxl_error
+        );
+        if (dxl_comm_result == COMM_SUCCESS)
+        {
+            RCLCPP_INFO(this->get_logger(), "[ID: %i] Torque enable reading: %i", 
+                static_cast<int>(servodata_[i].id),
+                data);
+        }
+    }
+    return;
+}
+
+void DXLDriver::read_present_voltage()
+{
+    int dxl_comm_result = COMM_TX_FAIL;
+    uint16_t data;
+    for (int i=0; i<num_servos_; i++)
+    {
+        dxl_comm_result = packetHandler->read2ByteTxRx(
+            portHandler,
+            servodata_[i].id,
+            DXLREGISTER::PRESENT_VOLTAGE,
+            &data,
+            &dxl_error
+        );
+        if (dxl_comm_result == COMM_SUCCESS)
+        {
+            RCLCPP_INFO(this->get_logger(), "[ID: %i] Present voltage reading: %i", 
+                static_cast<int>(servodata_[i].id),
+                data);
+        }
+    }
+    return;
+}
+
+void DXLDriver::read_present_temperature()
+{
+    int dxl_comm_result = COMM_TX_FAIL;
+    uint8_t data;
+    for (int i=0; i<num_servos_; i++)
+    {
+        dxl_comm_result = packetHandler->read1ByteTxRx(
+            portHandler,
+            servodata_[i].id,
+            DXLREGISTER::PRESENT_TEMPERATURE,
+            &data,
+            &dxl_error
+        );
+        if (dxl_comm_result == COMM_SUCCESS)
+        {
+            RCLCPP_INFO(this->get_logger(), "[ID: %i] Present temp reading: %i", 
+                static_cast<int>(servodata_[i].id),
+                data);
+        }
+    }
+    return;
+}
+
+void DXLDriver::read_shutdown_conditions()
+{
+    int dxl_comm_result = COMM_TX_FAIL;
+    uint8_t data;
+    for (int i=0; i<num_servos_; i++)
+    {
+        dxl_comm_result = packetHandler->read1ByteTxRx(
+            portHandler,
+            servodata_[i].id,
+            DXLREGISTER::SHUTDOWN,
+            &data,
+            &dxl_error
+        );
+        if (dxl_comm_result == COMM_SUCCESS)
+        {
+            RCLCPP_INFO(this->get_logger(), "[ID: %i] Shutdown reading: %i", 
+                static_cast<int>(servodata_[i].id),
+                data);
+        }
+    }
+    return;
+}
+
+void DXLDriver::read_hardware_error_status()
+{
+    int dxl_comm_result = COMM_TX_FAIL;
+    uint8_t data;
+    for (int i=0; i<num_servos_; i++)
+    {
+        dxl_comm_result = packetHandler->read1ByteTxRx(
+            portHandler,
+            servodata_[i].id,
+            DXLREGISTER::HARDWARE_ERROR,
+            &data,
+            &dxl_error
+        );
+        if (dxl_comm_result == COMM_SUCCESS)
+        {
+            RCLCPP_INFO(this->get_logger(), "[ID: %i] Hardware error status: %i", 
+                static_cast<int>(servodata_[i].id),
+                data);
+        }
+    }
+    return;
+}
+
 void DXLDriver::configure_servos()
 {
+    int dxl_comm_result = COMM_TX_FAIL;
     for (int i = 0; i < num_servos_; i++)
     {
         // Write operating mode 4 to use velocity-based profiles
@@ -421,6 +550,7 @@ void DXLDriver::configure_servos()
 // Writes max velocity from the servodata_
 bool DXLDriver::write_profile_velocity(const uint8_t id)
 {
+    int dxl_comm_result = COMM_TX_FAIL;
     int i = id2index_[id];
     uint32_t profile_velocity = static_cast<uint32_t>(std::abs(vel_rad2int(servodata_[i].id, servodata_[i].max_velocity)));
     dxl_comm_result = packetHandler->write4ByteTxRx(
@@ -469,6 +599,7 @@ bool DXLDriver::write_profile_velocity(const uint8_t id)
 
 bool DXLDriver::write_velocity_limit(const uint8_t id)
 {
+    int dxl_comm_result = COMM_TX_FAIL;
     int i = id2index_[id];
     uint32_t velocity_limit = static_cast<uint32_t>(std::abs(vel_rad2int(servodata_[i].id, servodata_[i].max_velocity))+1);
     dxl_comm_result = packetHandler->write4ByteTxRx(
@@ -491,35 +622,13 @@ bool DXLDriver::write_velocity_limit(const uint8_t id)
         RCLCPP_ERROR(this->get_logger(), "[ID: %i] Failed to set velocity limit, result %i, error %i", servodata_[i].id, dxl_comm_result, dxl_error);
         return false;
     }
-
-    // Read back the maximum profile velocity
-    uint32_t backread_velocity;
-    dxl_comm_result = packetHandler->read4ByteTxRx(
-        portHandler,
-        servodata_[i].id,
-        DXLREGISTER::VELOCITY_LIMIT,
-        &backread_velocity,
-        &dxl_error
-    );
-    if (dxl_comm_result == COMM_SUCCESS)
-    {
-        //RCLCPP_INFO(this->get_logger(), "[ID: %i] Backread max velocity %d ticks", servodata_[i].id, backread_velocity);
-        if (backread_velocity+1 == velocity_limit)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-    return false;
 }
 
 bool DXLDriver::write_home_position_at_current_position()
 {
     RCLCPP_INFO(this->get_logger(), "[SERVICE] Writing home position at the current position");
     // Update servo current positions
+    int dxl_comm_result = COMM_TX_FAIL;
     int32_t homing_offset;
     bool success = true;
     read_present_positions();
@@ -566,7 +675,7 @@ bool DXLDriver::write_home_position_at_current_position()
 
 bool DXLDriver::write_torque_enable(int8_t torque_enable)
 {
-
+    int dxl_comm_result = COMM_TX_FAIL;
     // TODO: Set current position as goal position?
     bool success = true;
     for (int i = 0; i < num_servos_; i++)
@@ -618,7 +727,7 @@ int32_t DXLDriver::vel_rad2int(uint8_t id, double velocity_rads)
     return static_cast<int32_t>(servodata_[i].direction * velocity_rads / RAD_PER_SECOND_PER_TICK * servodata_[id2index_[id]].gear_ratio);
 }
 
-double DXLDriver::cur_int2amp(uint16_t current_ticks)
+double DXLDriver::cur_int2amp(int16_t current_ticks)
 {
     return static_cast<double>(current_ticks*MA_PER_TICK);
 }
@@ -685,6 +794,7 @@ void DXLDriver::srv_set_max_velocity_callback(
 
 void DXLDriver::enable_all_torque()
 {
+    int dxl_comm_result = COMM_TX_FAIL;
     // Enable Torque of DYNAMIXEL
     dxl_comm_result = packetHandler->write1ByteTxRx(
         portHandler,
@@ -747,6 +857,7 @@ void DXLDriver::check_parameter_sizes(size_t num_servos) const
 
 void setup_port()
 {
+    int dxl_comm_result = COMM_TX_FAIL;
     dxl_comm_result = portHandler->openPort();
     if (dxl_comm_result == false) {
         RCLCPP_ERROR(rclcpp::get_logger("dxl_driver"), "Failed to open the port!");
