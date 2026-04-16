@@ -69,7 +69,7 @@ class MissionDirector(UAMStateMachine):
                 self.state_wait_for_arming(next_state="takeoff")
 
             case "takeoff":
-                self.state_takeoff(target_altitude=1.5, next_state="hover")
+                self.state_takeoff(target_altitude=1.4, next_state="hover")
 
             case "hover":
                 self.state_hover(duration_sec=1., next_state="pre_contact_arm_position") # TODO fix state transition
@@ -79,7 +79,7 @@ class MissionDirector(UAMStateMachine):
                 self.state_move_arms(q_des=q_right, next_state="approach")
 
             case "approach": # Better way is to command a negative z velocity on the end-effector and run it through the inverse kinematics
-                self.state_approach_wall_velocity(approach_speed=[0.0, 0.05, 0.0], transition=self.contact, next_state="tactile_servoing")
+                self.state_approach_wall_position(approach_speed=[0.0, 0.05, 0.0], transition=self.contact, next_state="tactile_servoing")
             
             case "tactile_servoing":
                 self.handle_state(state_number=30)

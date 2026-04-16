@@ -77,15 +77,15 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'Kp_depth': 20.0},
-            {'Ki_depth': 2.5}, # previous 12, 4
+            {'Kp_depth': 40.0},
+            {'Ki_depth': 12.0},
             {'Kd_depth': 2.0},
-            {'Kp_shear': 10.0}, # previous 20.0
+            {'Kp_shear': 20.0},
             {'Ki_shear': 2.5},
             {'Kd_shear': 2.0},
-            {'Kp_angular': 0.15},
+            {'Kp_angular': 0.55},
             {'Ki_angular': 0.0},
-            {'Kd_angular': 0.05},
+            {'Kd_angular': 0.45},
             {'nominal_state': [0., 0., 0., 0., 0., 0., PI/4, 0.0, PI/4]},
             {'torque_feedforward_gain': 0.0},
             {'alpha': 0.1},
@@ -103,7 +103,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'default_depth': -2.5}, # default contact depth in mm
+            {'default_depth': -3.0}, # default contact depth in mm
             {'mission_preset': 'default'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
             {'verbose': False}
         ],
