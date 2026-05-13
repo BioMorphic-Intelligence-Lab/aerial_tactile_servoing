@@ -14,6 +14,7 @@ The package can be launched with 'ros2 launch ats_bringup vbats_mission.launch.p
 logging = True
 log_path = '/ros2_ws/aerial_tactile_servoing/rosbags/'
 config_name = 'dxl_ros2_vbats.yaml'
+PI = 3.141592653589793
 
 def generate_launch_description():
     ld = LaunchDescription()
@@ -84,11 +85,10 @@ def generate_launch_description():
             {'Kp_angular': 0.75},
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
+            {'nominal_state': [0., 0., 0., 0., 0., 0., PI/4, 0.0, PI/4]},
+            {'torque_feedforward_gain': 0.0},
             {'alpha': 0.1},
             {'windup_clip': 0.15},
-            {'altitude_anchoring': False}, # Don't turn on with altitude damping
-            {'altitude_damping': False}, # Don't turn on with altitude anchoring
-            {'Kp_alt': 0.5},
             {'test_execution_time': False}
         ],
         arguments=['--ros-args', '--log-level', 'info']
