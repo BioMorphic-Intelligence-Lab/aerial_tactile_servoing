@@ -17,6 +17,7 @@ build_isolated/
 devel_isolated/
 install/
 log/
+rosbags/*
 
 # virtual environment
 venv-ats*
