@@ -110,8 +110,8 @@ def generate_launch_description():
             {'Kp_angular': 0.75},
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
+            {'IK_weights': [100., 100., 50., 50., 1., 1., 1.]}, # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
             {'nominal_state': [0., 0., 0., 0., 0., 0.,3*PI/4, 0.0, PI/4]},
-            {'torque_feedforward_gain': 0.5},
             {'alpha': 0.1},
             {'windup_clip': 0.15},
             {'test_execution_time': False}

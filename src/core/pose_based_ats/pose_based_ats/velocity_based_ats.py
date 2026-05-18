@@ -126,9 +126,8 @@ class VelocityBasedATS(Node):
         # Get state
         state = self.get_state()
         jacobian_full = self.evaluate_JG(roll=state[3], pitch=state[4], yaw=state[5], q_1=state[6], q_2=state[7], q_3=state[8])
-        J_controlled = jacobian_full[:,[0,1,2,5,6,7,8]] # X, Y, Z, yaw, q1, q2, q3 are controlled DOFs
-        J_uncontrolled = jacobian_full[:,[3,4]] # Roll and pitch are uncontrolled DOFs
-        #J_controlled_pinv = np.linalg.pinv(J_controlled) # Pseudo-inverse of controlled jacobian
+        J_controlled = jacobian_full[0:5,[0,1,2,5,6,7,8]] # X, Y, Z, yaw, q1, q2, q3 are controlled DOFs. Rz output is uncontrolled
+        J_uncontrolled = jacobian_full[0:5,[3,4]] # Roll and pitch are uncontrolled DOFs
         J_controlled_pinv = self.weights_inv @ J_controlled.T @ np.linalg.inv(J_controlled @ self.weights_inv @ J_controlled.T) # 
         J_null = np.eye(J_controlled.shape[1]) - J_controlled_pinv @ J_controlled # Null space projector of controlled jacobian
 
@@ -141,10 +140,7 @@ class VelocityBasedATS(Node):
         p_sc_vector = self.transformation_to_vector(P_SC) # If using subtraction to find the error, have poses in the same frame
         p_sref_vector = self.transformation_to_vector(self.P_Sref)
         e_sr = p_sref_vector - p_sc_vector
-        #self.get_logger().info(f"Error vector (e_sr) in sensor frame: {e_sr[0]*1000.:.2f}, {e_sr[1]*1000.:.2f}, {e_sr[2]*1000.:.2f}, {e_sr[3]:.2f}, {e_sr[4]:.2f}", throttle_duration_sec=1.0)
         self.publish_twist(e_sr, self.pub_e_sr) # Publish error for logging
-        # E_Sref = P_SC @ self.P_Cref
-        # e_sr = self.transformation_to_vector(E_Sref)
 
         # Use a filtered error for the derivative term to reduce noise
         e_sr_filtered = self.alpha * e_sr + (1-self.alpha) * self.e_sr_previous
@@ -172,7 +168,7 @@ class VelocityBasedATS(Node):
         # Rotate u_ss from sensor frame to inertial frame
         P_S = self.evaluate_P_S(state)
         R_S = P_S[0:3, 0:3]
-        u_s = np.concatenate((R_S @ u_ss[0:3], R_S @ u_ss[3:]), axis=0)
+        u_s = np.concatenate((R_S @ u_ss[0:3], R_S @ u_ss[3:]), axis=0)[0:5]
         self.publish_twist(u_s, self.pub_u_s) # Publish u_s for log
 
         # Secondary objective: move servos to nominal position and away from the singularity
@@ -564,14 +560,19 @@ class VelocityBasedATS(Node):
         self.broadcaster_tf2.sendTransform(t)
 
     def publish_twist(self, vec:np.array, publisher):
+        # Fill in the missing dimensions with zeros to create a full 6D twist message
+        full_vec = np.zeros(6)
+        for i in range(len(vec)):
+            full_vec[i] = vec[i]
+
         msg = TwistStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.twist.linear.x = vec[0]
-        msg.twist.linear.y = vec[1]
-        msg.twist.linear.z = vec[2]
-        msg.twist.angular.x = vec[3]
-        msg.twist.angular.y = vec[4]
-        msg.twist.angular.z = vec[5]
+        msg.twist.linear.x = full_vec[0]
+        msg.twist.linear.y = full_vec[1]
+        msg.twist.linear.z = full_vec[2]
+        msg.twist.angular.x = full_vec[3]
+        msg.twist.angular.y = full_vec[4]
+        msg.twist.angular.z = full_vec[5]
         publisher.publish(msg)
 
 def main(args=None):
