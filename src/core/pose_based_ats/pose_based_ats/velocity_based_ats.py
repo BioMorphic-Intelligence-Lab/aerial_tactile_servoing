@@ -31,14 +31,13 @@ class VelocityBasedATS(Node):
         self.declare_parameter('Kp_angular', 3.0)
         self.declare_parameter('Ki_angular', 0.1)
         self.declare_parameter('Kd_angular', 0.1)
+        self.declare_parameter('IK_weights', [1., 1., 1., 1., 1., 1., 1., 1., 1.]) # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
         self.declare_parameter('nominal_state', [0., 0., 0., 0., 0., 0., np.pi/3, 0., np.pi/6]) # nominal state for secondary objective in the null space (default is q1=60deg, q2=0deg, q3=30deg)
-        self.declare_parameter('torque_feedforward_gain', 0.0)
         self.declare_parameter('alpha', 1.0)
         self.declare_parameter('windup_clip', 10.)
         self.declare_parameter('test_execution_time', False)
         self.integrator = np.zeros(6)
         self.windup = self.get_parameter('windup_clip').get_parameter_value().double_value
-        self.feedforward_gain = self.get_parameter('torque_feedforward_gain').get_parameter_value().double_value
 
         # Subscribers
         self.subscription_tactip = self.create_subscription(TwistStamped, '/tactip/pose', self.callback_tactip, 10)
@@ -47,8 +46,6 @@ class VelocityBasedATS(Node):
         self.subscription_fmu = self.create_subscription(VehicleOdometry, '/fmu/in/vehicle_visual_odometry', self.callback_fmu, 10)
         self.subscription_md = self.create_subscription(Int32, '/md/state', self.md_callback, 10)
         self.sub_reference = self.create_subscription(TwistStamped, '/references/sensor_in_contact', self.callback_reference, 10)
-        self.sub_external_torque = self.create_subscription(Vector3Stamped, '/wrench_observer/out/estimated_torque', self.external_torque_callback, 10)
-        self.external_torque = None
 
         # Publishers (necessary)
         self.publisher_servo_state = self.create_publisher(JointState, '/controller/out/servo_state', 10)
@@ -115,6 +112,9 @@ class VelocityBasedATS(Node):
 
         self.nominal_state = np.array(self.get_parameter('nominal_state').get_parameter_value().double_array_value)
 
+        self.weights = np.diag(self.get_parameter('IK_weights').get_parameter_value().double_array_value)
+        self.weights_inv = np.linalg.inv(self.weights)
+
         self.previous_yaw_cmd = 0.0
 
         # Timer
@@ -128,7 +128,8 @@ class VelocityBasedATS(Node):
         jacobian_full = self.evaluate_JG(roll=state[3], pitch=state[4], yaw=state[5], q_1=state[6], q_2=state[7], q_3=state[8])
         J_controlled = jacobian_full[:,[0,1,2,5,6,7,8]] # X, Y, Z, yaw, q1, q2, q3 are controlled DOFs
         J_uncontrolled = jacobian_full[:,[3,4]] # Roll and pitch are uncontrolled DOFs
-        J_controlled_pinv = np.linalg.pinv(J_controlled) # Pseudo-inverse of controlled jacobian
+        #J_controlled_pinv = np.linalg.pinv(J_controlled) # Pseudo-inverse of controlled jacobian
+        J_controlled_pinv = self.weights_inv @ J_controlled.T @ np.linalg.inv(J_controlled @ self.weights_inv @ J_controlled.T) # 
         J_null = np.eye(J_controlled.shape[1]) - J_controlled_pinv @ J_controlled # Null space projector of controlled jacobian
 
         # Broadcast the current drone pose world -> body
@@ -197,16 +198,6 @@ class VelocityBasedATS(Node):
         self.broadcast_tf2(P_BS, "present_body_frame", "present_sensor_frame")
         self.broadcast_tf2(P_SC, "present_sensor_frame", "present_contact_frame")
 
-        # Compute FF acceleration based on external torque observer
-        # Torque about x is compensated by sideways acceleration (body y), torque about y is compensated by forward/backward acceleration (body x)
-        feedforward_acceleration = [0., 0., 0.]
-        if self.external_torque is not None:
-            feedforward_acceleration = [
-                self.feedforward_gain * self.external_torque.vector.y, 
-                -self.feedforward_gain * self.external_torque.vector.x, 
-                0.0]
-            #self.get_logger().info(f'FF accleration: x {feedforward_acceleration[0]:.2f} y {feedforward_acceleration[1]:.2f}', throttle_duration_sec=1.0)
-
         # Publish velocity commands
         servo_cmd = JointState()
         servo_cmd.name = ['q1', 'q2', 'q3']
@@ -217,7 +208,6 @@ class VelocityBasedATS(Node):
         drone_cmd = TrajectorySetpoint()
         drone_cmd.position = [np.nan, np.nan, np.nan]  # Position is not controlled
         drone_cmd.velocity = [float(controlled_state_reference[0]), float(controlled_state_reference[1]), float(controlled_state_reference[2])]
-        drone_cmd.acceleration = feedforward_acceleration # Feedforward acceleration can be added here if desired, currently set to zero
         drone_cmd.yaw = np.nan  # Yaw position is not controlled
         drone_cmd.yawspeed = float(controlled_state_reference[3])
         drone_cmd.timestamp = int(self.get_clock().now().nanoseconds / 1000)
@@ -254,9 +244,6 @@ class VelocityBasedATS(Node):
 
     def md_callback(self, msg):
         self.md_state = msg.data
-
-    def external_torque_callback(self, msg):
-        self.external_torque = msg
 
     ''' Evaluate transformation matrix of body frame in inertial frame
     '''
