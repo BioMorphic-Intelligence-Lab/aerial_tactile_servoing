@@ -31,7 +31,7 @@ class VelocityBasedATS(Node):
         self.declare_parameter('Kp_angular', 3.0)
         self.declare_parameter('Ki_angular', 0.1)
         self.declare_parameter('Kd_angular', 0.1)
-        self.declare_parameter('IK_weights', [1., 1., 1., 1., 1., 1., 1., 1., 1.]) # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
+        self.declare_parameter('IK_weights', [1., 1., 1., 1., 1., 1., 1.]) # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
         self.declare_parameter('nominal_state', [0., 0., 0., 0., 0., 0., np.pi/3, 0., np.pi/6]) # nominal state for secondary objective in the null space (default is q1=60deg, q2=0deg, q3=30deg)
         self.declare_parameter('alpha', 1.0)
         self.declare_parameter('windup_clip', 10.)
