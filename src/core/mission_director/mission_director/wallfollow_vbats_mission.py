@@ -117,7 +117,7 @@ class MissionDirector(UAMStateMachine):
                 transition = False
                 if (datetime.datetime.now()-self.state_start_time).seconds > 10:
                     transition = True
-                self.state_approach_wall_velocity(approach_speed=[0.0, 0.0, -0.1], transition=transition, next_state="land_arms_position")
+                self.state_approach_wall_velocity(approach_speed=[0.0, -0.2, 0.0], transition=transition, next_state="land_arms_position")
 
             case "land_arms_position":
                 q_right = [1.57, 0.0, -1.57] # put some position here

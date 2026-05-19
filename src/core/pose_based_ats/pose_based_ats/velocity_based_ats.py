@@ -126,8 +126,8 @@ class VelocityBasedATS(Node):
         # Get state
         state = self.get_state()
         jacobian_full = self.evaluate_JG(roll=state[3], pitch=state[4], yaw=state[5], q_1=state[6], q_2=state[7], q_3=state[8])
-        J_controlled = jacobian_full[0:5,[0,1,2,5,6,7,8]] # X, Y, Z, yaw, q1, q2, q3 are controlled DOFs. Rz output is uncontrolled
-        J_uncontrolled = jacobian_full[0:5,[3,4]] # Roll and pitch are uncontrolled DOFs
+        J_controlled = jacobian_full[:,[0,1,2,5,6,7,8]] # X, Y, Z, yaw, q1, q2, q3 are controlled DOFs. Rz output is uncontrolled
+        J_uncontrolled = jacobian_full[:,[3,4]] # Roll and pitch are uncontrolled DOFs
         J_controlled_pinv = self.weights_inv @ J_controlled.T @ np.linalg.inv(J_controlled @ self.weights_inv @ J_controlled.T) # 
         J_null = np.eye(J_controlled.shape[1]) - J_controlled_pinv @ J_controlled # Null space projector of controlled jacobian
 
@@ -160,6 +160,7 @@ class VelocityBasedATS(Node):
             self.integrator = np.zeros(6)
 
         u_ss = - (self.Kp@e_sr + self.integrator + self.derivative) # u_ss is in sensor frame, transform to inertial frame
+        u_ss[5] = 0. # Relinquish Rz control
         self.publish_twist(u_ss, self.pub_u_ss) # Publish u_ss for logging
         self.publish_twist(-self.Kp@e_sr, self.pub_proportional) # Publish proportional term for logging
         self.publish_twist(-self.integrator, self.pub_integrator) # Publish integrator for logging
@@ -168,7 +169,7 @@ class VelocityBasedATS(Node):
         # Rotate u_ss from sensor frame to inertial frame
         P_S = self.evaluate_P_S(state)
         R_S = P_S[0:3, 0:3]
-        u_s = np.concatenate((R_S @ u_ss[0:3], R_S @ u_ss[3:]), axis=0)[0:5]
+        u_s = np.concatenate((R_S @ u_ss[0:3], R_S @ u_ss[3:]), axis=0)
         self.publish_twist(u_s, self.pub_u_s) # Publish u_s for log
 
         # Secondary objective: move servos to nominal position and away from the singularity
