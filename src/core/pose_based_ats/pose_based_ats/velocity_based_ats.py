@@ -31,6 +31,7 @@ class VelocityBasedATS(Node):
         self.declare_parameter('Kp_angular', 3.0)
         self.declare_parameter('Ki_angular', 0.1)
         self.declare_parameter('Kd_angular', 0.1)
+        self.declare_parameter('Kp_secondary', 1.0)
         self.declare_parameter('IK_weights', [1., 1., 1., 1., 1., 1., 1.]) # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
         self.declare_parameter('nominal_state', [0., 0., 0., 0., 0., 0., np.pi/3, 0., np.pi/6]) # nominal state for secondary objective in the null space (default is q1=60deg, q2=0deg, q3=30deg)
         self.declare_parameter('alpha', 1.0)
@@ -115,6 +116,8 @@ class VelocityBasedATS(Node):
         self.weights = np.diag(self.get_parameter('IK_weights').get_parameter_value().double_array_value)
         self.weights_inv = np.linalg.inv(self.weights)
 
+        self.Kp_secondary = self.get_parameter('Kp_secondary').get_parameter_value().double_value
+
         self.previous_yaw_cmd = 0.0
 
         # Timer
@@ -174,9 +177,9 @@ class VelocityBasedATS(Node):
 
         # Secondary objective: move servos to nominal position and away from the singularity
         q_secondary = np.zeros(7) 
-        q_secondary[4] = self.nominal_state[6] - state[6]  # q1 nominal position
-        q_secondary[5] = self.nominal_state[7] - state[7]  # q2 nominal position
-        q_secondary[6] = self.nominal_state[8] - state[8]  # q3 nominal position
+        q_secondary[4] = self.Kp_secondary * (self.nominal_state[6] - state[6])  # q1 nominal position
+        q_secondary[5] = self.Kp_secondary * (self.nominal_state[7] - state[7])  # q2 nominal position
+        q_secondary[6] = self.Kp_secondary * (self.nominal_state[8] - state[8])  # q3 nominal position
 
         # Transform angular velocity from FCU to euler angle rates
         euler_rate_inertial = self.T_euler_rate_to_angular_velocity_inv(state[4], state[5]) @ \
