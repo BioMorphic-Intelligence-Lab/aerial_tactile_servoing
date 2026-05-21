@@ -56,8 +56,8 @@ def generate_launch_description():
 
     mission_director = Node(
         package="mission_director",
-        executable="leaderfollow_vbats_mission",
-        name="leaderfollow_vbats_mission",
+        executable="wallfollow_vbats_mission",
+        name="wallfollow_vbats_mission",
         output="screen",
         parameters=[
             {'sm.frequency': 100.0},
@@ -65,8 +65,7 @@ def generate_launch_description():
             {'sm.fcu_on': False},
             {'sm.sim': True},
             {'sm.manipulator_mode': 'velocity'},
-            {'im.tactile_servoing_time': 200.0},
-            {'im.feedforward_gain': 0.5}
+            {'im.tactile_servoing_time': 200.0}
         ],
         arguments=["--ros-args", "--log-level", "info"]
     )
@@ -101,17 +100,18 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'Kp_depth': 40.0},
-            {'Ki_depth': 4.0},
-            {'Kd_depth': 2.0},
+            {'Kp_depth': 300.0},
+            {'Ki_depth': 40.0},
+            {'Kd_depth': 0.0},
             {'Kp_shear': 20.0},
             {'Ki_shear': 2.5},
             {'Kd_shear': 2.0},
             {'Kp_angular': 0.75},
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
-            {'IK_weights': [100., 100., 50., 50., 1., 1., 1.]}, # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
-            {'nominal_state': [0., 0., 0., 0., 0., 0.,3*PI/4, 0.0, PI/4]},
+            {'Kp_secondary': 3.5},
+            {'IK_weights': [25., 25., 10., 10., 1., 20., 1.]}, # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
+            {'nominal_state': [0., 0., 0., 0., 0., 0.,PI/4, 0.0, PI/4]},
             {'alpha': 0.1},
             {'windup_clip': 0.15},
             {'test_execution_time': False}
@@ -121,24 +121,24 @@ def generate_launch_description():
     ld.add_action(controller)
 
     # Torque estimator
-    torque_observer = Node(
-        package='wrench_observer',
-        executable='torque_observer',
-        name='torque_observer',
-        output='screen',
-        parameters=[
-            {'frequency': 100.0},
-            {'gain_torque': 1.0}, # Should be unity following the dynamics
-            {'alpha_torque': 0.15}, # 1 is no filtering
-            {'alpha_angular_velocity': 0.2},
-            {'alpha_accelerometer': 0.2},
-            {'alpha_motor_inputs': 0.2}, # 1 is no filtering
-            {'model_mass': 4.239}, # [kg] with 6000 mAh batteries
-            {'torque_bias': [0.0, 0.0, 0.0]},
-        ],
-        arguments=["--ros-args", "--log-level", "info"] # Log level info
-    )
-    ld.add_action(torque_observer)
+    # torque_observer = Node(
+    #     package='wrench_observer',
+    #     executable='torque_observer',
+    #     name='torque_observer',
+    #     output='screen',
+    #     parameters=[
+    #         {'frequency': 100.0},
+    #         {'gain_torque': 1.0}, # Should be unity following the dynamics
+    #         {'alpha_torque': 0.15}, # 1 is no filtering
+    #         {'alpha_angular_velocity': 0.2},
+    #         {'alpha_accelerometer': 0.2},
+    #         {'alpha_motor_inputs': 0.2}, # 1 is no filtering
+    #         {'model_mass': 4.239}, # [kg] with 6000 mAh batteries
+    #         {'torque_bias': [0.0, 0.0, 0.0]},
+    #     ],
+    #     arguments=["--ros-args", "--log-level", "info"] # Log level info
+    # )
+    # ld.add_action(torque_observer)
 
     planner = Node(
         package='ats_planner',
@@ -147,7 +147,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'default_depth': -3.0}, # default contact depth in mm
+            {'default_depth': -6.0}, # default contact depth in mm
             {'mission_preset': 'default'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
             {'verbose': False}
         ],
