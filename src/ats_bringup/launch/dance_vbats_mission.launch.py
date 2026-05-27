@@ -77,16 +77,16 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'Kp_depth': 75.0}, # Go to 75
-            {'Ki_depth': 10.0}, # Go to 10
+            {'Kp_depth': 175.0}, # Go to 75
+            {'Ki_depth': 20.0}, # Go to 10
             {'Kd_depth': 2.0},
             {'Kp_shear': 20.0},
             {'Ki_shear': 2.5},
             {'Kd_shear': 2.0},
-            {'Kp_angular': 0.70},
+            {'Kp_angular': 0.80},
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
-            {'Kp_secondary': 2.5},
+            {'Kp_secondary': 3.5},
             {'IK_weights': [25., 25., 10., 10., 1., 20., 1.]}, # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
             {'nominal_state': [0., 0., 0., 0., 0., 0., PI/4, 0.0, PI/4]},
             {'alpha': 0.1},

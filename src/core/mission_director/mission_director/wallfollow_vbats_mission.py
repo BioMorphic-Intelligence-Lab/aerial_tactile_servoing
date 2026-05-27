@@ -115,16 +115,13 @@ class MissionDirector(UAMStateMachine):
             
             case "disengage":
                 transition = False
-                if (datetime.datetime.now()-self.state_start_time).seconds > 10:
+                if (datetime.datetime.now()-self.state_start_time).seconds > 5.:
                     transition = True
                 self.state_approach_wall_velocity(approach_speed=[0.0, -0.2, 0.0], transition=transition, next_state="land_arms_position")
 
             case "land_arms_position":
                 q_right = [1.57, 0.0, -1.57] # put some position here
-                self.state_move_arms(q_des=q_right, next_state="move_to_landing_position")
-
-            case "move_to_landing_position":
-                self.state_move_uam_to_position(target_position=[0.0, 0.0, -1.0], next_state="land")
+                self.state_move_arms(q_des=q_right, next_state="land")
 
             case "land":
                 self.state_land(next_state="done")
