@@ -105,14 +105,14 @@ def generate_launch_description():
         parameters=[
             {'frequency': 100.},
             {'default_depth': -3.0}, # default contact depth in mm
-            {'mission_preset': 'blockref_z'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
+            {'mission_preset': 'default'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
             {'verbose': False}
         ],
     )
     ld.add_action(planner)
 
     if logging:
-        rosbag_name = 'tunedepth_ros2bag_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        rosbag_name = 'tunedepth_blockz_ros2bag_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         ros2bag = ExecuteProcess(
             cmd=['ros2', 'bag', 'record', '-o', log_path+rosbag_name, '-a'], 
             output='screen', 
