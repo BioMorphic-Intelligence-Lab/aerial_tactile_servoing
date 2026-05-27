@@ -123,6 +123,23 @@ class ATSPlanner(Node):
                 else:
                     reference_msg.twist.angular.y = 0.0 # deg
                     reference_msg.twist.linear.x = 0.0 # mm
+            case 'blockref_z':
+                if self.ts_time_elapsed > 20.0 and self.ts_time_elapsed < 40.0:
+                    self.get_logger().info(f"Changing depth reference to -4 mm from {self.get_parameter('default_depth').get_parameter_value().double_value} mm after {self.ts_time_elapsed:.1f} seconds", once=True)
+                    reference_msg.twist.linear.z = -4.0 # mm
+                elif self.ts_time_elapsed >= 40.0 and self.ts_time_elapsed < 60.0:
+                    self.get_logger().info(f"Changing depth reference to -2 mm from -4 mm after {self.ts_time_elapsed:.1f} seconds", once=True)
+                    reference_msg.twist.linear.z = -2.0 # mm
+                elif self.ts_time_elapsed >= 60.0 and self.ts_time_elapsed < 80.0:
+                    self.get_logger().info(f"Changing depth reference to -4 mm from -2 mm after {self.ts_time_elapsed:.1f} seconds", once=True)
+                    reference_msg.twist.linear.z = -4.0 # mm
+                elif self.ts_time_elapsed >= 80.0 and self.ts_time_elapsed < 100.0:
+                    self.get_logger().info(f"Changing depth reference to -1 mm from -4 mm after {self.ts_time_elapsed:.1f} seconds", once=True)
+                    reference_msg.twist.linear.z = -1.0 # mm
+                elif self.ts_time_elapsed >= 100.0:
+                    self.get_logger().info(f"Changing depth reference to {self.get_parameter('default_depth').get_parameter_value().double_value} mm from -1 mm after {self.ts_time_elapsed:.1f} seconds", once=True)
+                    reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value # mm
+        
             case _:
                 self.get_logger().warning(f"Mission preset not recognized", throttle_duration_sec=1.0)
 

@@ -105,7 +105,7 @@ def generate_launch_description():
         parameters=[
             {'frequency': 100.},
             {'default_depth': -3.0}, # default contact depth in mm
-            {'mission_preset': 'default'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
+            {'mission_preset': 'blockref_z'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
             {'verbose': False}
         ],
     )
