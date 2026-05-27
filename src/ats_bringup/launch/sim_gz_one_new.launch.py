@@ -100,18 +100,18 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'Kp_depth': 300.0},
-            {'Ki_depth': 40.0},
-            {'Kd_depth': 0.0},
+            {'Kp_depth': 175.0}, # Go to 75
+            {'Ki_depth': 20.0}, # Go to 10
+            {'Kd_depth': 2.0},
             {'Kp_shear': 20.0},
             {'Ki_shear': 2.5},
             {'Kd_shear': 2.0},
-            {'Kp_angular': 0.75},
+            {'Kp_angular': 0.80},
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
             {'Kp_secondary': 3.5},
             {'IK_weights': [25., 25., 10., 10., 1., 20., 1.]}, # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
-            {'nominal_state': [0., 0., 0., 0., 0., 0.,PI/4, 0.0, PI/4]},
+            {'nominal_state': [0., 0., 0., 0., 0., 0., PI/4, 0.0, PI/4]},
             {'alpha': 0.1},
             {'windup_clip': 0.15},
             {'test_execution_time': False}
@@ -147,8 +147,8 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'frequency': 100.},
-            {'default_depth': -6.0}, # default contact depth in mm
-            {'mission_preset': 'default'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
+            {'default_depth': -3.0}, # default contact depth in mm
+            {'mission_preset': 'blockref_z'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
             {'verbose': False}
         ],
         arguments=['--ros-args', '--log-level', 'info']
