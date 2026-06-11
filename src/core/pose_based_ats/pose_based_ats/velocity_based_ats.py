@@ -129,9 +129,9 @@ class VelocityBasedATS(Node):
 
     def callback_timer(self):
         # Ik weights fading from 5 to 1 (1 being the set value)
-        if self.weights[4,4] > 1.0:
+        if self.weights[4,4] > 1.0 and self.contact:
             self.weights[4,4] = max(1.0, self.weights[4,4] - 0.8)
-        if self.weights[6,6] > 1.0:
+        if self.weights[6,6] > 1.0 and self.contact:
             self.weights[6,6] = max(1.0, self.weights[6,6] - 0.8)
         self.weights_inv = np.linalg.inv(self.weights)
 
