@@ -42,7 +42,7 @@ def generate_launch_description():
             {'sm.fcu_on': True},
             {'sm.sim': False},
             {'sm.manipulator_mode': 'velocity'},
-            {'im.tactile_servoing_time':110.0}
+            {'im.tactile_servoing_time': 2000.0}
         ],
         arguments=["--ros-args", "--log-level", "info"]
     )
@@ -87,7 +87,7 @@ def generate_launch_description():
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
             {'Kp_secondary': 3.5},
-            {'IK_weights': [25., 25., 10., 10., 5., 20., 5.]}, # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
+            {'IK_weights': [25., 25., 10., 10., 1., 20., 1.]}, # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
             {'nominal_state': [0., 0., 0., 0., 0., 0., PI/4, 0.0, PI/4]},
             {'alpha': 0.1},
             {'windup_clip': 0.15},
@@ -112,7 +112,7 @@ def generate_launch_description():
     ld.add_action(planner)
 
     if logging:
-        rosbag_name = 'tunedepth_blockz_ros2bag_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        rosbag_name = 'robot_draft_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         ros2bag = ExecuteProcess(
             cmd=['ros2', 'bag', 'record', '-o', log_path+rosbag_name, '-a'], 
             output='screen', 

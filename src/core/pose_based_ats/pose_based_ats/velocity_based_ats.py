@@ -114,6 +114,8 @@ class VelocityBasedATS(Node):
         self.nominal_state = np.array(self.get_parameter('nominal_state').get_parameter_value().double_array_value)
 
         self.weights = np.diag(self.get_parameter('IK_weights').get_parameter_value().double_array_value)
+        self.weights[4,4] = 5.0
+        self.weights[6,6] = 5.0
         self.weights_inv = np.linalg.inv(self.weights)
 
         self.Kp_secondary = self.get_parameter('Kp_secondary').get_parameter_value().double_value
@@ -126,6 +128,13 @@ class VelocityBasedATS(Node):
         self.timer = self.create_timer(self.period, self.callback_timer)
 
     def callback_timer(self):
+        # Ik weights fading from 5 to 1 (1 being the set value)
+        if self.weights[4,4] > 1.0:
+            self.weights[4,4] = max(1.0, self.weights[4,4] - 0.8)
+        if self.weights[6,6] > 1.0:
+            self.weights[6,6] = max(1.0, self.weights[6,6] - 0.8)
+        self.weights_inv = np.linalg.inv(self.weights)
+
         # Get state
         state = self.get_state()
         jacobian_full = self.evaluate_JG(roll=state[3], pitch=state[4], yaw=state[5], q_1=state[6], q_2=state[7], q_3=state[8])

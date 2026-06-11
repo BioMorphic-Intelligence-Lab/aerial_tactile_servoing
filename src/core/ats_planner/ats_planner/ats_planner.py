@@ -81,7 +81,7 @@ class ATSPlanner(Node):
         reference_msg.header.stamp = self.get_clock().now().to_msg()
         reference_msg.twist.linear.x = 0.0 # mm
         reference_msg.twist.linear.y = 0.0 # mm
-        reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value # mm
+        reference_msg.twist.linear.z = self.get_parameter('default_depth').get_parameter_value().double_value*np.min([0.7*(self.ts_time_elapsed/1.0)+0.3, 1.0]) # mm
         reference_msg.twist.angular.x = 0.0 # deg
         reference_msg.twist.angular.y = 0.0 # deg
         reference_msg.twist.angular.z = 0.0 # deg
@@ -89,6 +89,7 @@ class ATSPlanner(Node):
         # Count the time if tactile servoing is active, reset if not. This is used for time-based reference manipulation in the planner.
         if self.tactile_servoing_active:
             self.ts_time_elapsed += self.period
+            print(f"Tactile servoing time elapsed: {self.ts_time_elapsed:.1f} seconds", end='\r')
         else:
             self.ts_time_elapsed = 0.0
 
