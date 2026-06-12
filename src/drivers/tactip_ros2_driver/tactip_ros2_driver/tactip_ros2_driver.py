@@ -32,7 +32,7 @@ class TactipDriver(Node):
         self.declare_parameter('save_interval', 1.)
         self.declare_parameter('ssim_contact_threshold', 0.7)
         self.declare_parameter('save_directory', 'Please set a save_directory in the launch file')
-        self.declare_parameter('zero_when_no_contact', False)
+        self.declare_parameter('zero_when_no_contact', True)
         self.declare_parameter('fake_data', False)
         self.fake_data = self.get_parameter('fake_data').get_parameter_value().bool_value
         self.image_save_interval = self.get_parameter('save_interval').get_parameter_value().double_value
@@ -147,10 +147,10 @@ class TactipDriver(Node):
 
         # Convention: Tactip outputs own pose in the contact frame (P_CS)
         data[2] = -data[2]  # Invert Z to comply with convention -
-        data[3] = -data[3]  # Invert Rx to comply with convention -
-        data[4] = data[4]  # Invert Ry to comply with convention
+        data[3] = data[3]  # Invert Rx to comply with convention
+        data[4] = -data[4]  # Invert Ry to comply with convention -
         data[6] = data[6]  # Invert shear x to comply with convention
-        data[7] = -data[7]  # Invert shear y to comply with convention -
+        data[7] = data[7]  # Invert shear y to comply with convention -
 
         # Alternative convention: Tactip outputs pose of contact in sensor frame (P_SC)
         # data[2] = data[2]  # Invert Z to comply with convention
@@ -186,9 +186,9 @@ class TactipDriver(Node):
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = "present_sensor_frame"
         t.child_frame_id = "present_contact_frame_tactipdriver"
-        t.transform.translation.x = float(translation_inv[0])
-        t.transform.translation.y = float(translation_inv[1])
-        t.transform.translation.z = float(translation_inv[2])
+        t.transform.translation.x = float(translation_inv[0])/1000.
+        t.transform.translation.y = float(translation_inv[1])/1000.
+        t.transform.translation.z = float(translation_inv[2])/1000.
         t.transform.rotation.x = float(q_inv[0])
         t.transform.rotation.y = float(q_inv[1])
         t.transform.rotation.z = float(q_inv[2])
@@ -304,7 +304,7 @@ class TactipDriver(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         t = time.time()
         msg.twist.linear.x = 0.0 # in mm
-        msg.twist.linear.y = 0.0 # in mm
+        msg.twist.linear.y = 3.0 # in mm
         msg.twist.linear.z = -3.0 # in mm
         msg.twist.angular.x = 0.0 # in deg
         msg.twist.angular.y = 0.0 # in deg

@@ -77,17 +77,17 @@ def generate_launch_description():
         name='tactip_driver',
         output='screen',
         parameters=[
-            {'source': 4},
+            {'source': 0},
             {'frequency': 15.},
             {'dimension': 5},
-            {'verbose': False},
+            {'verbose': True},
             {'test_model_time': False},
             {'save_debug_image': False},
             {'save_interval': 10.0},
             {'ssim_contact_threshold': 0.65},
             {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},
             {'zero_when_no_contact': True},
-            {'fake_data': True}
+            {'fake_data': False}
         ],
         arguments=['--ros-args', '--log-level', 'info']
     )
@@ -148,7 +148,7 @@ def generate_launch_description():
         parameters=[
             {'frequency': 100.},
             {'default_depth': -3.0}, # default contact depth in mm
-            {'mission_preset': 'blockref_z'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
+            {'mission_preset': 'default'}, # mission preset to use (e.g., 'blockref_x', 'slide_x', etc.)
             {'verbose': False}
         ],
         arguments=['--ros-args', '--log-level', 'info']
