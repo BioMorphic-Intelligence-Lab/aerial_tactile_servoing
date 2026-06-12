@@ -32,7 +32,9 @@ class VelocityBasedATS(Node):
         self.declare_parameter('Ki_angular', 0.1)
         self.declare_parameter('Kd_angular', 0.1)
         self.declare_parameter('Kp_secondary', 1.0)
-        self.declare_parameter('IK_weights', [1., 1., 1., 1., 1., 1., 1.]) # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
+        self.declare_parameter('IK_weights_flight', [25., 25., 10., 10., 5., 20., 5.]) # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
+        self.declare_parameter('IK_weights_contact', [25., 25., 10., 10., 1., 20., 1.]) # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
+        self.declare_parameter('fade_time_ik_weights', 5.0) # Time it takes for the IK weights to fade from flight to contact values
         self.declare_parameter('nominal_state', [0., 0., 0., 0., 0., 0., np.pi/3, 0., np.pi/6]) # nominal state for secondary objective in the null space (default is q1=60deg, q2=0deg, q3=30deg)
         self.declare_parameter('alpha', 1.0)
         self.declare_parameter('windup_clip', 10.)
@@ -113,9 +115,11 @@ class VelocityBasedATS(Node):
 
         self.nominal_state = np.array(self.get_parameter('nominal_state').get_parameter_value().double_array_value)
 
-        self.weights = np.diag(self.get_parameter('IK_weights').get_parameter_value().double_array_value)
-        self.weights[4,4] = 5.0
-        self.weights[6,6] = 5.0
+        self.flight_weights = np.diag(self.get_parameter('IK_weights_flight').get_parameter_value().double_array_value)
+        self.contact_weights = np.diag(self.get_parameter('IK_weights_contact').get_parameter_value().double_array_value)
+        self.fade_time = self.get_parameter('fade_time_ik_weights').get_parameter_value().double_value
+        self.time_in_block = 0.0
+        self.weights = self.flight_weights.copy()
         self.weights_inv = np.linalg.inv(self.weights)
 
         self.Kp_secondary = self.get_parameter('Kp_secondary').get_parameter_value().double_value
@@ -128,12 +132,15 @@ class VelocityBasedATS(Node):
         self.timer = self.create_timer(self.period, self.callback_timer)
 
     def callback_timer(self):
-        # Ik weights fading from 5 to 1 (1 being the set value)
-        if self.weights[4,4] > 1.0 and self.contact:
-            self.weights[4,4] = max(1.0, self.weights[4,4] - 0.8)
-        if self.weights[6,6] > 1.0 and self.contact:
-            self.weights[6,6] = max(1.0, self.weights[6,6] - 0.8)
-        self.weights_inv = np.linalg.inv(self.weights)
+        #self.get_logger().info(f'Weights equal: {np.array_equal(self.weights, self.contact_weights)}')
+        # Fade the weights to contact weights when contact is detected, facilitating a smooth transition from flight to contact control
+        if not np.array_equal(self.weights, self.contact_weights) and self.contact == True:
+            # Fade the IK weights from flight to contact values based on times it has passed this block
+            for i in range(self.weights.shape[0]):
+                self.weights[i,i] = self.contact_weights[i,i] + (self.flight_weights[i,i] - self.contact_weights[i,i]) * max(0, 1 - self.time_in_block / self.fade_time)
+            
+            self.time_in_block += self.period
+            self.weights_inv = np.linalg.inv(self.weights)
 
         # Get state
         state = self.get_state()

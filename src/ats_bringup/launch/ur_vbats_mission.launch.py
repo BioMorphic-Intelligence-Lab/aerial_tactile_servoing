@@ -87,7 +87,9 @@ def generate_launch_description():
             {'Ki_angular': 0.0},
             {'Kd_angular': 0.45},
             {'Kp_secondary': 3.5},
-            {'IK_weights': [25., 25., 10., 10., 1., 20., 1.]}, # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
+            {'IK_weights_contact': [25., 25., 10., 10., 1., 20., 1.]}, # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
+            {'IK_weights_flight': [25., 25., 10., 10., 5., 20., 5.]}, # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
+            {'fade_time_ik_weights': 5.0}, # Time it takes for the IK weights to fade from flight to contact values
             {'nominal_state': [0., 0., 0., 0., 0., 0., PI/4, 0.0, PI/4]},
             {'alpha': 0.1},
             {'windup_clip': 0.15},
