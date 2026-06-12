@@ -132,7 +132,6 @@ class VelocityBasedATS(Node):
         self.timer = self.create_timer(self.period, self.callback_timer)
 
     def callback_timer(self):
-        #self.get_logger().info(f'Weights equal: {np.array_equal(self.weights, self.contact_weights)}')
         # Fade the weights to contact weights when contact is detected, facilitating a smooth transition from flight to contact control
         if not np.array_equal(self.weights, self.contact_weights) and self.contact == True:
             # Fade the IK weights from flight to contact values based on times it has passed this block
@@ -141,6 +140,11 @@ class VelocityBasedATS(Node):
             
             self.time_in_block += self.period
             self.weights_inv = np.linalg.inv(self.weights)
+        # If contact is lost, immediately switch back to flight weights and reset fade timer
+        elif self.contact == False:
+            self.weights = self.flight_weights.copy()
+            self.weights_inv = np.linalg.inv(self.weights)
+            self.time_in_block = 0.0
 
         # Get state
         state = self.get_state()
