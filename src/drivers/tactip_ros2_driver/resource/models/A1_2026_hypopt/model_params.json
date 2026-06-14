@@ -1,0 +1,1 @@
+{"model_type": "simple_cnn", "model_kwargs": {"conv_layers": [64, 64, 64, 64], "conv_kernel_sizes": [13, 11, 9, 7], "fc_layers": [2048, 1024], "activation": "relu", "dropout": 0.15507274414768213, "apply_batchnorm": true}}
