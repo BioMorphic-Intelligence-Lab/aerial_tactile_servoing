@@ -149,7 +149,7 @@ class TactipDriver(Node):
         data[2] = -data[2]  # Invert Z to comply with convention -
         data[3] = data[3]  # Invert Rx to comply with convention
         data[4] = -data[4]  # Invert Ry to comply with convention -
-        data[6] = data[6]  # Invert shear x to comply with convention
+        data[6] = -data[6]  # Invert shear x to comply with convention
         data[7] = data[7]  # Invert shear y to comply with convention -
 
         # Alternative convention: Tactip outputs pose of contact in sensor frame (P_SC)
@@ -304,7 +304,7 @@ class TactipDriver(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         t = time.time()
         msg.twist.linear.x = 0.0 # in mm
-        msg.twist.linear.y = 3.0 # in mm
+        msg.twist.linear.y = 0.0 # in mm
         msg.twist.linear.z = -3.0 # in mm
         msg.twist.angular.x = 0.0 # in deg
         msg.twist.angular.y = 0.0 # in deg
