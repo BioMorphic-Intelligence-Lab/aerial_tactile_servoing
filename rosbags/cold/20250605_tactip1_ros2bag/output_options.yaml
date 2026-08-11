@@ -1,7 +1,0 @@
-output_bags:
-- uri: output_bag1
-  storage_id: mcap
-  all_topics: true
-  all_services: true
-  all_actions: true
-  

@@ -18,6 +18,7 @@ devel_isolated/
 install/
 log/
 rosbags/*
+data/*
 
 # virtual environment
 venv-ats*
@@ -52,6 +53,9 @@ qtcreator-*
 
 # vscode stuff
 .vscode/
+
+# private environment
+.env
 
 # Emacs
 .#*
