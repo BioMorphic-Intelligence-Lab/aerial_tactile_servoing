@@ -1,6 +1,6 @@
 devel/
-logs/
-build/
+*logs/
+*build/
 bin/
 lib/
 msg_gen/
@@ -15,8 +15,8 @@ msg/*Result.msg
 msg/_*.py
 build_isolated/
 devel_isolated/
-install/
-log/
+*install/
+*log/
 rosbags/*
 data/*
 
