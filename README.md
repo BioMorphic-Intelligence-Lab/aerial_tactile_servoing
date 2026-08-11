@@ -1,59 +1,54 @@
 # Aerial Tactile Servoing
-Repository containing everything needed to run the companion computer component of the Aerial Tactile Servoing project.
 
-### Installation
-1. Clone this repository where you want your ROS2 workspace. The root of the repository is also the workspace root. Also update the submodules.
-```
-git clone https://github.com/mbrummelhuis/aerial_tactile_servoing.git
-git submodule update --init --recursive
-```
-2. Make a virtual environment in this and install all the requirements
-```
-python3 -m venv venv-ats
-source venv-ats/activate
-pip install -r requirements.txt
-```
-3. Build
-```
+Companion-computer software for the **Aerial Tactile Servoing (ATS)** project: a PX4 quadrotor
+carrying a 3-DOF arm that ends in a [TacTip](https://www.softformlab.com/) optical tactile
+sensor. The system flies to a surface, establishes contact, and then servos the drone and arm
+together to track a tactile reference (contact depth, shear, orientation) while sliding along
+the surface.
+
+This repository is a ROS 2 (Humble) workspace: the `ros2_ws/src` tree contains every node that
+runs on the onboard companion computer, plus a Gazebo simulation of the platform.
+
+> **New here? Start with the [documentation](docs/README.md).** The `docs/` folder is the
+> intended reading path — this README is only the front door.
+
+## Documentation
+
+| Guide | What it covers |
+|-------|----------------|
+| [Overview](docs/01-overview.md) | System architecture, node/topic graph, mission concept |
+| [Getting started](docs/02-getting-started.md) | Install, build, and run the simulation for the first time |
+| [System architecture](docs/03-system-architecture.md) | Control loop, inverse kinematics, contact detection, frames |
+| [Hardware setup](docs/04-hardware-setup.md) | Drone, servos, TacTip camera, RC mapping, PX4 params |
+| [Simulation](docs/05-simulation.md) | Running the Gazebo UAM simulation |
+| [Running a mission](docs/06-running-a-mission.md) | Launch files, mission presets, the flight state machine, safety |
+| [Tactile sensing](docs/07-tactile-sensing.md) | The TacTip model, contact detection, swapping/retraining |
+| [Data & logging](docs/08-data-and-logging.md) | Rosbags, the sync script, the `data/` folder |
+| [Troubleshooting](docs/09-troubleshooting.md) | Common failures and fixes |
+| [Glossary](docs/10-glossary.md) | Project-specific terms |
+
+Each ROS 2 package under `ros2_ws/src` also has its own `README.md` documenting its nodes,
+parameters, and topics.
+
+## Quickstart
+
+```bash
+# Clone with submodules (px4_msgs, DynamixelSDK)
+git clone --recursive https://github.com/mbrummelhuis/aerial_tactile_servoing.git
+cd aerial_tactile_servoing/ros2_ws
+
+# Build and source
 colcon build
 source install/setup.bash
+
+# Run a simulated mission
+ros2 launch ats_bringup sim_gz_one_new.launch.py
 ```
 
-### Running
-1. Run the package stack via the launch file
-```
-ros2 launch ats_bringup your-launch-file.launch.py
-```
+See [Getting started](docs/02-getting-started.md) for the full setup (virtual environment,
+dependencies, Docker) and [Running a mission](docs/06-running-a-mission.md) for the hardware
+workflow.
 
-### Docker instructions
-The aim is that we can deploy the repository by installing docker, pulling the image from Dockerhub and then run the container, pulling the src from this repo into a ROS2 workspace, and finally colcon building.
+## License
 
-To run the container, follow the following steps. First, install Docker and Docker compose on the machine.
-```
-# Add Docker's official GPG key:
-sudo apt-get update
-sudo apt-get install ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-# Add the repository to Apt sources:
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
-
-# Install docker
-sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-```
-Clone this repository recursively (needed if you want to build natively, for the [px4_msgs](https://github.com/PX4/px4_msgs) and [DynamixelSDK](https://github.com/ROBOTIS-GIT/DynamixelSDK), which are part of the ROS2 package stack).
-```
-git clone --recursive https://github.com/mbrummelhuis/aerial_tactile_servoing.git
-```
-Navigate to the docker folder and compose.
-```
-cd aerial_tactile_servoing/docker
-docker compose up
-```
-This will pull the built Docker image from Dockerhub, which has the built ROS2 package stack contained in this repository, along with its dependencies.
+See [LICENSE](LICENSE).
