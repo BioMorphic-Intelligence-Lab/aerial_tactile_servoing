@@ -1,7 +1,13 @@
 cmake_minimum_required(VERSION 3.8)
 project(px4_uam_sim)
-install(DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME})
+# Install launch files, the model description (URDF/xacro), and the meshes.
+# The meshes are installed at share/${PROJECT_NAME}/meshes because the xacro
+# references them as $(find px4_uam_sim)/meshes/... — this removes the old
+# manual "cp -r urdf/meshes install/.../share" setup step from the README.
+install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY urdf/ DESTINATION share/${PROJECT_NAME}/urdf
+        PATTERN "meshes" EXCLUDE)
+install(DIRECTORY urdf/meshes DESTINATION share/${PROJECT_NAME})
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
