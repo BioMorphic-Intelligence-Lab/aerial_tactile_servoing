@@ -13,8 +13,11 @@
   <test_depend>ament_lint_common</test_depend>
   <depend>rclcpp</depend>
   <depend>geometry_msgs</depend>
-  <depend>px4_msgs</depend>  
-  <depend>std_msgs</depend>  
+  <depend>px4_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>tf2</depend>
+  <depend>eigen</depend>
   <depend>gz_sim_vendor</depend>
   <depend>gz_transport_vendor</depend>
   <depend>gz_msgs_vendor</depend>  
