@@ -29,9 +29,14 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
     HOME = os.environ.get('HOME')    
-    pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')   
+    pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
     gz_launch_path = PathJoinSubstitution([pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py'])
     PX4_RUN_DIR = HOME + '/PX4-Autopilot'
+    # Model spawned from this package's install share. If you edit the model,
+    # regenerate the .urdf from the .xacro and `colcon build` again:
+    #   xacro urdf/martijn_one_arm.xacro > urdf/martijn_one_arm.urdf
+    urdf_path = os.path.join(
+        get_package_share_directory('px4_uam_sim'), 'urdf', 'martijn_one_arm.urdf')
     
     execute_microXRCEagent = ExecuteProcess(
         cmd=[
@@ -100,7 +105,7 @@ def generate_launch_description():
              executable='create',
             arguments=[
                 '-name', 'my_custom_model',
-                '-file',  '/home/martijn/aerial_tactile_servoing/src/simulation/px4_uam_sim/urdf/martijn_one_arm.urdf',
+                '-file',  urdf_path,
                 '-z', ' 0.1'],
             output='screen'),
         Node(package='px4_uam_sim',

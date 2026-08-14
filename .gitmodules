@@ -1,8 +1,0 @@
-[submodule "px4_msgs"]
-	path = src/drivers/px4_msgs
-	url = https://github.com/PX4/px4_msgs.git
-	branch = main
-[submodule "src/px4_uam_sim"]
-	path = src/simulation/px4_uam_sim
-	url = git@github.com:BioMorphic-Intelligence-Lab/px4_uam_sim.git
-	branch = martijn-ats

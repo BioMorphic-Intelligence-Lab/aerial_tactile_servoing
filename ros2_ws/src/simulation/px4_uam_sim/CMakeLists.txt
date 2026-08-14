@@ -1,7 +1,14 @@
 cmake_minimum_required(VERSION 3.8)
 project(px4_uam_sim)
-install(DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME})
+# Install launch files, the model description (URDF/xacro), and the meshes.
+# The meshes are installed at share/${PROJECT_NAME}/meshes because the xacro
+# references them as $(find px4_uam_sim)/meshes/... — this removes the old
+# manual "cp -r urdf/meshes install/.../share" setup step from the README.
+install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY urdf/ DESTINATION share/${PROJECT_NAME}/urdf
+        PATTERN "meshes" EXCLUDE)
+install(DIRECTORY urdf/meshes DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY worlds DESTINATION share/${PROJECT_NAME})
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -14,25 +21,17 @@ find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(px4_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
-#find_package(Eigen)
 find_package(tf2 REQUIRED)
-find_package(tf2_geometry_msgs REQUIRED)
-find_package(tf2_ros REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
-set(Eigen3_DIR /usr/share/eigen3/cmake)
 find_package(Eigen3 REQUIRED)
-
-include_directories(/opt/ros/jazzy/include /usr/include/eigen3)
 
 add_executable(uam_handler src/uam_handler.cpp)
 ament_target_dependencies(uam_handler rclcpp px4_msgs geometry_msgs std_msgs tf2 nav_msgs)
+target_link_libraries(uam_handler Eigen3::Eigen)
 
 add_executable(mocap_forwarder src/mocap_forwarder.cpp)
 ament_target_dependencies(mocap_forwarder rclcpp geometry_msgs px4_msgs nav_msgs)
-target_include_directories(mocap_forwarder PRIVATE
-  include
-)
+target_include_directories(mocap_forwarder PRIVATE include)
+target_link_libraries(mocap_forwarder Eigen3::Eigen)
 
 
 if(BUILD_TESTING)
