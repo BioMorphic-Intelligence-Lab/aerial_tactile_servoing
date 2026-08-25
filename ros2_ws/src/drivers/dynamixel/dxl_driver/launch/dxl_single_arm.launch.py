@@ -8,7 +8,7 @@ import datetime
 """
 Launch file for testing the ROS2 Dynamixel driver. 
 
-The package can be launched with 'ros2 launch dxl_driver dxl_example_config.launch.py'
+The package can be launched with 'ros2 launch dxl_driver dxl_single_arm.launch.py'
 """
 
 logging = False
@@ -18,7 +18,7 @@ def generate_launch_description():
     ld = LaunchDescription()
     
 
-    param_file = os.path.join(get_package_share_directory('dxl_driver'), 'config', 'dxl_ros2_ats.yaml')
+    param_file = os.path.join(get_package_share_directory('dxl_driver'), 'config', 'dxl_ros2_single_arm.yaml')
     servo_driver = Node(
         package="dxl_driver",
         executable="dxl_driver_node",

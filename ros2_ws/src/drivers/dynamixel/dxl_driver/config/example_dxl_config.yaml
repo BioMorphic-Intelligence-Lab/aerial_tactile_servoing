@@ -1,7 +1,7 @@
 /dxl_driver:
   ros__parameters:
     driver:
-      frequency: 1.0
+      frequency: 15.0
 
     servos:
       ids: [1] # Servo IDs
