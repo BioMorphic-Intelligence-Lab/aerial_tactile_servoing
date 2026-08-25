@@ -46,7 +46,7 @@ def generate_launch_description():
     # Add the logging
     if logging:
         rosbag_name = 'ros2bag_sim_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        rosbag_path = f'/home/martijn/aerial_tactile_servoing/rosbags/{rosbag_name}'
+        rosbag_path = f'/home/martijn/aerial_tactile_servoing/data/rosbags/{rosbag_name}'
         rosbag_record = ExecuteProcess(
             cmd=['ros2', 'bag', 'record', '-o', rosbag_path, '-a'], 
             output='screen', 
