@@ -33,6 +33,7 @@ def generate_launch_description():
                     "md_executable": "vbats",
                     "mission_params": os.path.join(pkg, "config", "missions", "vbats.yaml"),
                     "rosbag_prefix": "vbats_sim",
+                    "morphology": "single_arm",
                     "sim": "true",
                     "fcu_on": "false",  # no flight controller in sim (also forced by the base class)
                     "logging": LaunchConfiguration("logging"),

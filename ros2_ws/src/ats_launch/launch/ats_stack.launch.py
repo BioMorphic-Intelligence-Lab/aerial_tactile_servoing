@@ -39,9 +39,9 @@ _LOG_ARGS = ["--ros-args", "--log-level", "info"]
 
 def _build(context, *args, **kwargs):
     sim = LaunchConfiguration("sim").perform(context).lower() == "true"
+    morphology = LaunchConfiguration("morphology").perform(context)
     fcu_on = LaunchConfiguration("fcu_on").perform(context).lower() == "true"
     mission_params = LaunchConfiguration("mission_params").perform(context)
-    servo_config = LaunchConfiguration("servo_config").perform(context)
     md_executable = LaunchConfiguration("md_executable").perform(context)
 
     # The mission director is sim/real agnostic. sm.sim and sm.fcu_on describe
@@ -51,6 +51,7 @@ def _build(context, *args, **kwargs):
     # tactip runs on fake data in sim.
     md_params = [mission_params, {"sm.sim": sim, "sm.fcu_on": fcu_on}]
     tactip_params = [mission_params, {"fake_data": True}] if sim else [mission_params]
+    share_dir = get_package_share_directory("ats_launch")
 
     actions = []
 
@@ -59,7 +60,7 @@ def _build(context, *args, **kwargs):
         sim_launch = os.path.join(
             get_package_share_directory("px4_uam_sim"),
             "launch",
-            "gz_martijn_one_arm.launch.py",
+            "gz_martijn_"+morphology+".launch.py",
         )
         actions.append(
             IncludeLaunchDescription(
@@ -85,6 +86,7 @@ def _build(context, *args, **kwargs):
                 arguments=_LOG_ARGS,
             )
         )
+
     else:
         actions.append(
             Node(
@@ -92,7 +94,7 @@ def _build(context, *args, **kwargs):
                 executable="dxl_driver_node",
                 name="dxl_driver",
                 output="screen",
-                parameters=[servo_config],
+                parameters=[os.path.join(share_dir, "config", "servo", morphology+".yaml")],
                 arguments=_LOG_ARGS,
             )
         )
@@ -168,9 +170,9 @@ def generate_launch_description():
                 description="mission_director executable to run for this mission.",
             ),
             DeclareLaunchArgument(
-                "servo_config",
-                default_value="",
-                description="Path to the dxl_driver parameter YAML (real only).",
+                "morphology",
+                default_value="single_arm",
+                description="Aerial manipulator morphology",
             ),
             DeclareLaunchArgument(
                 "sim",
