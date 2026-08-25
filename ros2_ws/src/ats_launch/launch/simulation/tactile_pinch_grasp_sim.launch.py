@@ -30,9 +30,9 @@ def generate_launch_description():
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(stack),
                 launch_arguments={
-                    "md_executable": "vbats",
-                    "mission_params": os.path.join(pkg, "config", "missions", "vbats.yaml"),
-                    "rosbag_prefix": "vbats_sim",
+                    "md_executable": "pinch_grasp",
+                    "mission_params": os.path.join(pkg, "config", "missions", "pinch_grasp.yaml"),
+                    "rosbag_prefix": "pinch_grasp_sim",
                     "morphology": "dual_arm",
                     "sim": "true", # 1 for single arm, 2 for dual arm, 0 for no sim
                     "fcu_on": "false",  # no flight controller in sim (also forced by the base class)
