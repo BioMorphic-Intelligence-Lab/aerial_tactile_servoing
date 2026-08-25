@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>ats_launch</name>
+  <version>0.0.1</version>
+  <description>
+    Launch and configuration package for the aerial tactile servoing project.
+    Supersedes ats_bringup: the node graph is declared once in ats_stack.launch.py
+    and each mission is a thin wrapper that selects a per-mission parameter file.
+  </description>
+  <maintainer email="mbrummelhuis@gmail.com">Martijn Brummelhuis</maintainer>
+  <license>GPL-3.0-only</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Packages launched by the mission stack -->
+  <exec_depend>dxl_driver</exec_depend>
+  <exec_depend>mission_director</exec_depend>
+  <exec_depend>tactip_ros2_driver</exec_depend>
+  <exec_depend>pose_based_ats</exec_depend>
+  <exec_depend>ats_planner</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
