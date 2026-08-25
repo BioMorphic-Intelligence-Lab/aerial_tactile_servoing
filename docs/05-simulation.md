@@ -31,6 +31,9 @@ Install these once, outside the workspace:
   to behave correctly, so keep QGC running for the whole session — you don't need to interact with
   it. Download from [QGroundControl installation](https://docs.qgroundcontrol.com/Stable_V5.0/en/qgc-user-guide/getting_started/download_and_install.html).
 
+## Dependencies
+There are some Python dependencies associated with the Tactip driver. These can be installed (virtual environment recommended) with the `requirements.txt` in project root.
+
 ## Building the simulation
 
 The UAM's `.urdf` models are **generated from `.xacro` sources**. You generate them once after
