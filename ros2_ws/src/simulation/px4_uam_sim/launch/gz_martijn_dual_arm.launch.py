@@ -37,9 +37,9 @@ def generate_launch_description():
     PX4_RUN_DIR = HOME + '/PX4-Autopilot'
     # Model spawned from this package's install share. If you edit the model,
     # regenerate the .urdf from the .xacro and `colcon build` again:
-    #   xacro urdf/martijn.xacro > urdf/martijn.urdf
+    #   xacro urdf/martijn_dual_arm.xacro > urdf/martijn_dual_arm.urdf
     urdf_path = os.path.join(
-        get_package_share_directory('px4_uam_sim'), 'urdf', 'martijn.urdf')
+        get_package_share_directory('px4_uam_sim'), 'urdf', 'martijn_dual_arm.urdf')
     
     execute_microXRCEagent = ExecuteProcess(
         cmd=[
