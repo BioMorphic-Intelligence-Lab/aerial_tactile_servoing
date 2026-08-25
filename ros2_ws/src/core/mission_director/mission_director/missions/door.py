@@ -1,24 +1,23 @@
-import datetime
+from scipy.spatial.transform import Rotation as R
+from geometry_msgs.msg import PoseStamped
 
-import numpy as np
-
-from mission_director.tactile_mission_director import TactileMissionDirector, run_mission
+from mission_director.base_classes.tactile_mission_director import TactileMissionDirector, run_mission
 
 
-class VbatsMission(TactileMissionDirector):
-    """Baseline velocity-based tactile servoing mission.
+class DoorMission(TactileMissionDirector):
+    """Door-opening tactile servoing mission.
 
-    Proof-of-concept for the consolidated TactileMissionDirector pattern: this
-    file is *only* the mission-specific finite state machine. All shared wiring
-    lives in the base class, and every tuned constant comes from the per-mission
-    YAML (config/missions/vbats.yaml in ats_launch) rather than being hard-coded.
+    Same consolidated pattern as vbats: only the mission-specific FSM lives here.
+    It adds a mocap subscription to the door pose and disengages once the door
+    has swung past a configurable open angle. All tuning is in
+    config/missions/door.yaml.
     """
 
     def __init__(self):
         super().__init__('mission_director')
 
         # --- Mission-graph constants (from the per-mission YAML) ---
-        self.declare_parameter('im.takeoff_altitude', 1.0)  # [m]
+        self.declare_parameter('im.takeoff_altitude', 1.5)  # [m]
         self.takeoff_altitude = self.get_parameter('im.takeoff_altitude').get_parameter_value().double_value
 
         self.declare_parameter('im.pre_contact_arm_position', [1.0472, 0.0, 0.5236])  # [rad] q1,q2,q3
@@ -30,16 +29,27 @@ class VbatsMission(TactileMissionDirector):
         self.declare_parameter('im.approach_speed', [0.0, 0.05, 0.0])  # [m/s] end-effector approach velocity
         self.approach_speed = list(self.get_parameter('im.approach_speed').get_parameter_value().double_array_value)
 
-        self.declare_parameter('im.approach_heading_deg', 15.0)  # [deg]
-        self.approach_heading_deg = self.get_parameter('im.approach_heading_deg').get_parameter_value().double_value
-
         self.declare_parameter('im.disengage_speed', 0.15)  # [m/s]
         self.disengage_speed = self.get_parameter('im.disengage_speed').get_parameter_value().double_value
 
-        self.declare_parameter('im.ee_x_abort_threshold', -1.0)  # [m] abort servoing past this ee x
-        self.ee_x_abort_threshold = self.get_parameter('im.ee_x_abort_threshold').get_parameter_value().double_value
+        self.declare_parameter('im.door_open_angle', 1.5)  # [rad] |door angle| beyond which the door is open
+        self.door_open_angle = self.get_parameter('im.door_open_angle').get_parameter_value().double_value
 
-        self.get_logger().info('VbatsMission initialized.')
+        # --- Door pose from mocap (mission-specific interface) ---
+        self.sub_door = self.create_subscription(PoseStamped, '/mocap/door/pose', self.door_callback, 10)
+        self.door_pose = None
+
+        self.get_logger().info('DoorMission initialized.')
+
+    def door_callback(self, msg):
+        self.door_pose = msg
+
+    def door_angle(self):
+        """Yaw of the door in the mocap frame [rad], or 0.0 if no pose yet."""
+        if self.door_pose is None:
+            return 0.0
+        q = self.door_pose.pose.orientation
+        return R.from_quat([q.x, q.y, q.z, q.w]).as_euler('xyz')[2]
 
     def execute(self):
         match self.FSM_state:
@@ -58,42 +68,30 @@ class VbatsMission(TactileMissionDirector):
                 self.state_takeoff(target_altitude=self.takeoff_altitude, next_state="hover")
 
             case "hover":
-                self.state_hover(duration_sec=1, next_state="pre_contact_arm_position")
+                self.state_hover(duration_sec=1., next_state="pre_contact_arm_position")
 
             case "pre_contact_arm_position":
                 self.state_move_arms(q_des=self.pre_contact_arm_position, next_state="approach")
 
             case "approach":
-                self.state_approach_wall_position(
-                    approach_speed=self.approach_speed,
-                    approach_heading=np.deg2rad(self.approach_heading_deg),
-                    transition=self.contact,
-                    next_state="tactile_servoing")
+                self.state_approach_wall_position(approach_speed=self.approach_speed, transition=self.contact, next_state="tactile_servoing")
 
             case "tactile_servoing":
                 self.handle_state(state_number=30)
                 self.publish_tactile_servoing_outputs()
 
+                door_angle = self.door_angle()
                 depth = self.tactip_data.twist.linear.z if self.tactip_data else float('nan')
-                elapsed = (datetime.datetime.now() - self.state_start_time).seconds
-                self.get_logger().info(
-                    f'Contact depth: {depth} mm, time: {elapsed:.1f}/{self.tactile_servoing_time}',
-                    throttle_duration_sec=1)
-
-                transform = self.get_transform()
-                position_ee = transform.transform.translation if transform else None
-                if position_ee is not None:
-                    self.get_logger().info(
-                        f'End-effector position: x={position_ee.x:.3f}, y={position_ee.y:.3f}, z={position_ee.z:.3f}',
-                        throttle_duration_sec=1)
+                self.get_logger().info(f'Contact depth: {depth:.2f} mm, door angle: {door_angle:.2f}', throttle_duration_sec=1)
 
                 if self.lost_contact():
                     self.get_logger().info('Lost contact, returning to approach.')
                     self.ts_no_contact_counter = 0
                     self.transition_to_state('pre_contact_arm_position')
-                elif self.servoing_time_elapsed() or self.input_state == 1:
+                elif abs(door_angle) > self.door_open_angle:
+                    self.get_logger().info('Door opened, transitioning to disengage.')
                     self.transition_to_state('disengage')
-                elif position_ee is not None and position_ee.x < self.ee_x_abort_threshold:
+                elif self.servoing_time_elapsed() or self.input_state == 1:
                     self.transition_to_state('disengage')
                 elif not self.offboard and self.fcu_on:
                     self.transition_to_state('emergency')
@@ -120,7 +118,7 @@ class VbatsMission(TactileMissionDirector):
 
 
 def main():
-    run_mission(VbatsMission)
+    run_mission(DoorMission)
 
 
 if __name__ == '__main__':

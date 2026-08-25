@@ -22,16 +22,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'uam_md_test = mission_director.uam_md_test:main',
-            'uam_control_test = mission_director.uam_control_test:main',
-            'ats_mission = mission_director.ats_mission:main',
-            'ymca_md=mission_director.ymca_mission_director:main',
-            'vbats_mission=mission_director.vbats_mission:main',
-            'vbats=mission_director.vbats:main',  # consolidated POC (TactileMissionDirector)
-            'door_vbats_mission=mission_director.door_vbats_mission:main',
-            'leaderfollow_vbats_mission=mission_director.leaderfollow_vbats_mission:main',
-            'slide_vbats_mission=mission_director.slide_vbats_mission:main',
-            'wallfollow_vbats_mission=mission_director.wallfollow_vbats_mission:main',
+            'vbats=mission_director.missions.vbats:main',  # consolidated POC (TactileMissionDirector)
+            'door=mission_director.missions.door:main'
         ],
     },
 )

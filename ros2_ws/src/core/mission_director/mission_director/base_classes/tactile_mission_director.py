@@ -9,7 +9,7 @@ from geometry_msgs.msg import TwistStamped
 from sensor_msgs.msg import JointState
 from px4_msgs.msg import TrajectorySetpoint
 
-from mission_director.uam_state_machine import UAMStateMachine
+from mission_director.base_classes.uam_state_machine import UAMStateMachine
 
 
 class TactileMissionDirector(UAMStateMachine):
