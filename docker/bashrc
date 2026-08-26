@@ -1,3 +1,7 @@
 source /opt/ros/jazzy/setup.bash # Source ROS2
 source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash # Source colcon argument completion
 export ROS_DOMAIN_ID=75
+
+# Source install/set.bash if it has been built
+[ -f /aerial_tactile_servoing/ros2_ws/install/setup.bash ] && \
+source /aerial_tactile_servoing/ros2_ws/install/setup.bash

@@ -1,9 +1,9 @@
 # Use an official ROS 2 base image (e.g., Humble Hawksbill on Ubuntu 22.04)
 # We use 
-FROM ros:jazzy-ros-base
+FROM ros:humble-ros-base
 
 # Set environment variables
-ENV ROS_DISTRO=jazzy
+ENV ROS_DISTRO=humble
 ENV ROS_DOMAIN_ID=75
 
 # Update and install dependencies
@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     python3-colcon-common-extensions \
     python3-argcomplete \
     bash-completion \
-    ros-jazzy-ament-cmake-clang-format \
+    ros-humble-ament-cmake-clang-format \
     git \
     nano \
     terminator \
@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies (for TacTip driver)
-RUN pip3 install -U --break-system-packages \
+RUN pip3 install -U \
     numpy==1.26.4 \
     opencv-python==4.10.0.84 \
     scikit-image==0.24.0 \
@@ -33,7 +33,4 @@ RUN pip3 install -U --break-system-packages \
     matplotlib==3.9.2 \
     seaborn==0.13.2
 
-WORKDIR /aerial_tactile_servoing/ros2_ws
-
-COPY docker/bashrc /root/.bashrc
-
+WORKDIR /ros2_ws/aerial_tactile_servoing
