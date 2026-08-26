@@ -11,3 +11,5 @@
 # --mount -- bind a volume to the container, this is handy for active development as you can develop on the host and it gets automtically updated in the container
 
 docker run -it --rm --name ats-container --network=host --ipc=host --device=/dev/ttyUSB0 --device=/dev/video0 --privileged --mount type=bind,src=/home/orangepi/aerial_tactile_servoing,dst=/aerial_tactile_servoing mbrummelhuis/ats-no-build
+# after the container exits, hand ownership back to the host user
+sudo chown -R orangepi:orangepi /home/orangepi/aerial_tactile_servoing
