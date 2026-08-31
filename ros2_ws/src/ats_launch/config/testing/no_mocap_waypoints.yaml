@@ -1,0 +1,27 @@
+# waypoints mission parameters -- bare flight test (takeoff, fly waypoints, land).
+#
+# Only the mission_director node is launched for this mission (see
+# ats_launch/launch/testing/waypoints.launch.py). There is no tactip, controller,
+# planner or servo driver, so this file only carries /mission_director params.
+#
+# sm.sim and sm.fcu_on describe the run environment (sim vs hardware, flight
+# controller in the loop), so the launch owns them -- they are NOT set here.
+
+/mission_director:
+  ros__parameters:
+    sm:
+      frequency: 100.0
+      position_clip: 3.0        # [m] setpoint clamp around the origin; 0 disables
+      manipulator_mode: position  # emergency state uses position mode (no servo feedback needed)
+    im:
+      takeoff_altitude: 1.0     # [m]
+      # Flat [x, y, z, yaw] quadruples flown in order.
+      #   x, y : offset from the take-off (home) position [m]
+      #   z    : altitude above home [m] (positive up)
+      #   yaw  : heading [rad]
+      waypoints: [
+        1.0, 0.0, 1.0, 0.0,
+        1.0, 1.0, 1.0, 0.0,
+        0.0, 1.0, 1.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+      ]
