@@ -19,9 +19,9 @@
       #   x, y : offset from the take-off (home) position [m]
       #   z    : altitude above home [m] (positive up)
       #   yaw  : heading [rad]
-      waypoints: [
-        # 1.0, 0.0, 1.0, 0.0,
-        # 1.0, 1.0, 1.0, 0.0,
-        # 0.0, 1.0, 1.0, 0.0,
-        # 0.0, 0.0, 1.0, 0.0,
-      ]
+      # waypoints: [
+      #   1.0, 0.0, 1.0, 0.0,
+      #   1.0, 1.0, 1.0, 0.0,
+      #   0.0, 1.0, 1.0, 0.0,
+      #   0.0, 0.0, 1.0, 0.0,
+      # ]

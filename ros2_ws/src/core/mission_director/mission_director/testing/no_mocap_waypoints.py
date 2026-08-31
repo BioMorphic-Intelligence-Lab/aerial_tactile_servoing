@@ -27,10 +27,7 @@ class WaypointsMission(UAMStateMachine):
 
         # Flat [x, y, z, yaw] quadruples; x/y relative to home, z altitude (up), yaw [rad].
         self.declare_parameter('im.waypoints', [
-            1.0, 0.0, 1.0, 0.0,
-            1.0, 1.0, 1.0, 0.0,
-            0.0, 1.0, 1.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, -1.0, 0.0,
         ])
         flat = list(self.get_parameter('im.waypoints').get_parameter_value().double_array_value)
         if len(flat) % 4 != 0:
