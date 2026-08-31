@@ -109,7 +109,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "log_path",
-                default_value="/home/martijn/aerial_tactile_servoing/data/rosbags",
+                default_value="../data/rosbags",
                 description="Directory the recorded rosbag is written to.",
             ),
             DeclareLaunchArgument(

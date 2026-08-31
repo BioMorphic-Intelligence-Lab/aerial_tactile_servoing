@@ -266,6 +266,7 @@ class UAMStateMachine(Node):
 
     def state_wait_for_arming(self, next_state='emergency'):
         self.handle_state(state_number=3)
+        self.publish_trajectory_position_setpoint(*self.home_position)
 
         self.get_logger().info('[3] Waiting for arming and offboard mode', throttle_duration_sec=1)
 
