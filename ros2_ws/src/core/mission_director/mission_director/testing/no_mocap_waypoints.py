@@ -89,8 +89,11 @@ class WaypointsMission(UAMStateMachine):
                 self.state_wait_for_arming(next_state="takeoff")
 
             case "takeoff":
+                self.state_takeoff(target_altitude=self.takeoff_altitude, next_state='hover')
+
+            case "hover":
                 first = "waypoint_0" if self.waypoints else "land"
-                self.state_takeoff(target_altitude=self.takeoff_altitude, next_state=first)
+                self.state_hover(duration_sec= 10., next_state=first)
 
             case "land":
                 self.state_land(next_state="done")
