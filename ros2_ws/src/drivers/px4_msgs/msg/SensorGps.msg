@@ -30,18 +30,26 @@ float32 vdop			# Vertical dilution of precision
 int32 noise_per_ms		# GPS noise per millisecond
 uint16 automatic_gain_control   # Automatic gain control monitor
 
-uint8 JAMMING_STATE_UNKNOWN  = 0
-uint8 JAMMING_STATE_OK       = 1
-uint8 JAMMING_STATE_WARNING  = 2
-uint8 JAMMING_STATE_CRITICAL = 3
-uint8 jamming_state		# indicates whether jamming has been detected or suspected by the receivers. O: Unknown, 1: OK, 2: Warning, 3: Critical
-int32 jamming_indicator		# indicates jamming is occurring
+uint8 JAMMING_STATE_UNKNOWN   = 0 #default
+uint8 JAMMING_STATE_OK        = 1
+uint8 JAMMING_STATE_MITIGATED = 2
+uint8 JAMMING_STATE_DETECTED  = 3
+uint8 jamming_state	      # indicates whether jamming has been detected or suspected by the receivers. O: Unknown, 1: OK, 2: Mitigated, 3: Detected
+int32 jamming_indicator	      # indicates jamming is occurring
 
-uint8 SPOOFING_STATE_UNKNOWN   = 0
-uint8 SPOOFING_STATE_NONE      = 1
-uint8 SPOOFING_STATE_INDICATED = 2
-uint8 SPOOFING_STATE_MULTIPLE  = 3
-uint8 spoofing_state		# indicates whether spoofing has been detected or suspected by the receivers. O: Unknown, 1: OK, 2: Warning, 3: Critical
+uint8 SPOOFING_STATE_UNKNOWN   = 0 #default
+uint8 SPOOFING_STATE_OK        = 1
+uint8 SPOOFING_STATE_MITIGATED = 2
+uint8 SPOOFING_STATE_DETECTED  = 3
+uint8 spoofing_state	       # indicates whether spoofing has been detected or suspected by the receivers. O: Unknown, 1: OK, 2: Mitigated, 3: Detected
+
+# Combined authentication state (e.g. Galileo OSNMA)
+uint8 AUTHENTICATION_STATE_UNKNOWN      = 0 #default
+uint8 AUTHENTICATION_STATE_INITIALIZING = 1
+uint8 AUTHENTICATION_STATE_ERROR        = 2
+uint8 AUTHENTICATION_STATE_OK           = 3
+uint8 AUTHENTICATION_STATE_DISABLED     = 4
+uint8 authentication_state              # GPS signal authentication state
 
 float32 vel_m_s			# GPS ground speed, (metres/sec)
 float32 vel_n_m_s		# GPS North velocity, (metres/sec)
@@ -55,6 +63,16 @@ uint64 time_utc_usec		# Timestamp (microseconds, UTC), this is the timestamp whi
 
 uint8 satellites_used		# Number of satellites used
 
+uint32 SYSTEM_ERROR_OK                   = 0 #default
+uint32 SYSTEM_ERROR_INCOMING_CORRECTIONS = 1
+uint32 SYSTEM_ERROR_CONFIGURATION        = 2
+uint32 SYSTEM_ERROR_SOFTWARE             = 4
+uint32 SYSTEM_ERROR_ANTENNA              = 8
+uint32 SYSTEM_ERROR_EVENT_CONGESTION     = 16
+uint32 SYSTEM_ERROR_CPU_OVERLOAD         = 32
+uint32 SYSTEM_ERROR_OUTPUT_CONGESTION    = 64
+uint32 system_error                      # General errors with the connected GPS receiver
+
 float32 heading			# heading angle of XYZ body frame rel to NED. Set to NaN if not available and updated (used for dual antenna GPS), (rad, [-PI, PI])
 float32 heading_offset		# heading offset of dual antenna array in body frame. Set to NaN if not applicable. (rad, [-PI, PI])
 float32 heading_accuracy	# heading accuracy (rad, [0, 2PI])
@@ -62,11 +80,23 @@ float32 heading_accuracy	# heading accuracy (rad, [0, 2PI])
 float32 rtcm_injection_rate	# RTCM message injection rate Hz
 uint8 selected_rtcm_instance	# uorb instance that is being used for RTCM corrections
 
-bool rtcm_crc_failed		# RTCM message CRC failure detected
+uint8 CORRECTIONS_PROTOCOL_UNKNOWN = 0
+uint8 CORRECTIONS_PROTOCOL_RTCM3 = 1
+uint8 CORRECTIONS_PROTOCOL_SPARTN = 2
+uint8 CORRECTIONS_PROTOCOL_HAS = 3	# Galileo High Accuracy Service, received on E6
+uint8 CORRECTIONS_PROTOCOL_PMP = 4	# SPARTN over L-band (u-blox NEO-D9S)
+uint8 CORRECTIONS_PROTOCOL_QZSS_L6 = 5	# QZSS CLAS
+uint8 corrections_protocol	# Protocol of the last correction message the receiver parsed
 
-uint8 RTCM_MSG_USED_UNKNOWN = 0
-uint8 RTCM_MSG_USED_NOT_USED = 1
-uint8 RTCM_MSG_USED_USED = 2
-uint8 rtcm_msg_used		# Indicates if the RTCM message was used successfully by the receiver
+bool corrections_crc_failed	# Last correction message failed its CRC or content check
+
+uint8 CORRECTIONS_MSG_USED_UNKNOWN = 0
+uint8 CORRECTIONS_MSG_USED_NOT_USED = 1
+uint8 CORRECTIONS_MSG_USED_USED = 2
+uint8 corrections_msg_used	# Whether the receiver used the last correction message
+
+float32 antenna_offset_x	# [m] [@frame body frame FRD] X Position of GNSS antenna
+float32 antenna_offset_y	# [m] [@frame body frame FRD] Y Position of GNSS antenna
+float32 antenna_offset_z	# [m] [@frame body frame FRD] Z Position of GNSS antenna
 
 # TOPICS sensor_gps vehicle_gps_position
