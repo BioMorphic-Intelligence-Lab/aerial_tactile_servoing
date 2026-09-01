@@ -430,42 +430,42 @@ class UAMStateMachine(Node):
         next_state (str, optional): Next state to transition to after completion. Defaults to 'emergency'.
     """
     def state_approach_wall_position(self, approach_speed: list, approach_heading=None, transition: bool=False, next_state='emergency'):
-                self.handle_state(state_number=21)
+        self.handle_state(state_number=21)
 
-                # First state loop
-                if self.first_state_loop:
-                    self.running_position[0] = self.vehicle_local_position.x
-                    self.running_position[1] = self.vehicle_local_position.y
-                    self.running_position[2] = self.vehicle_local_position.z
-                    if approach_heading is None:
-                        self.running_position[3] = self.vehicle_local_position.heading
-                        self.get_logger().info(f'[21] Approaching contact surface at {approach_speed} m/s \t {self.running_position[3]:.3f} rad (no heading provided)')
-                    else:
-                        self.running_position[3] = approach_heading
-                        self.get_logger().info(f'[21] Approaching contact surface at {approach_speed} m/s \t {self.running_position[3]:.3f} rad')
-                    self.first_state_loop = False
+        # First state loop
+        if self.first_state_loop:
+            self.running_position[0] = self.vehicle_local_position.x
+            self.running_position[1] = self.vehicle_local_position.y
+            self.running_position[2] = self.vehicle_local_position.z
+            if approach_heading is None:
+                self.running_position[3] = self.vehicle_local_position.heading
+                self.get_logger().info(f'[21] Approaching contact surface at {approach_speed} m/s \t {self.running_position[3]:.3f} rad (no heading provided)')
+            else:
+                self.running_position[3] = approach_heading
+                self.get_logger().info(f'[21] Approaching contact surface at {approach_speed} m/s \t {self.running_position[3]:.3f} rad')
+            self.first_state_loop = False
 
-                    if len(approach_speed) !=3:
-                        self.get_logger().error(f'Approach speed must be a list of 3 (vx, vy, vz). Got {approach_speed}')
-                        self.transition_to_state('emergency')
-                
-                # Update position setpoint
-                self.running_position[0] += approach_speed[0] / self.frequency  # Increase x at approach
-                self.running_position[1] += approach_speed[1] / self.frequency  # Increase y at approach
-                self.running_position[2] += approach_speed[2] / self.frequency  # Increase z at approach
-                self.get_logger().info(f'Approaching... XYZ setpoint: {self.running_position[0]:.2f}, {self.running_position[1]:.2f}, {self.running_position[2]:.2f} m', throttle_duration_sec=1)
-                self.publish_trajectory_position_setpoint(
-                    self.running_position[0],
-                    self.running_position[1],
-                    self.running_position[2],
-                    self.running_position[3]
-                )
+            if len(approach_speed) !=3:
+                self.get_logger().error(f'Approach speed must be a list of 3 (vx, vy, vz). Got {approach_speed}')
+                self.transition_to_state('emergency')
+        
+        # Update position setpoint
+        self.running_position[0] += approach_speed[0] / self.frequency  # Increase x at approach
+        self.running_position[1] += approach_speed[1] / self.frequency  # Increase y at approach
+        self.running_position[2] += approach_speed[2] / self.frequency  # Increase z at approach
+        self.get_logger().info(f'Approaching... XYZ setpoint: {self.running_position[0]:.2f}, {self.running_position[1]:.2f}, {self.running_position[2]:.2f} m', throttle_duration_sec=1)
+        self.publish_trajectory_position_setpoint(
+            self.running_position[0],
+            self.running_position[1],
+            self.running_position[2],
+            self.running_position[3]
+        )
 
-                # State transition
-                if not self.offboard and self.fcu_on:
-                    self.transition_to_state('emergency')
-                elif transition or self.input_state==1:
-                    self.transition_to_state(new_state=next_state)
+        # State transition
+        if not self.offboard and self.fcu_on:
+            self.transition_to_state('emergency')
+        elif transition or self.input_state==1:
+            self.transition_to_state(new_state=next_state)
 
     def state_approach_wall_velocity(self, approach_speed: list, transition: bool=False, next_state='emergency'): # Better way is to command a negative z velocity on the end-effector and run it through the inverse kinematics
         self.handle_state(state_number=22)
