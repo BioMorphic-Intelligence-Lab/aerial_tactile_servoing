@@ -19,15 +19,13 @@
       # launch owns them. vbats.launch.py -> real, fcu_on arg (default true);
       # vbats_sim.launch.py -> sim, fcu_on forced off by the base class.
     im:
-      tactile_servoing_time: 180.0        # [s] max servoing duration
+      tactile_servoing_time: 60.0        # [s] max servoing duration
       no_contact_timeout: 10.0            # [s] lost-contact grace period
       takeoff_altitude: 1.5               # [m]
       pre_contact_arm_position: [0.79, 0.0, 0.79]  # [rad] q1,q2,q3 (pi/3, 0, pi/6)
       land_arm_position: [1.57, 0.0, -1.57]            # [rad]
       approach_speed: [0.0, 0.05, 0.0]    # [m/s] end-effector approach velocity
-      approach_heading_deg: 0.0          # [deg]
       disengage_speed: 0.15               # [m/s]
-      ee_x_abort_threshold: -1.0          # [m] abort servoing past this ee x
 
 /tactip_driver:
   ros__parameters:
@@ -36,9 +34,9 @@
     dimension: 5
     verbose: false
     test_model_time: false
-    save_debug_image: true
+    save_debug_image: false
     save_interval: 10.0
-    ssim_contact_threshold: 0.65
+    ssim_contact_threshold: 0.8
     save_directory: /home/martijn/aerial_tactile_servoing/data/tactip_images
     zero_when_no_contact: true
     fake_data: false
@@ -46,25 +44,28 @@
 /controller:
   ros__parameters:
     frequency: 100.0
-    Kp_depth: 40.0
-    Ki_depth: 12.0
+    Kp_depth: 175.0
+    Ki_depth: 20.0
     Kd_depth: 2.0
     Kp_shear: 20.0
     Ki_shear: 2.5
     Kd_shear: 2.0
-    Kp_angular: 0.75
+    Kp_angular: 0.8
     Ki_angular: 0.0
     Kd_angular: 0.45
+    Kp_secondary: 3.5
+    IK_weights_contact: [25., 25., 10., 10., 1., 20., 1.]
+    IK_weights_flight: [25., 25., 10., 10., 5., 20., 5.]
+    fade_time_ik_weights: 5.0
+    nominal_state: [0., 0., 0., 0., 0., 0., 0.7854, 0.0, 0.7854]
     alpha: 0.1
     windup_clip: 0.15
-    altitude_anchoring: false  # Don't turn on with altitude damping
-    altitude_damping: false    # Don't turn on with altitude anchoring
     Kp_alt: 0.5
     test_execution_time: false
 
 /planner:
   ros__parameters:
     frequency: 100.0
-    default_depth: -3.3        # default contact depth in mm
+    default_depth: -3.0        # default contact depth in mm
     mission_preset: default    # mission preset (e.g. 'blockref_x', 'slide_x', ...)
     verbose: false

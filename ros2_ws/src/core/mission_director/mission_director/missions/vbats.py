@@ -30,14 +30,8 @@ class VbatsMission(TactileMissionDirector):
         self.declare_parameter('im.approach_speed', [0.0, 0.05, 0.0])  # [m/s] end-effector approach velocity
         self.approach_speed = list(self.get_parameter('im.approach_speed').get_parameter_value().double_array_value)
 
-        self.declare_parameter('im.approach_heading_deg', 15.0)  # [deg]
-        self.approach_heading_deg = self.get_parameter('im.approach_heading_deg').get_parameter_value().double_value
-
         self.declare_parameter('im.disengage_speed', 0.15)  # [m/s]
         self.disengage_speed = self.get_parameter('im.disengage_speed').get_parameter_value().double_value
-
-        self.declare_parameter('im.ee_x_abort_threshold', -1.0)  # [m] abort servoing past this ee x
-        self.ee_x_abort_threshold = self.get_parameter('im.ee_x_abort_threshold').get_parameter_value().double_value
 
         self.get_logger().info('VbatsMission initialized.')
 
@@ -66,7 +60,7 @@ class VbatsMission(TactileMissionDirector):
             case "approach":
                 self.state_approach_wall_position(
                     approach_speed=self.approach_speed,
-                    approach_heading=np.deg2rad(self.approach_heading_deg),
+                    approach_heading=0.0,
                     transition=self.contact,
                     next_state="tactile_servoing")
 
@@ -92,8 +86,6 @@ class VbatsMission(TactileMissionDirector):
                     self.ts_no_contact_counter = 0
                     self.transition_to_state('pre_contact_arm_position')
                 elif self.servoing_time_elapsed() or self.input_state == 1:
-                    self.transition_to_state('disengage')
-                elif position_ee is not None and position_ee.x < self.ee_x_abort_threshold:
                     self.transition_to_state('disengage')
                 elif not self.offboard and self.fcu_on:
                     self.transition_to_state('emergency')
