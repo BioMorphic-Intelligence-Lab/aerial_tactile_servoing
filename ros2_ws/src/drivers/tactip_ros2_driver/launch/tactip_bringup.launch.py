@@ -37,9 +37,9 @@ def generate_launch_description():
             {'test_model_time': False},
             {'save_debug_image': False},
             {'save_interval': 5.},
-            {'ssim_contact_threshold': 0.7},
+            {'ssim_contact_threshold': 0.8},
             {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},
-            {'fake_data': True},
+            {'fake_data': False},
             {'zero_when_no_contact': True},
         ],
         arguments=['--ros-args', '--log-level', 'info']

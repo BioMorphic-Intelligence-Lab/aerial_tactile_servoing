@@ -111,11 +111,11 @@ class TactipDriver(Node):
                 self.get_logger().info(f"Saving image number {self.img_counter} in location {raw_outfile}")
             self.img_counter += 1
             self.cycle_counter = 0
-        
+
         # Just read data without saving
         else:
             sensor_image = self.sensor.process()
-        
+
         # Get SSIM
         ssim_score = ssim(self.ref_image_ssim, sensor_image.squeeze())
         msg = Float64()
