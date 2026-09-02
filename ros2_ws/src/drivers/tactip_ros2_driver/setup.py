@@ -4,7 +4,7 @@ import os
 
 package_name = 'tactip_ros2_driver'
 
-model_name = 'A1_2026_hypopt'
+model_name = 'simple_cnn_C2_2026'
 
 setup(
     name=package_name,
@@ -13,8 +13,8 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/model/', glob('resource/models/'+model_name+'/*')),
-        (os.path.join('share', package_name), glob('launch/*.launch.py')), # Add the launch files
+        ('share/' + package_name + '/model', glob('resource/models/' + model_name + '/*')),
+        ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
     ],
     install_requires=[
         'setuptools', 
