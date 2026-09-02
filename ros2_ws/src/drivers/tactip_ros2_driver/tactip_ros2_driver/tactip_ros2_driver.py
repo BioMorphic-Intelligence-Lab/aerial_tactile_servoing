@@ -8,7 +8,7 @@ import numpy as np
 from skimage.metrics import structural_similarity as ssim
 from scipy.spatial.transform import Rotation as R
 
-from geometry_msgs.msg import TwistStamped, TransformStamped
+from geometry_msgs.msg import TwistStamped, TransformStamped, WrenchStamped
 from std_msgs.msg import Float64, Int8
 from tf2_ros import TransformBroadcaster
 
@@ -25,12 +25,12 @@ class TactipDriver(Node):
         # Parameters
         self.declare_parameter('source', 0)
         self.declare_parameter('frequency', 10.)
-        self.declare_parameter('dimension', 5)
+        self.declare_parameter('dimension', 8)
         self.declare_parameter('verbose', True)
         self.declare_parameter('test_model_time', False)
         self.declare_parameter('save_debug_image', False)
         self.declare_parameter('save_interval', 1.)
-        self.declare_parameter('ssim_contact_threshold', 0.7)
+        self.declare_parameter('ssim_contact_threshold', 0.9)
         self.declare_parameter('save_directory', 'Please set a save_directory in the launch file')
         self.declare_parameter('zero_when_no_contact', True)
         self.declare_parameter('fake_data', False)
@@ -73,6 +73,7 @@ class TactipDriver(Node):
         self.publisher_pose_ = self.create_publisher(TwistStamped, '/tactip/pose', 10)
         self.publisher_ssim_ = self.create_publisher(Float64, '/tactip/ssim', 10)
         self.publisher_contact_ = self.create_publisher(Int8, '/tactip/contact', 10)
+        self.publisher_force_ = self.create_publisher(WrenchStamped, '/tactip/force', 10)
 
         # Broadcaster TF
         self.broadcaster_tf = TransformBroadcaster(self)
@@ -193,7 +194,17 @@ class TactipDriver(Node):
         t.transform.rotation.y = float(q_inv[1])
         t.transform.rotation.z = float(q_inv[2])
         t.transform.rotation.w = float(q_inv[3])
-        self.broadcaster_tf.sendTransform(t)
+        self.broadcaster_tf.sendTransform(t) 
+
+        # ADDED FORCE 
+        force_msg = WrenchStamped()
+        force_msg.header.stamp = self.get_clock().now().to_msg()
+        force_msg.header.frame_id = "present_sensor_frame"
+        force_msg.wrench.force.x = float(data[12])
+        force_msg.wrench.force.y = float(data[13])
+        force_msg.wrench.force.z = float(data[14])
+        self.publisher_force_.publish(force_msg)
+
 
     def publish_zero_data(self):  
         if self.get_parameter('verbose').get_parameter_value().bool_value and self.dimension == 3:
@@ -228,6 +239,18 @@ class TactipDriver(Node):
         t.transform.rotation.z = 0.0
         t.transform.rotation.w = 1.0
         self.broadcaster_tf.sendTransform(t)
+
+        # forces
+        zero_force_msg = WrenchStamped()
+        zero_force_msg.header.stamp = self.get_clock().now().to_msg()
+        zero_force_msg.header.frame_id = "present_sensor_frame"
+
+        zero_force_msg.wrench.force.x = 0.0
+        zero_force_msg.wrench.force.y = 0.0
+        zero_force_msg.wrench.force.z = 0.0
+
+        self.publisher_force_.publish(zero_force_msg)
+
 
     def test_model_execution_time(self, iterations = 1000):
         start_time = time.time()
@@ -334,6 +357,14 @@ class TactipDriver(Node):
         t.transform.rotation.z = 0.0
         t.transform.rotation.w = 1.0
         self.broadcaster_tf.sendTransform(t)
+
+        zero_force_msg = WrenchStamped()
+        zero_force_msg.header.stamp = self.get_clock().now().to_msg()
+        zero_force_msg.header.frame_id = "present_sensor_frame"
+        zero_force_msg.wrench.force.x = 0.0
+        zero_force_msg.wrench.force.y = 0.0
+        zero_force_msg.wrench.force.z = 0.0
+        self.publisher_force_.publish(zero_force_msg)
 
 def main(args=None):
     rclpy.init(args=args)

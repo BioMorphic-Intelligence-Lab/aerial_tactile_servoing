@@ -3,6 +3,7 @@ TacTip driver for ROS2, heavily inspired by RealSensor implementation
 """
 import os
 import cv2
+import time
 
 from .dependencies.image_transforms import process_image
 from .dependencies.models import create_model
@@ -15,9 +16,20 @@ class TacTip:
     def __init__(self, source = 4):
         # set up the camera
         self.source = source
-        self.cam = cv2. VideoCapture(self.source)
-        for _ in range(10):
-            self.cam.read()
+        #self.cam = cv2. VideoCapture(self.source)
+        self.cam = cv2.VideoCapture(self.source, cv2.CAP_V4L2)
+        #for _ in range(10):
+        #    self.cam.read()
+
+        # Give V4L2 time to initialize video stream buffers
+        time.sleep(0.5)
+
+        # Flush warm-up frames safely without blocking indefinitely
+        for _ in range(5):
+            if self.cam.grab():
+                self.cam.retrieve()
+            else:
+                time.sleep(0.05)
         
         # initialize params
         self.model_label_params = {}
