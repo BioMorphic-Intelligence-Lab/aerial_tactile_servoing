@@ -19,7 +19,7 @@
       # launch owns them. vbats.launch.py -> real, fcu_on arg (default true);
       # vbats_sim.launch.py -> sim, fcu_on forced off by the base class.
     im:
-      tactile_servoing_time: 60.0        # [s] max servoing duration
+      tactile_servoing_time: 65.0        # [s] max servoing duration
       no_contact_timeout: 10.0            # [s] lost-contact grace period
       takeoff_altitude: 1.5               # [m]
       pre_contact_arm_position: [0.79, 0.0, 0.79]  # [rad] q1,q2,q3 (pi/3, 0, pi/6)
@@ -66,6 +66,6 @@
 /planner:
   ros__parameters:
     frequency: 100.0
-    default_depth: -3.0        # default contact depth in mm
+    default_depth: -3.3        # default contact depth in mm
     mission_preset: default    # mission preset (e.g. 'blockref_x', 'slide_x', ...)
     verbose: false

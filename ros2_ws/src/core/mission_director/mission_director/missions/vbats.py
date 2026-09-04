@@ -60,7 +60,7 @@ class VbatsMission(TactileMissionDirector):
             case "approach":
                 self.state_approach_wall_position(
                     approach_speed=self.approach_speed,
-                    approach_heading=0.0,
+                    approach_heading=None, # Approach at the current heading
                     transition=self.contact,
                     next_state="tactile_servoing")
 

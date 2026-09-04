@@ -30,7 +30,7 @@ def generate_launch_description():
         name='tactip_driver',
         output='screen',
         parameters=[
-            {'source': 4},
+            {'source': 0},
             {'frequency': 20.},
             {'dimension': 5},
             {'verbose': True},

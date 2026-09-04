@@ -241,7 +241,7 @@ class UAMStateMachine(Node):
         self.home_position[0] = self.vehicle_local_position.x
         self.home_position[1] = self.vehicle_local_position.y
         self.home_position[2] = self.vehicle_local_position.z
-        self.home_position[3] = self.vehicle_local_position.heading        
+        self.home_position[3] = self.vehicle_local_position.heading
 
         if (self.home_position[0] == 0.0 and self.home_position[1] == 0.0):        
             self.get_logger().info(f"[ENTRYPOINT] Waiting for position fix!, vehicle_x {self.vehicle_local_position.x:.4f}, vehicle_y {self.vehicle_local_position.y:.4f}", throttle_duration_sec=1)
@@ -334,7 +334,7 @@ class UAMStateMachine(Node):
     def state_hover(self, duration_sec: float, next_state='emergency'):
         self.handle_state(state_number=10)
 
-        # First state loop
+        # Run once when the state is called for the first time.
         if self.first_state_loop:
             self.hover_position[0] = self.vehicle_local_position.x
             self.hover_position[1] = self.vehicle_local_position.y
@@ -343,6 +343,8 @@ class UAMStateMachine(Node):
             self.get_logger().info(f'[5] Hovering at altitude: {self.home_position[2]:.2f} m for {duration_sec} seconds')
             self.first_state_loop = False
 
+        # Keep publishing position at first state loop as position reference
+        self.publish_trajectory_position_setpoint(*self.hover_position)
         self.get_logger().info(f'Hovering... {(datetime.datetime.now()-self.state_start_time).seconds:.1f}/{duration_sec} sec', throttle_duration_sec=1)
 
         # State transition
@@ -362,7 +364,8 @@ class UAMStateMachine(Node):
     def state_move_arms(self, q_des: list, next_state='emergency', epsilon=0.2): # keep at 0.2 
         self.handle_state(state_number=11)
         error = 0.0
-        # First state loop
+
+        # Run once when the state is called for the first time.
         if self.first_state_loop:
             self.hover_position[0] = self.vehicle_local_position.x
             self.hover_position[1] = self.vehicle_local_position.y
@@ -370,6 +373,9 @@ class UAMStateMachine(Node):
             self.hover_position[3] = self.vehicle_local_position.heading
             self.get_logger().info(f'[11] Hovering at altitude: {self.home_position[2]:.2f} m while moving arms to states {q_des} in mode {self.manipulator_mode}')
             self.first_state_loop = False
+
+        # Keep publishing position at first state loop as position reference
+        self.publish_trajectory_position_setpoint(*self.hover_position)
         
         if self.manipulator_mode=='position': # If the servos are controlled in position mode
             self.publish_servo_position_references(q_des)
