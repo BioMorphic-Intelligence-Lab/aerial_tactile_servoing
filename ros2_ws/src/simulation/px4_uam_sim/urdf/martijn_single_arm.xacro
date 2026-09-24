@@ -29,6 +29,7 @@
       <sensor name="air_pressure_sensor" type="air_pressure">
         <always_on>1</always_on>
         <update_rate>50</update_rate>
+        <gz_frame_id>base_link</gz_frame_id>
         <air_pressure>
           <pressure>
             <noise type="gaussian">
@@ -41,6 +42,7 @@
       <sensor name="imu_sensor" type="imu">
         <always_on>1</always_on>
         <update_rate>1000</update_rate>
+        <gz_frame_id>base_link</gz_frame_id>
         <imu>
           <angular_velocity>
             <x>
@@ -99,6 +101,29 @@
       <sensor name="navsat_sensor" type="navsat">
         <always_on>1</always_on>
         <update_rate>100</update_rate>
+        <gz_frame_id>base_link</gz_frame_id>
+      </sensor>
+      <sensor name="magnetometer_sensor" type="magnetometer">
+        <gz_frame_id>base_link</gz_frame_id>
+        <always_on>1</always_on>
+        <update_rate>100</update_rate>
+        <magnetometer>
+          <x>
+            <noise type="gaussian">
+              <stddev>0.0001</stddev>
+            </noise>
+          </x>
+          <y>
+            <noise type="gaussian">
+              <stddev>0.0001</stddev>
+            </noise>
+          </y>
+          <z>
+            <noise type="gaussian">
+              <stddev>0.0001</stddev>
+            </noise>
+          </z>
+        </magnetometer>
       </sensor>
     </gazebo>
   

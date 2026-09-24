@@ -10,17 +10,19 @@ import datetime
 from math import pi as PI
 
 """
-Launch simulation with one arm. Corresponds to the implementation after refactoring.
-
-The package can be launched with 'ros2 launch ats_bringup sim_gz_one_new.launch.py'
+Launch the dual-arm pinch grasp mission in Gazebo simulation.
 """
 logging = False
 
 def generate_launch_description():
     ld = LaunchDescription()
 
+    # Same grasp geometry as the real launch 
+    grasp_config = os.path.join(get_package_share_directory('ats_bringup'), 'config',
+                                'grasp_geometry.yaml')
+
     # Add the paths to the simulation and controller launch files
-    sim_launch_path = os.path.join(get_package_share_directory('px4_uam_sim'), 'launch', 'gz_martijn_single_arm.launch.py')
+    sim_launch_path = os.path.join(get_package_share_directory('px4_uam_sim'), 'launch', 'gz_martijn_dual_arm.launch.py')
     ld.add_action(IncludeLaunchDescription(
         PythonLaunchDescriptionSource(sim_launch_path),
         launch_arguments={
@@ -56,10 +58,11 @@ def generate_launch_description():
 
     mission_director = Node(
         package="mission_director",
-        executable="vbats",
+        executable="pinch_grasp",
         name="mission_director",
         output="screen",
         parameters=[
+            grasp_config,
             {'sm.frequency': 100.0},
             {'sm.position_clip': 3.0},
             {'sm.fcu_on': False},
@@ -67,14 +70,22 @@ def generate_launch_description():
             {'sm.manipulator_mode': 'velocity'},
             {'im.tactile_servoing_time': 200.0}
         ],
+        remappings=[
+            # The base class uses the driver's default names; in the dual stack those are the LEFT
+            # arm. The mission makes its own clients for the right one.
+            ('/tactip/pose', '/tactip_left/pose'),
+            ('/tactip/contact', '/tactip_left/contact'),
+            ('set_ssim_ref', 'set_ssim_ref_left'),
+        ],
         arguments=["--ros-args", "--log-level", "info"]
     )
     ld.add_action(mission_director)
 
-    tactip_driver = Node(
+    # Left TacTip (B1) on arm 1.
+    tactip_driver_left = Node(
         package='tactip_ros2_driver',
         executable='tactip_ros2_driver',
-        name='tactip_driver',
+        name='tactip_driver_left',
         output='screen',
         parameters=[
             {'source': 0},
@@ -85,40 +96,77 @@ def generate_launch_description():
             {'save_debug_image': False},
             {'save_interval': 10.0},
             {'ssim_contact_threshold': 0.65},
-            {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},
+            {'save_directory': os.path.join(os.path.expanduser('~'),'aerial_tactile_servoing','data','tactip_images')},
             {'zero_when_no_contact': True},
-            {'fake_data': True}
+            {'fake_data': True},
+            # Distinct TF frames per arm, or both broadcast the same edge and lookups mix them.
+            {'sensor_frame': 'present_sensor_frame_left'},
+            {'contact_frame': 'present_contact_frame_tactipdriver_left'},
+        ],
+        remappings=[
+            ('/tactip/pose', '/tactip_left/pose'),
+            ('/tactip/ssim', '/tactip_left/ssim'),
+            ('/tactip/contact', '/tactip_left/contact'),
+            ('/tactip/force', '/tactip_left/force'),
+            ('set_ssim_ref', 'set_ssim_ref_left'),
+            ('tare_force', 'tare_force_left'),
         ],
         arguments=['--ros-args', '--log-level', 'info']
     )
-    ld.add_action(tactip_driver)
+    ld.add_action(tactip_driver_left)
 
-    controller = Node(
-        package='pose_based_ats',
-        executable='velocity_based_ats',
-        name='controller',
+    # Right TacTip (B2) on arm 2.
+    tactip_driver_right = Node(
+        package='tactip_ros2_driver',
+        executable='tactip_ros2_driver',
+        name='tactip_driver_right',
         output='screen',
         parameters=[
-            {'frequency': 100.},
-            {'Kp_depth': 175.0}, # Go to 75
-            {'Ki_depth': 20.0}, # Go to 10
-            {'Kd_depth': 2.0},
-            {'Kp_shear': 20.0},
-            {'Ki_shear': 2.5},
-            {'Kd_shear': 2.0},
-            {'Kp_angular': 0.80},
-            {'Ki_angular': 0.0},
-            {'Kd_angular': 0.45},
-            {'Kp_secondary': 3.5},
-            {'IK_weights': [25., 25., 10., 10., 1., 20., 1.]}, # Weights for the weighted pseudo-inverse of the Jacobian, if empty then no weighting is applied
-            {'nominal_state': [0., 0., 0., 0., 0., 0., PI/4, 0.0, PI/4]},
-            {'alpha': 0.1},
-            {'windup_clip': 0.15},
-            {'test_execution_time': False}
+            {'source': 0},
+            {'frequency': 15.},
+            {'dimension': 5},
+            {'verbose': True},
+            {'test_model_time': False},
+            {'save_debug_image': False},
+            {'save_interval': 10.0},
+            {'ssim_contact_threshold': 0.65},
+            {'save_directory': os.path.join(os.path.expanduser('~'),'aerial_tactile_servoing','data','tactip_images')},
+            {'zero_when_no_contact': True},
+            {'fake_data': True},
+            # Distinct TF frames, or both broadcast the same edge and lookups mix the sensors.
+            {'sensor_frame': 'present_sensor_frame_right'},
+            {'contact_frame': 'present_contact_frame_tactipdriver_right'},
+        ],
+        remappings=[
+            ('/tactip/pose', '/tactip_right/pose'),
+            ('/tactip/ssim', '/tactip_right/ssim'),
+            ('/tactip/contact', '/tactip_right/contact'),
+            ('/tactip/force', '/tactip_right/force'),
+            ('set_ssim_ref', 'set_ssim_ref_right'),
         ],
         arguments=['--ros-args', '--log-level', 'info']
     )
-    ld.add_action(controller)
+    ld.add_action(tactip_driver_right)
+
+    tactile_controller = Node(
+        package='pose_based_ats',
+        executable='dual_arm_tactile_controller',
+        name='dual_arm_tactile_controller',
+        output='screen',
+        parameters=[
+            grasp_config,
+            {'frequency': 30.0},                     # matches the TacTip stream
+            {'sim': True},                           # fake tactile data: closes on position,
+                                                     # publishes no mass estimate
+            # ARM 1 is the LEFT arm (body +y, TacTip B1); ARM 2 is the RIGHT arm (body -y, B2).
+            {'arm1_force_topic': '/tactip_left/force'},
+            {'arm2_force_topic': '/tactip_right/force'},
+            {'arm1_pose_topic': '/tactip_left/pose'},
+            {'arm2_pose_topic': '/tactip_right/pose'},
+        ],
+        arguments=['--ros-args', '--log-level', 'info']
+    )
+    ld.add_action(tactile_controller)
 
     # Torque estimator
     # torque_observer = Node(

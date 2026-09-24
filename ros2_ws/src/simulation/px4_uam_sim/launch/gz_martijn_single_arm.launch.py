@@ -19,7 +19,8 @@ from ament_index_python.packages import (get_package_share_directory)
 from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument,
                             ExecuteProcess,
-                            IncludeLaunchDescription)
+                            IncludeLaunchDescription,
+                            SetEnvironmentVariable)
 
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.actions import Node
@@ -30,13 +31,11 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 def generate_launch_description():
     HOME = os.environ.get('HOME')    
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
+    pkg_px4_uam_sim = get_package_share_directory('px4_uam_sim')
     gz_launch_path = PathJoinSubstitution([pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py'])
     PX4_RUN_DIR = HOME + '/PX4-Autopilot'
-    # Model spawned from this package's install share. If you edit the model,
-    # regenerate the .urdf from the .xacro and `colcon build` again:
-    #   xacro urdf/martijn_single_arm.xacro > urdf/martijn_single_arm.urdf
-    urdf_path = os.path.join(
-        get_package_share_directory('px4_uam_sim'), 'urdf', 'martijn_single_arm.urdf')
+    world_path = os.path.join(pkg_px4_uam_sim, 'worlds', 'test_world.sdf')
+    model_sdf_path = os.path.join(pkg_px4_uam_sim, 'urdf', 'martijn_single_arm.sdf')
     
     execute_microXRCEagent = ExecuteProcess(
         cmd=[
@@ -46,12 +45,18 @@ def generate_launch_description():
         output='screen')
     
     # Launch PX4 GZ Sim
-    """
     execute_px4_gz_sim = ExecuteProcess(
         cmd=[
             PX4_RUN_DIR + '/build/px4_sitl_default/bin/px4',
-            ])
-    """
+        ],
+        cwd=PX4_RUN_DIR,
+        additional_env={
+            'PX4_SYS_AUTOSTART': '4001',
+            'PX4_SIMULATOR': 'GZ',
+            'PX4_GZ_MODEL_NAME': 'my_custom_model',
+        },
+        prefix="bash -c 'sleep 7s; $0 $@'",
+        output='screen')
 
     declare_use_sim_time_cmd = DeclareLaunchArgument(
         name='use_sim_time',
@@ -94,18 +99,23 @@ def generate_launch_description():
     )
 
     ld = LaunchDescription([
+        SetEnvironmentVariable(
+            name='GZ_SIM_RESOURCE_PATH',
+            value=f"{os.path.join(pkg_px4_uam_sim, 'worlds')}:{os.path.join(pkg_px4_uam_sim, 'urdf')}:{pkg_px4_uam_sim}:{os.environ.get('GZ_SIM_RESOURCE_PATH', '')}"
+        ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(gz_launch_path),
             launch_arguments={
-                'gz_args': 'test_world.sdf',
+                'gz_args': f"-r {world_path}",
                 'on_exit_shutdown': 'True'
             }.items(),
         ),
         Node(package='ros_gz_sim', 
              executable='create',
             arguments=[
+                '-world', 'world_demo',
                 '-name', 'my_custom_model',
-                '-file',  urdf_path,
+                '-file',  model_sdf_path,
                 '-z', ' 0.1'],
             output='screen'),
         Node(package='px4_uam_sim',
@@ -115,7 +125,7 @@ def generate_launch_description():
     ])
         # Execute processes
     ld.add_action(execute_microXRCEagent)
-    #ld.add_action(execute_px4_gz_sim)
+    ld.add_action(execute_px4_gz_sim)
     ld.add_action(bridge)
     
     return ld

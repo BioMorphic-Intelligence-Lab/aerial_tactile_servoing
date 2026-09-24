@@ -775,11 +775,29 @@ void DXLDriver::servo_reference_callback(const sensor_msgs::msg::JointState::Sha
     {
         if (servodata_[i].operating_mode == DXLMode::EXTENDED_POSITION)
         {
-            servodata_[i].goal_position = msg->position[i];
+            if (static_cast<size_t>(i) < msg->position.size())
+            {
+                servodata_[i].goal_position = msg->position[i];
+            }
+            else
+            {
+                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                    "Servo %d is in EXTENDED_POSITION mode but received reference has no position field (size %zu) -- ignoring",
+                    servodata_[i].id, msg->position.size());
+            }
         }
         else if (servodata_[i].operating_mode == DXLMode::VELOCITY)
         {
-            servodata_[i].goal_velocity = msg->velocity[i];
+            if (static_cast<size_t>(i) < msg->velocity.size())
+            {
+                servodata_[i].goal_velocity = msg->velocity[i];
+            }
+            else
+            {
+                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                    "Servo %d is in VELOCITY mode but received reference has no velocity field (size %zu) -- ignoring",
+                    servodata_[i].id, msg->velocity.size());
+            }
         }
     }
 }

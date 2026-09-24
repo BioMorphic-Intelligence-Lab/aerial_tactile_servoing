@@ -55,9 +55,26 @@ class SimRemapper(Node):
             self.get_logger().warn(f"Feedback length {self.feedback_length} does not match reference length {self.ref_length}", throttle_duration_sec=5.0)
 
     def joint_states_callback(self, msg):
-        self.feedback_length = max(len(msg.position), len(msg.velocity))
-        self.arm_positions = msg.position
-        self.arm_velocities = msg.velocity
+        canonical_names = [
+            'shoulder_joint_1', 'elbow_joint_1', 'forearm_joint_1',
+            'shoulder_joint_2', 'elbow_joint_2', 'forearm_joint_2'
+        ]
+        if len(msg.name) >= 6 and list(msg.name) != canonical_names:
+            name_to_idx = {name: i for i, name in enumerate(msg.name)}
+            missing = [n for n in canonical_names if n not in name_to_idx]
+            if missing:
+                self.get_logger().warn(
+                    f"joint_states names {list(msg.name)} do not contain expected "
+                    f"{missing} -- defaulting those to 0.0", throttle_duration_sec=5.0)
+            pos = [msg.position[name_to_idx[n]] if n in name_to_idx and len(msg.position) > name_to_idx[n] else 0.0 for n in canonical_names]
+            vel = [msg.velocity[name_to_idx[n]] if n in name_to_idx and len(msg.velocity) > name_to_idx[n] else 0.0 for n in canonical_names]
+            self.arm_positions = pos
+            self.arm_velocities = vel
+            self.feedback_length = len(pos)
+        else:
+            self.feedback_length = max(len(msg.position), len(msg.velocity))
+            self.arm_positions = msg.position
+            self.arm_velocities = msg.velocity
 
     def servo_refs_callback(self, msg):
         self.ref_length = max(len(msg.position), len(msg.velocity))

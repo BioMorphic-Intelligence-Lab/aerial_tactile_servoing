@@ -29,6 +29,7 @@
       <sensor name="air_pressure_sensor" type="air_pressure">
         <always_on>1</always_on>
         <update_rate>50</update_rate>
+        <gz_frame_id>base_link</gz_frame_id>
         <air_pressure>
           <pressure>
             <noise type="gaussian">
@@ -41,6 +42,7 @@
       <sensor name="imu_sensor" type="imu">
         <always_on>1</always_on>
         <update_rate>1000</update_rate>
+        <gz_frame_id>base_link</gz_frame_id>
         <imu>
           <angular_velocity>
             <x>
@@ -99,6 +101,29 @@
       <sensor name="navsat_sensor" type="navsat">
         <always_on>1</always_on>
         <update_rate>100</update_rate>
+        <gz_frame_id>base_link</gz_frame_id>
+      </sensor>
+      <sensor name="magnetometer_sensor" type="magnetometer">
+        <gz_frame_id>base_link</gz_frame_id>
+        <always_on>1</always_on>
+        <update_rate>100</update_rate>
+        <magnetometer>
+          <x>
+            <noise type="gaussian">
+              <stddev>0.0001</stddev>
+            </noise>
+          </x>
+          <y>
+            <noise type="gaussian">
+              <stddev>0.0001</stddev>
+            </noise>
+          </y>
+          <z>
+            <noise type="gaussian">
+              <stddev>0.0001</stddev>
+            </noise>
+          </z>
+        </magnetometer>
       </sensor>
     </gazebo>
   
@@ -282,7 +307,7 @@
     <child link="elbow_link_1"/>
     <origin xyz="0 0 0.0125" rpy="1.5708 1.5708 3.14"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-1.5708" upper="1.5708" velocity="2" effort="100"/>
+    <limit lower="-1.5708" upper="2.0" velocity="2" effort="100"/>
     <dynamics damping="0.01" friction="0.1"/>
   </joint>  
   <link name="motor_link_elbow_1">
@@ -317,9 +342,9 @@
   </joint>
   <link name="forearm_link_1">
     <collision>
-      <origin xyz="-0.135 0 0" rpy="0 0 0"/>
+      <origin xyz="-0.11 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.27 0.024 0.054"/>
+        <box size="0.22 0.024 0.054"/>
       </geometry>
     </collision>
     <visual>
@@ -332,11 +357,11 @@
       </material>      
     </visual>
     <inertial>
-      <origin xyz="-0.135 0 0" rpy="0 0 0"/>
+      <origin xyz="-0.11 0 0" rpy="0 0 0"/>
       <mass value="0.03"/>
       <inertia ixx="4.9e-07" ixy="0.0" ixz="0.0"
-        iyy="0.00012446" iyz="0.0"
-        izz="0.00012446"/>
+        iyy="0.00008265" iyz="0.0"
+        izz="0.00008265"/>
     </inertial>
   </link>
   <joint name="forearm_joint_1" type="revolute">
@@ -344,8 +369,61 @@
     <child link="forearm_link_1"/>
     <origin xyz="-0.31 0 0" rpy="0 0 0"/>
     <axis xyz="0 -1 0"/>
-    <limit lower="-1.9" upper="1.9" velocity="20" effort="100"/>
+    <limit lower="-2.1" upper="2.1" velocity="20" effort="100"/>
     <dynamics damping="0.0001" friction="0.0"/>    
+  </joint>  
+
+  <!-- TacTip 1: Mounted co-axially (0 deg) on the end of forearm tube -->
+  <link name="tactip_link_1">
+    <!-- DESIGN v2: the tube is cut 50 mm shorter, 0.278 -> 0.228 m, which brings an 8-12 cm
+         object inside the TacTip models' +-25 deg trained tilt in the side grasp. Contact dome
+         apex now sits 0.280 m from the forearm joint axis (was 0.330, the in-situ L_3 from
+         torque_observer.py, vs 0.273 without the sensor): 0.228 + 0.04075 + 0.01125 = 0.280 m. -->
+    <collision>
+      <origin xyz="-0.04075 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.01125"/>
+      </geometry>
+      <surface>
+        <friction>
+          <ode>
+            <!-- Silicone dome on printed plastic. Placeholder:  -->
+            <mu>1.0</mu>
+            <mu2>1.0</mu2>
+          </ode>
+        </friction>
+      </surface>
+    </collision>
+    <!-- Black silicone contact dome -->
+    <visual>
+      <origin xyz="-0.04075 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.01125"/>
+      </geometry>
+      <material name="tactip_dome_1">
+        <color rgba="0.15 0.15 0.15 1.0"/>
+      </material>
+    </visual>
+    <!-- White printed housing -->
+    <visual>
+      <origin xyz="-0.02038 0 0" rpy="0 1.5708 0"/>
+      <geometry>
+        <cylinder radius="0.0125" length="0.04075"/>
+      </geometry>
+      <material name="tactip_housing_1">
+        <color rgba="0.95 0.95 0.95 1.0"/>
+      </material>
+    </visual>
+    <inertial>
+      <origin xyz="-0.02038 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <inertia ixx="1e-5" ixy="0" ixz="0" iyy="1e-5" iyz="0" izz="1e-5"/>
+    </inertial>
+  </link>
+  <joint name="tactip_joint_1" type="fixed">
+    <parent link="forearm_link_1"/>
+    <child link="tactip_link_1"/>
+    <origin xyz="-0.228 0 0" rpy="0 0 0"/>
   </joint>  
   
 
@@ -443,7 +521,7 @@
     <child link="elbow_link_2"/>
     <origin xyz="0 0 0.0125" rpy="1.5708 1.5708 0"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-1.5708" upper="1.5708" velocity="2" effort="100"/>
+    <limit lower="-1.5708" upper="2.0" velocity="2" effort="100"/>
     <dynamics damping="0.01" friction="0.1"/>
   </joint>  
   <link name="motor_link_elbow_2">
@@ -478,9 +556,9 @@
   </joint>
   <link name="forearm_link_2">
     <collision>
-      <origin xyz="-0.135 0 0" rpy="0 0 0"/>
+      <origin xyz="-0.11 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.27 0.024 0.054"/>
+        <box size="0.22 0.024 0.054"/>
       </geometry>
     </collision>
     <visual>
@@ -493,11 +571,11 @@
       </material>      
     </visual>
     <inertial>
-      <origin xyz="-0.135 0 0" rpy="0 0 0"/>
+      <origin xyz="-0.11 0 0" rpy="0 0 0"/>
       <mass value="0.03"/>
       <inertia ixx="4.9e-07" ixy="0.0" ixz="0.0"
-        iyy="0.00012446" iyz="0.0"
-        izz="0.00012446"/>
+        iyy="0.00008265" iyz="0.0"
+        izz="0.00008265"/>
     </inertial>
   </link>
   <joint name="forearm_joint_2" type="revolute">
@@ -505,8 +583,58 @@
     <child link="forearm_link_2"/>
     <origin xyz="-0.31 0 0" rpy="0 0 0"/>
     <axis xyz="0 -1 0"/>
-    <limit lower="-1.9" upper="1.9" velocity="20" effort="100"/>
+    <limit lower="-2.1" upper="2.1" velocity="20" effort="100"/>
     <dynamics damping="0.0001" friction="0.0"/>    
+  </joint>  
+
+  <!-- TacTip 2: Mounted co-axially (0 deg) on the end of forearm tube -->
+  <link name="tactip_link_2">
+    <!-- MEASURED geometry  -->
+    <collision>
+      <origin xyz="-0.04075 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.01125"/>
+      </geometry>
+      <surface>
+        <friction>
+          <ode>
+            <!-- Silicone dome on printed plastic.  -->
+            <mu>1.0</mu>
+            <mu2>1.0</mu2>
+          </ode>
+        </friction>
+      </surface>
+    </collision>
+    <!-- Black silicone contact dome -->
+    <visual>
+      <origin xyz="-0.04075 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.01125"/>
+      </geometry>
+      <material name="tactip_dome_2">
+        <color rgba="0.15 0.15 0.15 1.0"/>
+      </material>
+    </visual>
+    <!-- White printed housing -->
+    <visual>
+      <origin xyz="-0.02038 0 0" rpy="0 1.5708 0"/>
+      <geometry>
+        <cylinder radius="0.0125" length="0.04075"/>
+      </geometry>
+      <material name="tactip_housing_2">
+        <color rgba="0.95 0.95 0.95 1.0"/>
+      </material>
+    </visual>
+    <inertial>
+      <origin xyz="-0.02038 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <inertia ixx="1e-5" ixy="0" ixz="0" iyy="1e-5" iyz="0" izz="1e-5"/>
+    </inertial>
+  </link>
+  <joint name="tactip_joint_2" type="fixed">
+    <parent link="forearm_link_2"/>
+    <child link="tactip_link_2"/>
+    <origin xyz="-0.228 0 0" rpy="0 0 0"/>
   </joint>  
 
 
@@ -565,10 +693,10 @@
 -->
     <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
 	<joint_name>shoulder_joint_1</joint_name>
-	<joint_name>shoulder_joint_2</joint_name>
 	<joint_name>elbow_joint_1</joint_name>
-	<joint_name>elbow_joint_2</joint_name>
 	<joint_name>forearm_joint_1</joint_name>
+	<joint_name>shoulder_joint_2</joint_name>
+	<joint_name>elbow_joint_2</joint_name>
 	<joint_name>forearm_joint_2</joint_name>
     </plugin>
     <plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">

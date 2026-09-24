@@ -1,0 +1,121 @@
+# Dual-arm pinch geometry: Single source of truth for the mission and the controller 
+# ARM NAMING. Arm 1 = LEFT = body +y = TacTip B1 = Dynamixel 31/32/33, topics /tactip_left/*.
+# Arm 2 = RIGHT = body -y = B2 = 41/42/43, /tactip_right/*.
+
+# 1 deg of shoulder = 14.0 mm of width, so that angle is the width measurement. 
+
+/**:
+  ros__parameters:
+
+    # arm pose, shared by the mission and the controller
+    grasp:
+      # Forearm joint -> tube end, after the 50 mm cut. Re-measure?
+      tube_m: 0.228
+      # Forearm MAGNITUDE (arm 1 is commanded -1.95, arm 2 +1.95)
+      forearm_working_rad: 1.95
+
+      # Shoulder MAGNITUDES; arm 1 gets +value, arm 2 -value.
+      shoulder_open_rad: 4.0435     # clears the widest declared object (14 cm) by 15 mm/side
+      shoulder_nominal_rad: 3.9556  # expected contact for 10 cm; logging and sim fallback only
+      shoulder_min_rad: 3.88        # net if contact is never seen: leaves a 3.9 cm gap
+      shoulder_max_rad: 4.08
+
+      # [arm1_min, arm1_max, arm2_min, arm2_max]. MUST match dxl_ros2_pinch_grasp.yaml. The
+      # mission uses it to pick the legal winding nearest each joint's present position.
+      shoulder_limits_rad: [-1.0, 5.0, -5.0, 1.0]
+
+    # TacTip mounting, controller only 
+    # The marked point (the force model's +Y) points the way the pad travels as the arm folds up  
+    # the same gesture on both arms, hence one setting. 
+    # the arms are mirrored, so that axis points up on arm 1 and down on arm 2, and arm_kinematics.mark_plus_z() does the translation. 
+    mark_along_fold_direction: true
+
+    # grip law, controller only 
+    # N_target = clip( SF * F_tangential / mu_est , floor , ceiling ). The contribution: grip set
+    # by the load the pads measure, so no mass estimate and no object model, and it adapts during
+    # the lift. F_tangential runs along the face 
+    grip:
+      # A pad is "in contact" above this; it is above the models' own noise floor (0.02-0.09 N).
+      contact_threshold_n: 0.15
+      force_deadband_n: 0.05       # just above that same noise, so the squeeze does not chatter
+      safety_factor: 1.4
+      normal_floor_n: 0.3          # enough to hold the pads on the object before it is lifted
+      normal_ceiling_n: 1.5        # keeps the pads inside their trained range, under 3 mm deep
+      mu_initial: 1.0              # PLACEHOLDER -- replace with the bench friction measurement?
+      mu_min: 0.3
+      mu_max: 2.0
+      # SLIP AND FRICTION. The shear/normal ratio says nothing about real friction -- in steady
+      # state it is just SF/mu_est, the controller's own command echoed. Only an actual slip does.
+      # The ratio at which sliding began is an upper bound on mu, so mu_est drops to `slip_backoff`
+      # times it, which RAISES the grip (N = SF * F_tan / mu).
+      slip_shear_drop_fraction: 0.4
+      slip_shear_floor_mm: 0.10
+      slip_drop_fraction: 0.3      # secondary: load falling this far below its steady value
+      slip_backoff: 0.8            # how far below the measured sliding ratio to put mu_est
+      slip_holdoff_s: 1.0          # do not re-trigger while the pads are still catching the object
+      # A slip while the load is still coming on is expected (the grip starts at its floor), so it
+      # raises the grip but is NOT recorded as friction -- only steady-load slips reach
+      # /grasp/mu_measured. Lifting slowly enough for the squeeze loop to keep up avoids them.
+      load_steady_window_s: 0.6
+      load_steady_tol_n: 0.05
+      # Pressed pads with no shear in flight mean the object is sliding continuously or absent 
+      no_grip_confirm_s: 1.5
+      # Sum of the two shear vectors = sliding; difference = turning. A two-point pinch barely
+      # resists turning, so it is watched separately.
+      turning_warn_mm: 0.30
+      pad_stiffness_n_per_m: 0.0
+
+    # safety, controller only 
+    limits:
+      # S1, the real protection: each arm closes no more than this past its own first contact, so
+      # depth follows the object rather than the drone's position. 0.0075 rad = 3 mm at 401 mm/rad
+      relative_backstop_rad: 0.0075
+      max_depth_mm: 2.8            # S2; models trained to 3.0 mm
+      max_force_n: 2.0             # S3; per pad, MAGNITUDE (membrane protection)
+      # S4 FLAGS the force reading (and suppresses the mass) rather than stopping the squeeze
+      max_tilt_deg: 25.0
+      # The real stop is a DISAGREEMENT check - how far the measured tilt may differ from what FK
+      # says this pose should produce. 
+      tilt_mismatch_deg: 8.0
+      forearm_clamp_rad: 1.95      # S5; magnitude, keeps clear of the +-2.1 belt limit
+      slip_force_n: 0.2            # S7; pad force this low in flight means the object is going
+      slip_time_s: 0.3
+
+    # rates, controller only 
+      shoulder_approach_rad_s: 0.02    # 8 mm/s while closing the air gap
+      shoulder_squeeze_rad_s: 0.002    # 0.8 mm/s of indentation once in contact
+      shoulder_open_rad_s: 0.05
+      forearm_hold_kp: 2.0             # forearm is position-held in velocity mode
+      forearm_max_rad_s: 0.3
+      squeeze_kp_rad_s_per_n: 0.004    # shoulder velocity per newton of force error
+      # SIM ONLY 
+      sim_grip_hold_rad_s: 0.01
+
+    # mission timeouts 
+    timeouts:
+      close_s: 25.0
+      squeeze_s: 15.0
+      weigh_s: 12.0
+      release_s: 8.0
+
+    # heading, mission only 
+    target_yaw_rad: 0.0
+
+    # waypoint geometry, mission only 
+    geom:
+      # `pad_drop_m` is how far the contact points sit below the body
+      # origin at the working pose (0.4012 m for a 10 cm object; 0.3977-0.4038 m across the whole
+      # 6-14 cm range).
+      pad_drop_m: 0.4012
+      object_north_m: 2.0
+      object_east_m: 0.0
+      object_centre_altitude_m: 1.050   # table top 1.000 + half of the 10 cm object height
+      approach_clearance_m: 0.30        # how far ABOVE the grasp height the approach hover sits
+      dropoff_north_m: 2.0
+      dropoff_east_m: 2.0
+      dropoff_centre_altitude_m: 1.050  # same table height at the drop-off
+      lift_height_m: 0.25
+      
+      grasp_above_centre_m: 0.015
+      
+      altitude_datum_offset_m: 0.10

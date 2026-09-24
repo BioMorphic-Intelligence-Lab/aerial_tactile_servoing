@@ -20,11 +20,9 @@ from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument,
                             ExecuteProcess,
                             SetEnvironmentVariable,
-                            IncludeLaunchDescription,
-                            SetLaunchConfiguration,
-                            TimerAction)
+                            IncludeLaunchDescription)
 
-from launch.substitutions import PathJoinSubstitution, LaunchConfiguration, TextSubstitution
+from launch.substitutions import PathJoinSubstitution
 from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
@@ -33,13 +31,11 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 def generate_launch_description():
     HOME = os.environ.get('HOME')    
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
+    pkg_px4_uam_sim = get_package_share_directory('px4_uam_sim')
     gz_launch_path = PathJoinSubstitution([pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py'])
     PX4_RUN_DIR = HOME + '/PX4-Autopilot'
-    # Model spawned from this package's install share. If you edit the model,
-    # regenerate the .urdf from the .xacro and `colcon build` again:
-    #   xacro urdf/martijn_dual_arm.xacro > urdf/martijn_dual_arm.urdf
-    urdf_path = os.path.join(
-        get_package_share_directory('px4_uam_sim'), 'urdf', 'martijn_dual_arm.urdf')
+    world_path = os.path.join(pkg_px4_uam_sim, 'worlds', 'grasp_world.sdf')
+    model_sdf_path = os.path.join(pkg_px4_uam_sim, 'urdf', 'martijn_dual_arm.sdf')
     
     execute_microXRCEagent = ExecuteProcess(
         cmd=[
@@ -49,25 +45,24 @@ def generate_launch_description():
         output='screen')
     
     # Launch PX4 GZ Sim
-    """
     execute_px4_gz_sim = ExecuteProcess(
         cmd=[
             PX4_RUN_DIR + '/build/px4_sitl_default/bin/px4',
-            ])
-    """
+        ],
+        cwd=PX4_RUN_DIR,
+        additional_env={
+            'PX4_SYS_AUTOSTART': '4001',
+            'PX4_SIMULATOR': 'GZ',
+            'PX4_GZ_MODEL_NAME': 'my_custom_model',
+        },
+        prefix="bash -c 'sleep 7s; $0 $@'",
+        output='screen')
 
     declare_use_sim_time_cmd = DeclareLaunchArgument(
         name='use_sim_time',
         default_value='True',
         description='Use simulation (Gazebo) clock if true')
     
-    """
-    declare_flight_mode_cmd = DeclareLaunchArgument(
-        name='flight_mode',
-        default_value='position',
-        description='Which flight mode to open the ros2-px4 bridge in')
-    """
-
     # GZ - ROS Bridge
     bridge = Node(
         package='ros_gz_bridge',
@@ -106,24 +101,33 @@ def generate_launch_description():
     )
 
     ld = LaunchDescription([
+        SetEnvironmentVariable(
+            name='GZ_SIM_RESOURCE_PATH',
+            value=f"{os.path.join(pkg_px4_uam_sim, 'worlds')}:{os.path.join(pkg_px4_uam_sim, 'urdf')}:{pkg_px4_uam_sim}:{os.environ.get('GZ_SIM_RESOURCE_PATH', '')}"
+        ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(gz_launch_path),
             launch_arguments={
-                'gz_args': 'test_world.sdf',
+                'gz_args': f"-r {world_path}",
                 'on_exit_shutdown': 'True'
             }.items(),
         ),
         Node(package='ros_gz_sim', 
              executable='create',
             arguments=[
+                '-world', 'world_demo',
                 '-name', 'my_custom_model',
-                '-file',  urdf_path,
-                '-z', ' 0.1'],
-            output='screen')
+                '-file',  model_sdf_path,
+                '-z', '0.1'],
+            output='screen'),
+        Node(package='px4_uam_sim',
+             executable='mocap_forwarder',
+             name='mocap_forwarder',
+             output='screen')
     ])
         # Execute processes
     ld.add_action(execute_microXRCEagent)
-    #ld.add_action(execute_px4_gz_sim)
+    ld.add_action(execute_px4_gz_sim)
     ld.add_action(bridge)
     
     return ld
