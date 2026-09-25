@@ -37,6 +37,20 @@ planner) so the sections in the mission YAML match by name.
 _LOG_ARGS = ["--ros-args", "--log-level", "info"]
 
 
+def _find_repo_root(start):
+    """Walk up from `start` until a directory containing .git is found.
+
+    Anchors the default rosbag path to the repo regardless of the caller's
+    working directory or the colcon install layout (isolated/merge/symlink).
+    """
+    d = os.path.abspath(start)
+    while d != "/":
+        if os.path.isdir(os.path.join(d, ".git")):
+            return d
+        d = os.path.dirname(d)
+    raise RuntimeError("repo root (.git) not found above %s" % start)
+
+
 def _build(context, *args, **kwargs):
     sim = LaunchConfiguration("sim").perform(context).lower() == "true"
     morphology = LaunchConfiguration("morphology").perform(context)
@@ -144,7 +158,11 @@ def _build(context, *args, **kwargs):
     # --- Optional rosbag recording -------------------------------------------
     if LaunchConfiguration("logging").perform(context).lower() == "true":
         prefix = LaunchConfiguration("rosbag_prefix").perform(context)
+        # Empty log_path (the default) means "repo's data/rosbags", resolved
+        # from the .git marker so it is independent of cwd and install layout.
         log_path = LaunchConfiguration("log_path").perform(context)
+        if not log_path:
+            log_path = os.path.join(_find_repo_root(share_dir), "data", "rosbags")
         stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         dest = os.path.join(log_path, f"{prefix}_ros2bag_{stamp}")
         actions.append(
@@ -191,8 +209,9 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "log_path",
-                default_value="../data/rosbags",
-                description="Directory the recorded rosbag is written to.",
+                default_value="",
+                description="Directory the recorded rosbag is written to. "
+                "Empty = the repo's data/rosbags (found via the .git marker).",
             ),
             DeclareLaunchArgument(
                 "rosbag_prefix",
