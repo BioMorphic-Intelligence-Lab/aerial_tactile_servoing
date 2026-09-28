@@ -23,6 +23,7 @@ Frame chain, per arm:
 """
 
 import numpy as np
+from scipy.optimize import brentq
 from scipy.spatial.transform import Rotation as R
 
 
@@ -58,9 +59,9 @@ _ARM = {
 DOME_OFFSET_M = 0.04075
 DOME_RADIUS_M = 0.01125
 
-# Default carbon tube length, forearm joint -> tube end. 0.228 m is the value after the planned
-# 50 mm cut, which puts the dome apex 0.280 m from the joint (0.228 + 0.04075 + 0.01125).
-DEFAULT_TUBE_M = 0.228
+# FALLBACK tube length only, used when a caller passes no tube_m. The real value comes from
+# grasp.tube_m in grasp_geometry.yaml. 0.278 is the original tube (dome apex 0.330 m).
+DEFAULT_TUBE_M = 0.278
 
 # Body FLU (URDF, z up) -> body FRD (PX4, z down).
 R_FRD_FLU = np.diag([1.0, -1.0, -1.0])
@@ -240,3 +241,65 @@ def decompose_force(f_world, press_dir_world):
     f = np.asarray(f_world, dtype=float)
     n = float(f @ press_dir_world)
     return n, f - n * np.asarray(press_dir_world, dtype=float)
+
+
+# --- Deriving the grasp pose from the tube length ------------------------------------------------
+# Every pose angle below depends on the forearm tube length, so none of them is typed into the
+# config: they are solved here at startup. Changing the tube means changing `grasp.tube_m` only.
+
+def symmetric_width_m(shoulder_mag, forearm_mag, tube_m=DEFAULT_TUBE_M):
+    """Contact-point gap for the mirrored pose: arm 1 at (+s, 0, -f), arm 2 at (-s, 0, +f)."""
+    return grasp_width_m((shoulder_mag, 0.0, -forearm_mag), (-shoulder_mag, 0.0, forearm_mag),
+                         tube_m=tube_m)
+
+
+def crossing_shoulder(forearm_mag, tube_m=DEFAULT_TUBE_M, lo=3.2, hi=4.9):
+    """Shoulder magnitude at which the two pads would MEET -- the arms collide there.
+
+    The gap is V-shaped in the shoulder angle: it closes to zero here and then grows again as
+    the arms swing past each other. Only the branch ABOVE this angle is a real grasp.
+    """
+    S = np.linspace(lo, hi, 341)
+    return float(S[int(np.argmin([symmetric_width_m(v, forearm_mag, tube_m) for v in S]))])
+
+
+def shoulder_for_width(width_m, forearm_mag, tube_m=DEFAULT_TUBE_M, hi=4.9):
+    """Shoulder magnitude at which the contact points are `width_m` apart.
+
+    Searched only above `crossing_shoulder`, where opening the shoulder widens the gap
+    monotonically -- below it the arms have passed through each other.
+    """
+    lo = crossing_shoulder(forearm_mag, tube_m) + 1e-3
+    return float(brentq(lambda v: symmetric_width_m(v, forearm_mag, tube_m) - width_m, lo, hi))
+
+
+def derive_grasp_pose(tube_m, forearm_mag, nominal_width_m, widest_width_m,
+                      open_clearance_m, min_gap_m, travel_margin_m=0.010):
+    """Every tube-dependent pose value, solved from the kinematics.
+
+    Returns a dict of shoulder MAGNITUDES (arm 1 gets +, arm 2 gets -) plus the geometry the
+    mission and controller need. All inputs are physical: lengths in metres, forearm in rad.
+    """
+    s_nominal = shoulder_for_width(nominal_width_m, forearm_mag, tube_m)
+    s_open = shoulder_for_width(widest_width_m + 2.0 * open_clearance_m, forearm_mag, tube_m)
+    s_max = shoulder_for_width(widest_width_m + 2.0 * (open_clearance_m + travel_margin_m),
+                               forearm_mag, tube_m)
+    s_min = shoulder_for_width(min_gap_m, forearm_mag, tube_m)
+    q1 = (s_nominal, 0.0, -forearm_mag)
+    q2 = (-s_nominal, 0.0, forearm_mag)
+    d = 1e-5
+    # How far each contact point moves INTO the face per radian of shoulder: half the rate the
+    # gap closes, since both arms move.
+    sens = (symmetric_width_m(s_nominal + d, forearm_mag, tube_m)
+            - symmetric_width_m(s_nominal - d, forearm_mag, tube_m)) / (2.0 * d) / 2.0
+    return {
+        'shoulder_nominal_rad': s_nominal,
+        'shoulder_open_rad': s_open,
+        'shoulder_min_rad': s_min,
+        'shoulder_max_rad': s_max,
+        'pad_drop_m': float(-(dome_centre_body(1, *q1, tube_m=tube_m)[2]
+                              + dome_centre_body(2, *q2, tube_m=tube_m)[2]) / 2.0),
+        'shoulder_sensitivity_m_per_rad': float(sens),
+        'contact_angle_deg': contact_angle_deg(1, q1, q2, tube_m=tube_m),
+        'crossing_shoulder_rad': crossing_shoulder(forearm_mag, tube_m),
+    }

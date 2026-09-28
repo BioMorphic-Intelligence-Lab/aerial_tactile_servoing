@@ -4,7 +4,8 @@
     centre. The grasp is held by FRICTION, so how hard to squeeze is the question the tactile
     sensing has to answer.
   * The SHOULDER presses; the forearm only aims. At this pose the shoulder moves the pad
-    401 mm/rad into the face and 61 along, the forearm 113 into and 244 along -- squeezing with
+    ~400 mm/rad into the face and ~60 along, the forearm ~110 into and ~240 along (exact values
+    depend on the tube length) -- squeezing with
     the forearm would scrub the pad 6.5 mm per 3 mm of indentation. It also keeps the BELT, which
     drives the forearm, out of the force loop.
   * GRIP LAW, the contribution:  N_target = clip(SF * F_tangential / mu_est, floor, ceiling).
@@ -92,12 +93,14 @@ class DualArmTactileController(Node):
         self.declare_parameter('phase_timeout_s', 0.5)     # S8: stale phase message
 
         # --- Geometry (from grasp_geometry.yaml) --------------------------------------------------
-        self.declare_parameter('grasp.tube_m', 0.228)
+        self.declare_parameter('grasp.tube_m', 0.278)
         self.declare_parameter('grasp.forearm_working_rad', 1.95)
-        self.declare_parameter('grasp.shoulder_open_rad', 4.0435)
-        self.declare_parameter('grasp.shoulder_nominal_rad', 3.9556)
-        self.declare_parameter('grasp.shoulder_min_rad', 3.88)
-        self.declare_parameter('grasp.shoulder_max_rad', 4.08)
+        # The object range, in metres. Every shoulder angle is SOLVED from these and the tube
+        # length at startup, never typed in, so changing the tube cannot leave them stale.
+        self.declare_parameter('grasp.nominal_width_m', 0.10)
+        self.declare_parameter('grasp.widest_width_m', 0.14)
+        self.declare_parameter('grasp.open_clearance_m', 0.015)
+        self.declare_parameter('grasp.min_gap_m', 0.04)
 
         # --- Grip law ------------------------------------------------------------------------------
         self.declare_parameter('grip.contact_threshold_n', 0.15)
@@ -120,7 +123,7 @@ class DualArmTactileController(Node):
         self.declare_parameter('grip.pad_stiffness_n_per_m', 0.0)
 
         # --- Safety ---------------------------------------------------------------------------------
-        self.declare_parameter('limits.relative_backstop_rad', 0.0075)
+        self.declare_parameter('limits.relative_backstop_mm', 3.0)
         self.declare_parameter('limits.max_depth_mm', 2.8)
         self.declare_parameter('limits.max_force_n', 2.0)
         self.declare_parameter('limits.max_tilt_deg', 25.0)
@@ -163,10 +166,16 @@ class DualArmTactileController(Node):
 
         self.tube = g('grasp.tube_m').double_value
         self.q_fore = g('grasp.forearm_working_rad').double_value
-        self.sh_open = g('grasp.shoulder_open_rad').double_value
-        self.sh_nominal = g('grasp.shoulder_nominal_rad').double_value
-        self.sh_min = g('grasp.shoulder_min_rad').double_value
-        self.sh_max = g('grasp.shoulder_max_rad').double_value
+        self.nominal_width = g('grasp.nominal_width_m').double_value
+        self.grasp_pose = ak.derive_grasp_pose(
+            self.tube, self.q_fore, self.nominal_width,
+            g('grasp.widest_width_m').double_value, g('grasp.open_clearance_m').double_value,
+            g('grasp.min_gap_m').double_value)
+        self.sh_open = self.grasp_pose['shoulder_open_rad']
+        self.sh_nominal = self.grasp_pose['shoulder_nominal_rad']
+        self.sh_min = self.grasp_pose['shoulder_min_rad']
+        self.sh_max = self.grasp_pose['shoulder_max_rad']
+        self.sensitivity = self.grasp_pose['shoulder_sensitivity_m_per_rad']   # pad travel, m per rad
 
         self.contact_n = g('grip.contact_threshold_n').double_value
         self.deadband = g('grip.force_deadband_n').double_value
@@ -187,7 +196,8 @@ class DualArmTactileController(Node):
         self.turning_warn = g('grip.turning_warn_mm').double_value
         self.pad_stiffness = g('grip.pad_stiffness_n_per_m').double_value
 
-        self.rel_backstop = g('limits.relative_backstop_rad').double_value
+        self.rel_backstop_mm = g('limits.relative_backstop_mm').double_value
+        self.rel_backstop = self.rel_backstop_mm / 1000.0 / self.sensitivity   # -> shoulder rad
         self.max_depth = g('limits.max_depth_mm').double_value
         self.max_force = g('limits.max_force_n').double_value
         self.max_tilt = g('limits.max_tilt_deg').double_value
@@ -284,10 +294,17 @@ class DualArmTactileController(Node):
             f'DualArmTactileController (v2, side grasp) ready: sim={self.sim}, '
             f'{self.frequency:.0f} Hz. Shoulder squeezes from {self.sh_open:.4f} rad, floor '
             f'{self.sh_min:.4f}; forearm held at {self.q_fore:.2f} rad; backstop '
-            f'{self.rel_backstop:.4f} rad ({self.rel_backstop * 401:.1f} mm) past first contact; '
+            f'{self.rel_backstop:.4f} rad ({self.rel_backstop_mm:.1f} mm) past first contact; '
             f'grip = {self.sf:.1f} * F_tan / mu (mu0 {self.mu_est:.2f}), '
             f'{self.n_floor:.2f}-{self.n_ceiling:.2f} N. Contact is expected near '
             f'{self.sh_nominal:.4f} rad for a nominal-width object.')
+        self.get_logger().info(
+            f'Grasp pose SOLVED from tube {self.tube:.3f} m (apex {(self.tube + 0.052):.3f} m), '
+            f'forearm {self.q_fore:.2f}: shoulder open {self.sh_open:.4f} / nominal '
+            f'{self.sh_nominal:.4f} / floor {self.sh_min:.4f} / ceiling {self.sh_max:.4f} rad, '
+            f'{self.sensitivity * 1000:.1f} mm/rad, contact angle '
+            f'{self.grasp_pose["contact_angle_deg"]:.1f} deg at {self.nominal_width * 1000:.0f} mm, '
+            f'pads {self.grasp_pose["pad_drop_m"]:.4f} m below the body.')
 
     # ------------------------------------------------------------------ callbacks
     def cb_phase(self, msg: Int32):
@@ -739,11 +756,9 @@ class DualArmTactileController(Node):
             w += 2.0 * self.contact_n / self.pad_stiffness
         self.measured_width = w
         angles = [ak.contact_angle_deg(a, q1, q2, tube_m=self.tube) for a in (1, 2)]
-        # How far this object is from the nominal one, in shoulder terms: a quick check that the
-        # arms stopped where an object of this width should have stopped them.
-        off = np.mean([self.contact_shoulder[a] for a in (1, 2)]) - self.sh_nominal
         self.get_logger().info(
-            f'Object width measured at {w * 1000:.1f} mm ({off * 401 * 2:+.1f} mm vs nominal); '
+            f'Object width measured at {w * 1000:.1f} mm '
+            f'({(w - self.nominal_width) * 1000:+.1f} mm vs nominal); '
             f'contact angles {angles[0]:.1f} / {angles[1]:.1f} deg'
             + ('' if max(angles) <= self.max_tilt else '  -- OUTSIDE the models trained tilt range'))
 
@@ -779,7 +794,11 @@ class DualArmTactileController(Node):
         # nominal 10 cm object sits at 24.9 deg, so a holding rule blocks all but the narrowest.
         # Tilt is not a hardware hazard either -- S1, S2 and S3 protect the pads. What it means is
         # that the force reading is outside the models' training, so it gates the mass estimate.
-        if p is not None:
+        # Tilt only means anything once THIS pad is touching. Before contact the driver publishes
+        # exact zeros (`zero_when_no_contact`, on by default), and comparing that 0 deg against
+        # the 25-36 deg the kinematics expect would trip S4b during every approach and freeze the
+        # arms short of the object.
+        if p is not None and self.contact_shoulder[arm] is not None:
             unreliable = p['tilt_deg'] > self.max_tilt
             if unreliable and not self.tilt_unreliable[arm]:
                 self.get_logger().warn(

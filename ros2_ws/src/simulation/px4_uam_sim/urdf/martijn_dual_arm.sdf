@@ -334,27 +334,27 @@
     <link name='forearm_link_1'>
       <pose relative_to='forearm_joint_1'>0 0 0 0 0 0</pose>
       <inertial>
-        <pose>-0.144595 0 0 0 0 0</pose>
+        <pose>-0.175845 0 0 0 0 0</pose>
         <mass>0.040000000000000001</mass>
         <inertia>
           <ixx>1.049e-05</ixx>
           <ixy>0</ixy>
           <ixz>0</ixz>
-          <iyy>0.00023626768300000019</iyy>
+          <iyy>0.00033465768300000001</iyy>
           <iyz>0</iyz>
-          <izz>0.00023626768300000019</izz>
+          <izz>0.00033465768300000001</izz>
         </inertia>
       </inertial>
       <collision name='forearm_link_1_collision'>
-        <pose>-0.11 0 0 0 0 0</pose>
+        <pose>-0.13500000000000001 0 0 0 0 0</pose>
         <geometry>
           <box>
-            <size>0.22 0.024 0.053999999999999999</size>
+            <size>0.27000000000000002 0.024 0.053999999999999999</size>
           </box>
         </geometry>
       </collision>
       <collision name='forearm_link_1_fixed_joint_lump__tactip_link_1_collision_1'>
-        <pose>-0.26874999999999999 0 0 0 0 0</pose>
+        <pose>-0.31874999999999998 0 0 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.01125</radius>
@@ -375,7 +375,7 @@
         </material>
       </visual>
       <visual name='forearm_link_1_fixed_joint_lump__tactip_link_1_visual_1'>
-        <pose>-0.26874999999999999 0 0 0 0 0</pose>
+        <pose>-0.31874999999999998 0 0 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.01125</radius>
@@ -387,7 +387,7 @@
         </material>
       </visual>
       <visual name='forearm_link_1_fixed_joint_lump__tactip_link_1_visual_2'>
-        <pose>-0.24837999999999999 0 0 0 1.5707963267948966 0</pose>
+        <pose>-0.29837999999999998 0 0 0 1.5707963267948966 0</pose>
         <geometry>
           <cylinder>
             <length>0.040750000000000001</length>
@@ -578,27 +578,27 @@
     <link name='forearm_link_2'>
       <pose relative_to='forearm_joint_2'>0 0 0 0 0 0</pose>
       <inertial>
-        <pose>-0.144595 0 0 0 0 0</pose>
+        <pose>-0.175845 0 0 0 0 0</pose>
         <mass>0.040000000000000001</mass>
         <inertia>
           <ixx>1.049e-05</ixx>
           <ixy>0</ixy>
           <ixz>0</ixz>
-          <iyy>0.00023626768300000019</iyy>
+          <iyy>0.00033465768300000001</iyy>
           <iyz>0</iyz>
-          <izz>0.00023626768300000019</izz>
+          <izz>0.00033465768300000001</izz>
         </inertia>
       </inertial>
       <collision name='forearm_link_2_collision'>
-        <pose>-0.11 0 0 0 0 0</pose>
+        <pose>-0.13500000000000001 0 0 0 0 0</pose>
         <geometry>
           <box>
-            <size>0.22 0.024 0.053999999999999999</size>
+            <size>0.27000000000000002 0.024 0.053999999999999999</size>
           </box>
         </geometry>
       </collision>
       <collision name='forearm_link_2_fixed_joint_lump__tactip_link_2_collision_1'>
-        <pose>-0.26874999999999999 0 0 0 0 0</pose>
+        <pose>-0.31874999999999998 0 0 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.01125</radius>
@@ -619,7 +619,7 @@
         </material>
       </visual>
       <visual name='forearm_link_2_fixed_joint_lump__tactip_link_2_visual_1'>
-        <pose>-0.26874999999999999 0 0 0 0 0</pose>
+        <pose>-0.31874999999999998 0 0 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.01125</radius>
@@ -631,7 +631,7 @@
         </material>
       </visual>
       <visual name='forearm_link_2_fixed_joint_lump__tactip_link_2_visual_2'>
-        <pose>-0.24837999999999999 0 0 0 1.5707963267948966 0</pose>
+        <pose>-0.29837999999999998 0 0 0 1.5707963267948966 0</pose>
         <geometry>
           <cylinder>
             <length>0.040750000000000001</length>
@@ -1064,7 +1064,7 @@
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='tactip_joint_1' attached_to='forearm_link_1'>
-      <pose>-0.22800000000000001 0 0 0 0 0</pose>
+      <pose>-0.27800000000000002 0 0 0 0 0</pose>
     </frame>
     <frame name='tactip_link_1' attached_to='tactip_joint_1'>
       <pose>0 0 0 0 0 0</pose>
@@ -1082,7 +1082,7 @@
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='tactip_joint_2' attached_to='forearm_link_2'>
-      <pose>-0.22800000000000001 0 0 0 0 0</pose>
+      <pose>-0.27800000000000002 0 0 0 0 0</pose>
     </frame>
     <frame name='tactip_link_2' attached_to='tactip_joint_2'>
       <pose>0 0 0 0 0 0</pose>

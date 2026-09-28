@@ -1,6 +1,18 @@
 <?xml version="1.0"?>
 <robot name="martijn" xmlns:xacro="http://ros.org/wiki/xacro">
   <xacro:property name="uses_real_torques" value="true"/>
+  <!-- Forearm carbon tube, forearm joint -> tube end. The TacTip adds 52 mm on top (dome centre
+       40.75 mm past the tube end + 11.25 mm dome radius), so the dome apex sits at tube + 0.052.
+       MUST match grasp.tube_m in ats_bringup/config/grasp_geometry.yaml. Gazebo loads the
+       generated martijn_dual_arm.sdf, not this file, so regenerate it from this folder with the
+       workspace sourced (xacro needs it to resolve the mesh paths):
+         source ~/aerial_tactile_servoing/ros2_ws/install/setup.bash
+         xacro martijn_dual_arm.xacro > /tmp/d.urdf && gz sdf -p /tmp/d.urdf > martijn_dual_arm.sdf
+       0.278 is the original tube; the ordered replacement is 7 cm shorter, 0.208. -->
+  <xacro:property name="forearm_tube_length" value="0.278"/>
+  <!-- Collision box and inertia follow the tube: 0.27 m and 1.2446e-4 kg m^2 at the original. -->
+  <xacro:property name="forearm_box_length" value="${forearm_tube_length - 0.008}"/>
+  <xacro:property name="forearm_inertia" value="${0.00012446 * (forearm_box_length / 0.27) ** 2}"/>
 
   <link name="base_link">
     <collision>
@@ -342,9 +354,9 @@
   </joint>
   <link name="forearm_link_1">
     <collision>
-      <origin xyz="-0.11 0 0" rpy="0 0 0"/>
+      <origin xyz="${-forearm_box_length / 2} 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.22 0.024 0.054"/>
+        <box size="${forearm_box_length} 0.024 0.054"/>
       </geometry>
     </collision>
     <visual>
@@ -357,11 +369,11 @@
       </material>      
     </visual>
     <inertial>
-      <origin xyz="-0.11 0 0" rpy="0 0 0"/>
+      <origin xyz="${-forearm_box_length / 2} 0 0" rpy="0 0 0"/>
       <mass value="0.03"/>
       <inertia ixx="4.9e-07" ixy="0.0" ixz="0.0"
-        iyy="0.00008265" iyz="0.0"
-        izz="0.00008265"/>
+        iyy="${forearm_inertia}" iyz="0.0"
+        izz="${forearm_inertia}"/>
     </inertial>
   </link>
   <joint name="forearm_joint_1" type="revolute">
@@ -375,10 +387,11 @@
 
   <!-- TacTip 1: Mounted co-axially (0 deg) on the end of forearm tube -->
   <link name="tactip_link_1">
-    <!-- DESIGN v2: the tube is cut 50 mm shorter, 0.278 -> 0.228 m, which brings an 8-12 cm
-         object inside the TacTip models' +-25 deg trained tilt in the side grasp. Contact dome
-         apex now sits 0.280 m from the forearm joint axis (was 0.330, the in-situ L_3 from
-         torque_observer.py, vs 0.273 without the sensor): 0.228 + 0.04075 + 0.01125 = 0.280 m. -->
+    <!-- Tube length comes from the `forearm_tube_length` property at the top of this file. The
+         dome centre lies 0.04075 m past the tube end and the apex 0.052 m past it, so the apex
+         is 0.330 m from the forearm joint on the original tube (the advisor's in-situ L_3 from
+         torque_observer.py). Dome radius 0.01125 m from the measured 22.5 mm dome diameter;
+         housing OD 25 mm. -->
     <collision>
       <origin xyz="-0.04075 0 0" rpy="0 0 0"/>
       <geometry>
@@ -423,7 +436,7 @@
   <joint name="tactip_joint_1" type="fixed">
     <parent link="forearm_link_1"/>
     <child link="tactip_link_1"/>
-    <origin xyz="-0.228 0 0" rpy="0 0 0"/>
+    <origin xyz="${-forearm_tube_length} 0 0" rpy="0 0 0"/>
   </joint>  
   
 
@@ -556,9 +569,9 @@
   </joint>
   <link name="forearm_link_2">
     <collision>
-      <origin xyz="-0.11 0 0" rpy="0 0 0"/>
+      <origin xyz="${-forearm_box_length / 2} 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.22 0.024 0.054"/>
+        <box size="${forearm_box_length} 0.024 0.054"/>
       </geometry>
     </collision>
     <visual>
@@ -571,11 +584,11 @@
       </material>      
     </visual>
     <inertial>
-      <origin xyz="-0.11 0 0" rpy="0 0 0"/>
+      <origin xyz="${-forearm_box_length / 2} 0 0" rpy="0 0 0"/>
       <mass value="0.03"/>
       <inertia ixx="4.9e-07" ixy="0.0" ixz="0.0"
-        iyy="0.00008265" iyz="0.0"
-        izz="0.00008265"/>
+        iyy="${forearm_inertia}" iyz="0.0"
+        izz="${forearm_inertia}"/>
     </inertial>
   </link>
   <joint name="forearm_joint_2" type="revolute">
@@ -634,7 +647,7 @@
   <joint name="tactip_joint_2" type="fixed">
     <parent link="forearm_link_2"/>
     <child link="tactip_link_2"/>
-    <origin xyz="-0.228 0 0" rpy="0 0 0"/>
+    <origin xyz="${-forearm_tube_length} 0 0" rpy="0 0 0"/>
   </joint>  
 
 

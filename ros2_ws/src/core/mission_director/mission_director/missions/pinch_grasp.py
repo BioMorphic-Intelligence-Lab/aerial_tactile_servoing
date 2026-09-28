@@ -6,6 +6,7 @@ from std_msgs.msg import Int8, Int32, Float64, Bool
 from std_srvs.srv import SetBool, Trigger
 
 from mission_director.base_classes.tactile_mission_director import TactileMissionDirector, run_mission
+from pose_based_ats import arm_kinematics as ak
 
 
 class PinchGraspMission(TactileMissionDirector):
@@ -42,7 +43,6 @@ class PinchGraspMission(TactileMissionDirector):
         super().__init__('mission_director')
 
         # --- Geometry (defaults mirror grasp_geometry.yaml) ------------------------------------
-        self.declare_parameter('geom.pad_drop_m', 0.4012)
         self.declare_parameter('geom.object_north_m', 2.0)
         self.declare_parameter('geom.object_east_m', 0.0)
         self.declare_parameter('geom.object_centre_altitude_m', 1.050)
@@ -53,8 +53,14 @@ class PinchGraspMission(TactileMissionDirector):
         self.declare_parameter('geom.lift_height_m', 0.25)
         self.declare_parameter('geom.grasp_above_centre_m', 0.015)
         self.declare_parameter('geom.altitude_datum_offset_m', 0.10)
-        self.declare_parameter('grasp.shoulder_open_rad', 4.0435)
+        # The pose is SOLVED from the tube length, exactly as the controller does, so the two
+        # cannot disagree and a tube change needs only `grasp.tube_m`.
+        self.declare_parameter('grasp.tube_m', 0.278)
         self.declare_parameter('grasp.forearm_working_rad', 1.95)
+        self.declare_parameter('grasp.nominal_width_m', 0.10)
+        self.declare_parameter('grasp.widest_width_m', 0.14)
+        self.declare_parameter('grasp.open_clearance_m', 0.015)
+        self.declare_parameter('grasp.min_gap_m', 0.04)
         self.declare_parameter('timeouts.close_s', 25.0)
         self.declare_parameter('timeouts.squeeze_s', 15.0)
         self.declare_parameter('timeouts.weigh_s', 12.0)
@@ -68,7 +74,12 @@ class PinchGraspMission(TactileMissionDirector):
         self.declare_parameter('target_yaw_rad', 0.0)
 
         g = lambda n: self.get_parameter(n).get_parameter_value()
-        pad_drop = g('geom.pad_drop_m').double_value
+        q_fore = g('grasp.forearm_working_rad').double_value
+        grasp_pose = ak.derive_grasp_pose(
+            g('grasp.tube_m').double_value, q_fore, g('grasp.nominal_width_m').double_value,
+            g('grasp.widest_width_m').double_value, g('grasp.open_clearance_m').double_value,
+            g('grasp.min_gap_m').double_value)
+        pad_drop = grasp_pose['pad_drop_m']
         obj_n = g('geom.object_north_m').double_value
         obj_e = g('geom.object_east_m').double_value
         obj_alt = g('geom.object_centre_altitude_m').double_value
@@ -119,8 +130,7 @@ class PinchGraspMission(TactileMissionDirector):
         # takes over. Arm 1 is +shoulder / -forearm, arm 2 is -shoulder / +forearm -- the two arms
         # run the SAME shoulder locus and mirror through the FOREARM sign, so giving both forearms
         # the same sign puts one arm out to the side instead of under the drone.
-        sh_open = g('grasp.shoulder_open_rad').double_value
-        q_fore = g('grasp.forearm_working_rad').double_value
+        sh_open = grasp_pose['shoulder_open_rad']
         self.pre_grasp_arms = [sh_open, 0.0, -q_fore, -sh_open, 0.0, q_fore]
 
         # --- Controller interfaces ----------------------------------------------------------------

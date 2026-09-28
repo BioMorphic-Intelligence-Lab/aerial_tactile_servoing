@@ -9,16 +9,21 @@
 
     # arm pose, shared by the mission and the controller
     grasp:
-      # Forearm joint -> tube end, after the 50 mm cut. Re-measure?
-      tube_m: 0.228
+      # Forearm joint -> tube end. THE ONE NUMBER TO CHANGE when the tubes are swapped: every
+      # shoulder angle, the pad drop and the backstop are solved from it at startup
+      # (arm_kinematics.derive_grasp_pose), and logged so you can check them. Must match
+      # `forearm_tube_length` in martijn_dual_arm.xacro (the sim model).
+      #   0.278  original tube -- dry test
+      #   0.208  ordered replacement, 7 cm shorter
+      tube_m: 0.278
       # Forearm MAGNITUDE (arm 1 is commanded -1.95, arm 2 +1.95)
       forearm_working_rad: 1.95
 
-      # Shoulder MAGNITUDES; arm 1 gets +value, arm 2 -value.
-      shoulder_open_rad: 4.0435     # clears the widest declared object (14 cm) by 15 mm/side
-      shoulder_nominal_rad: 3.9556  # expected contact for 10 cm; logging and sim fallback only
-      shoulder_min_rad: 3.88        # net if contact is never seen: leaves a 3.9 cm gap
-      shoulder_max_rad: 4.08
+      # The object range the pose is solved for. Design inputs in METRES, not angles.
+      nominal_width_m: 0.10         # contact expected here; used for logging and winding fold
+      widest_width_m: 0.14          # the opening pose clears this ...
+      open_clearance_m: 0.015       # ... by this much per side
+      min_gap_m: 0.04               # travel floor if contact is never seen: pads stop this apart
 
       # [arm1_min, arm1_max, arm2_min, arm2_max]. MUST match dxl_ros2_pinch_grasp.yaml. The
       # mission uses it to pick the legal winding nearest each joint's present position.
@@ -68,8 +73,9 @@
     # safety, controller only 
     limits:
       # S1, the real protection: each arm closes no more than this past its own first contact, so
-      # depth follows the object rather than the drone's position. 0.0075 rad = 3 mm at 401 mm/rad
-      relative_backstop_rad: 0.0075
+      # depth follows the object rather than the drone's position. In MILLIMETRES of pad travel;
+      # converted to shoulder radians from the tube length at startup.
+      relative_backstop_mm: 3.0
       max_depth_mm: 2.8            # S2; models trained to 3.0 mm
       max_force_n: 2.0             # S3; per pad, MAGNITUDE (membrane protection)
       # S4 FLAGS the force reading (and suppresses the mass) rather than stopping the squeeze
@@ -81,7 +87,8 @@
       slip_force_n: 0.2            # S7; pad force this low in flight means the object is going
       slip_time_s: 0.3
 
-    # rates, controller only 
+    # rates, controller only
+    rates:
       shoulder_approach_rad_s: 0.02    # 8 mm/s while closing the air gap
       shoulder_squeeze_rad_s: 0.002    # 0.8 mm/s of indentation once in contact
       shoulder_open_rad_s: 0.05
@@ -103,10 +110,7 @@
 
     # waypoint geometry, mission only 
     geom:
-      # `pad_drop_m` is how far the contact points sit below the body
-      # origin at the working pose (0.4012 m for a 10 cm object; 0.3977-0.4038 m across the whole
-      # 6-14 cm range).
-      pad_drop_m: 0.4012
+      # How far the pads hang below the body is NOT set here -- it is solved from grasp.tube_m.
       object_north_m: 2.0
       object_east_m: 0.0
       object_centre_altitude_m: 1.050   # table top 1.000 + half of the 10 cm object height

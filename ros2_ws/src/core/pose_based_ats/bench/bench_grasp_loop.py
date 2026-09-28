@@ -51,7 +51,14 @@ OBJECT_WIDTH_M = 0.10
 OBJECT_WEIGHT_N = 1.48        # 150 g
 PAD_STIFFNESS_N_PER_M = 600.0
 WEIGHT_TRANSFER_S = 1.5       # how long the drone takes to put the load on the pads
-OPEN_POSE = [4.0435, 0.0, -1.95, -4.0435, 0.0, 1.95]
+TUBE_M = 0.278                # original tube; override with --tube
+FOREARM = 1.95
+
+
+def open_pose(tube_m):
+    """The opening pose, solved from the tube exactly as the controller solves it."""
+    s = ak.derive_grasp_pose(tube_m, FOREARM, 0.10, 0.14, 0.015, 0.04)['shoulder_open_rad']
+    return [s, 0.0, -FOREARM, -s, 0.0, FOREARM]
 
 # Phase numbers, kept in step with the controller and the mission.
 PRE_GRASP, CLOSE, SQUEEZE, LIFT, CARRY, PLACE, RELEASE = 30, 31, 32, 33, 34, 35, 36
@@ -60,12 +67,13 @@ PRE_GRASP, CLOSE, SQUEEZE, LIFT, CARRY, PLACE, RELEASE = 30, 31, 32, 33, 34, 35,
 class Plant(Node):
     """Stands in for the drone, the arms and both sensors."""
 
-    def __init__(self, mu_true, hard_stall, fake_tactile=False):
+    def __init__(self, mu_true, hard_stall, fake_tactile=False, tube_m=TUBE_M):
         super().__init__('bench_plant')
         self.mu_true = mu_true
         self.hard_stall = hard_stall        # emulate Gazebo, where the object blocks the joint
         self.fake_tactile = fake_tactile    # publish what the sim driver publishes, not the truth
-        self.q = np.array(OPEN_POSE, dtype=float)
+        self.tube_m = tube_m
+        self.q = np.array(open_pose(tube_m), dtype=float)
         self.cmd = np.zeros(6)
         self.phase = 0
         self.shear = 0.0
@@ -101,7 +109,7 @@ class Plant(Node):
     def indentation(self):
         """How far each pad is into the object, plus the two arms' joint triples."""
         q1, q2 = tuple(self.q[0:3]), tuple(self.q[3:6])
-        gap = ak.grasp_width_m(q1, q2)
+        gap = ak.grasp_width_m(q1, q2, tube_m=self.tube_m)
         return max(0.0, (OBJECT_WIDTH_M - gap) / 2.0), q1, q2
 
     def step(self):
@@ -133,7 +141,7 @@ class Plant(Node):
 
         R_wb = ak.R_world_from_body(odom.q)
         for arm, joints_arm in ((1, q1), (2, q2)):
-            press = R_wb @ ak.press_direction_body(arm, q1, q2)
+            press = R_wb @ ak.press_direction_body(arm, q1, q2, tube_m=self.tube_m)
             f_world = normal * press + tangential * np.array([0.0, 0.0, 1.0])
             # Back into the sensor's own frame, using the same mounting convention as the rig.
             R_ws = R_wb @ ak.R_body_from_sensor(arm, *joints_arm,
@@ -152,10 +160,12 @@ class Plant(Node):
                 # Exactly what tactip_ros2_driver.publish_fake_data() sends: a constant depth and
                 # no tilt or shear at all, whatever the arms are actually doing.
                 pose.twist.linear.z = -3.0
-            else:
+            elif depth > 0.0:
+                # In contact: the real contact angle for THIS tube and pose, not a fixed number.
                 pose.twist.linear.z = float(-depth * 1000.0)
                 pose.twist.linear.x = float(self.shear)
-                pose.twist.angular.x = 24.9    # the contact angle at the nominal pose
+                pose.twist.angular.x = ak.contact_angle_deg(arm, q1, q2, tube_m=self.tube_m)
+            # else: no contact -> all zeros, as the real driver does with zero_when_no_contact.
             self.pub_pose[arm].publish(pose)
 
     def _contact_load(self, normal):
@@ -179,19 +189,17 @@ class Plant(Node):
         return load
 
 
-def run_case(mu_true, sim, verbose=True, fake_tactile=False):
+def run_case(mu_true, sim, verbose=True, fake_tactile=False, tube_m=TUBE_M):
     """Drive one whole grasp and report what happened at each phase."""
     rclpy.init(args=['--ros-args',
                      '-p', f'sim:={"true" if sim else "false"}',
                      '-p', 'frequency:=100.0',
-                     '-p', 'grasp.tube_m:=0.228',
-                     '-p', 'grasp.forearm_working_rad:=1.95',
-                     '-p', 'grasp.shoulder_open_rad:=4.0435',
-                     '-p', 'grasp.shoulder_min_rad:=3.88',
-                     '-p', 'limits.relative_backstop_rad:=0.0075',
+                     '-p', f'grasp.tube_m:={tube_m}',
+                     '-p', f'grasp.forearm_working_rad:={FOREARM}',
+                     '-p', 'limits.relative_backstop_mm:=3.0',
                      '-p', 'grip.mu_initial:=1.0'])
     controller = DualArmTactileController()
-    plant = Plant(mu_true, hard_stall=sim, fake_tactile=fake_tactile)
+    plant = Plant(mu_true, hard_stall=sim, fake_tactile=fake_tactile, tube_m=tube_m)
     executor = SingleThreadedExecutor()
     executor.add_node(controller)
     executor.add_node(plant)
@@ -242,26 +250,36 @@ def main():
     parser.add_argument('--mu', type=float, help='the plant\'s true friction coefficient')
     parser.add_argument('--sim', action='store_true', help="exercise the controller's sim path")
     parser.add_argument('--all', action='store_true', help='run every case and summarise')
+    parser.add_argument('--tube', type=float, default=TUBE_M,
+                        help='forearm tube length in m (0.278 original, 0.208 ordered)')
     parser.add_argument('--fake-tactile', action='store_true',
                         help='publish the pose model the way the real sim driver fakes it')
     args = parser.parse_args()
 
     if not args.all:
         result = run_case(args.mu if args.mu is not None else 0.55, args.sim,
-                          fake_tactile=args.fake_tactile)
+                          fake_tactile=args.fake_tactile, tube_m=args.tube)
         print(f'\n  mass {result["mass"] * 1000:.1f} g (true {OBJECT_WEIGHT_N / 9.80665 * 1000:.1f}'
               f'), valid={result["mass_valid"]}, mu_est {result["mu_est"]:.3f}')
         return 0
 
     # Each case needs its own rclpy context, so run them as separate processes.
     failures = 0
+    # A held object's mass is only trustworthy if the contact sits inside the force models'
+    # trained tilt -- on the original tube it does not (31 deg), so the controller is RIGHT to
+    # flag it. The expectation follows the tube rather than being written for one.
+    angle = ak.derive_grasp_pose(args.tube, FOREARM, 0.10, 0.14, 0.015, 0.04)['contact_angle_deg']
+    trusted = angle <= 25.0
+    print(f'tube {args.tube} m: contact angle {angle:.1f} deg -> mass '
+          f'{"trusted" if trusted else "flagged (outside the trained 25 deg)"}\n')
     for mu, sim, want_status, want_valid, fake in (
             [(a, b, c, d, False) for a, b, c, d in CASES] + [FAKE_CASE + (True,)]):
-        cmd = ([sys.executable, __file__, '--mu', str(mu)] + (['--sim'] if sim else [])
-               + (['--fake-tactile'] if fake else []))
+        cmd = ([sys.executable, __file__, '--mu', str(mu), '--tube', str(args.tube)]
+               + (['--sim'] if sim else []) + (['--fake-tactile'] if fake else []))
         out = subprocess.run(cmd, capture_output=True, text=True).stdout
         got_status = _grep_int(out, 'phase 34:', 'status ')
         got_valid = 'valid=True' in out
+        want_valid = want_valid and trusted
         ok = (got_status == want_status) and (got_valid == want_valid)
         failures += 0 if ok else 1
         tag = ('  sim+fake' if fake else '  sim     ') if sim else '           '
