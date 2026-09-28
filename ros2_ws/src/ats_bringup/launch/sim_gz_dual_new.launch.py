@@ -9,9 +9,7 @@ import os
 import datetime
 from math import pi as PI
 
-"""
-Launch the dual-arm pinch grasp mission in Gazebo simulation.
-"""
+
 logging = False
 
 def generate_launch_description():
