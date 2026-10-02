@@ -13,9 +13,9 @@
       # shoulder angle, the pad drop and the backstop are solved from it at startup
       # (arm_kinematics.derive_grasp_pose), and logged so you can check them. Must match
       # `forearm_tube_length` in martijn_dual_arm.xacro (the sim model).
-      #   0.278  original tube -- dry test
-      #   0.208  ordered replacement, 7 cm shorter
-      tube_m: 0.278
+      #   0.278  original tube
+      #   0.208  new tube, 7 cm shorter (fitted 2026-10-02)
+      tube_m: 0.208
       # Forearm MAGNITUDE (arm 1 is commanded -1.95, arm 2 +1.95)
       forearm_working_rad: 1.95
 

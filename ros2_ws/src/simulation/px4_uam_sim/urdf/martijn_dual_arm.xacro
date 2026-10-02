@@ -9,7 +9,7 @@
          source ~/aerial_tactile_servoing/ros2_ws/install/setup.bash
          xacro martijn_dual_arm.xacro > /tmp/d.urdf && gz sdf -p /tmp/d.urdf > martijn_dual_arm.sdf
        0.278 is the original tube; the ordered replacement is 7 cm shorter, 0.208. -->
-  <xacro:property name="forearm_tube_length" value="0.278"/>
+  <xacro:property name="forearm_tube_length" value="0.208"/>
   <!-- Collision box and inertia follow the tube: 0.27 m and 1.2446e-4 kg m^2 at the original. -->
   <xacro:property name="forearm_box_length" value="${forearm_tube_length - 0.008}"/>
   <xacro:property name="forearm_inertia" value="${0.00012446 * (forearm_box_length / 0.27) ** 2}"/>
