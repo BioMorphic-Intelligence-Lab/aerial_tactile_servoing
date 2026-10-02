@@ -103,7 +103,7 @@ def mount_rotation(mark_along_plus_z=True):
 
 # Which end of the forearm tube's OWN z axis the mark lies along, per arm, when it is mounted
 # along the arm's FOLDING DIRECTION -- the way the pad travels as the arm folds up.
-_MARK_PLUS_Z_WHEN_ALONG_FOLD = {1: True, 2: False}
+_MARK_PLUS_Z_WHEN_ALONG_FOLD = {1: False, 2: True}
 
 
 def mark_plus_z(arm, along_fold_direction=True):

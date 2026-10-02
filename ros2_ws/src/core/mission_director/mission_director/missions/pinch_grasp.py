@@ -123,15 +123,15 @@ class PinchGraspMission(TactileMissionDirector):
         # Arm poses 
         # Takeoff/landing: upper arms out, forearms up, pads 0.27 m ABOVE the body.
     
-        self.land_arms = [4.7124, 0.00, 1.5708, -4.7124, 0.00, -1.5708]
+        self.land_arms = [1.5708, 0.00, -1.5708, -1.5708, 0.00, 1.5708]
 
         # Pre-grasp: shoulders open wide enough for the widest declared object, forearms at the
         # working angle. This is the last position-commanded arm pose; from here the controller
-        # takes over. Arm 1 is +shoulder / -forearm, arm 2 is -shoulder / +forearm -- the two arms
+        # takes over. Arm 1 is -shoulder / +forearm, arm 2 is +shoulder / -forearm -- the two arms
         # run the SAME shoulder locus and mirror through the FOREARM sign, so giving both forearms
         # the same sign puts one arm out to the side instead of under the drone.
         sh_open = grasp_pose['shoulder_open_rad']
-        self.pre_grasp_arms = [sh_open, 0.0, -q_fore, -sh_open, 0.0, q_fore]
+        self.pre_grasp_arms = [-sh_open, 0.0, q_fore, sh_open, 0.0, -q_fore]
 
         # --- Controller interfaces ----------------------------------------------------------------
         self.sub_grasp_status = self.create_subscription(Int8, '/grasp/status',

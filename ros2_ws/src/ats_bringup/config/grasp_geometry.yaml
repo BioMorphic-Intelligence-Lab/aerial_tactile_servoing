@@ -16,7 +16,7 @@
       #   0.278  original tube
       #   0.208  new tube, 7 cm shorter (fitted 2026-10-02)
       tube_m: 0.208
-      # Forearm MAGNITUDE (arm 1 is commanded -1.95, arm 2 +1.95)
+      # Forearm MAGNITUDE (arm 1 is commanded +1.95, arm 2 -1.95)
       forearm_working_rad: 1.95
 
       # The object range the pose is solved for. Design inputs in METRES, not angles.

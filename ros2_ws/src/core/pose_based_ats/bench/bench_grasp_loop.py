@@ -58,7 +58,7 @@ FOREARM = 1.95
 def open_pose(tube_m):
     """The opening pose, solved from the tube exactly as the controller solves it."""
     s = ak.derive_grasp_pose(tube_m, FOREARM, 0.10, 0.14, 0.015, 0.04)['shoulder_open_rad']
-    return [s, 0.0, -FOREARM, -s, 0.0, FOREARM]
+    return [-s, 0.0, FOREARM, s, 0.0, -FOREARM]
 
 # Phase numbers, kept in step with the controller and the mission.
 PRE_GRASP, CLOSE, SQUEEZE, LIFT, CARRY, PLACE, RELEASE = 30, 31, 32, 33, 34, 35, 36

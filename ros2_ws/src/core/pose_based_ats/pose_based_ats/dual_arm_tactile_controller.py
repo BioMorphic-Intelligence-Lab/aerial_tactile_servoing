@@ -69,9 +69,10 @@ class DualArmTactileController(Node):
     FOREARM_IDX = {1: 2, 2: 5}
 
     # The two arms run the SAME shoulder locus and the SAME forearm magnitude; only the signs
-    # differ. Arm 1 sits at +shoulder / -forearm, arm 2 at -shoulder / +forearm. Closing always
-    # DECREASES the magnitude of the shoulder angle.
-    SIGN = {1: +1.0, 2: -1.0}
+    # differ. Arm 1 sits at -shoulder / +forearm, arm 2 at +shoulder / -forearm, so each arm grasps
+    # on the side it rests on and the two never cross under the body (checked on the drone
+    # 2026-10-02). Closing always DECREASES the magnitude of the shoulder angle.
+    SIGN = {1: -1.0, 2: +1.0}
 
     # Status codes on /grasp/status.
     ST_OPEN = 0        # released / idle
