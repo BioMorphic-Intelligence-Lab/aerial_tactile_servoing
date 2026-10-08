@@ -24,7 +24,8 @@ setup(
         'console_scripts': [
             'vbats=mission_director.missions.vbats:main',  # consolidated POC (TactileMissionDirector)
             'door=mission_director.missions.door:main',
-            'pinch_grasp=mission_director.missions.pinch_grasp:main'
+            'pinch_grasp=mission_director.missions.pinch_grasp:main',
+            'pinch_dry_test=mission_director.missions.pinch_dry_test:main'
         ],
     },
 )

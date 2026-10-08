@@ -1,7 +1,8 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.conditions import UnlessCondition
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from ament_index_python.packages import get_package_share_directory
 import os
 
@@ -19,6 +20,10 @@ Usage:
   # Real flight test:
   ros2 launch ats_bringup real_dual_pinch.launch.py fcu_on:=true
 
+  # Dry test on the bench, no PX4 (then `ros2 run mission_director pinch_dry_test` in a second
+  # terminal; see that file for the procedure):
+  ros2 launch ats_bringup real_dual_pinch.launch.py dry_test:=true
+
 Before a real run: confirm which /dev/videoN index belongs to each TacTip ( `v4l2-ctl --list-devices`) 
 and set left_tactip_source / right_tactip_source accordingly --
 """
@@ -35,6 +40,14 @@ def generate_launch_description():
 
     declare_fcu = DeclareLaunchArgument('fcu_on', default_value='true', description='Enable flight controller')
     ld.add_action(declare_fcu)
+    # Dry test: no mission node (pinch_dry_test takes its place) and the controller reads the
+    # level, still attitude that pinch_dry_test publishes instead of the motion-capture feed.
+    declare_dry = DeclareLaunchArgument('dry_test', default_value='false',
+                                        description='Bench test without PX4 or the mission')
+    ld.add_action(declare_dry)
+    odometry_topic = PythonExpression([
+        "'/dry_test/vehicle_odometry' if '", LaunchConfiguration('dry_test'),
+        "'.lower() == 'true' else '/fmu/in/vehicle_visual_odometry'"])
 
     # /dev/videoN index for each TacTip camera.
     # `v4l2-ctl --list-devices` before a real run 
@@ -73,7 +86,8 @@ def generate_launch_description():
             ('/tactip/contact', '/tactip_left/contact'),
             ('set_ssim_ref', 'set_ssim_ref_left'),
         ],
-        arguments=["--ros-args", "--log-level", "info"]
+        arguments=["--ros-args", "--log-level", "info"],
+        condition=UnlessCondition(LaunchConfiguration('dry_test'))
     )
     ld.add_action(mission_director)
 
@@ -154,11 +168,12 @@ def generate_launch_description():
             grasp_config,                            # pose, backstops, squeeze target
             {'frequency': 30.0},                     # matches the TacTip stream (~30 Hz)
             {'sim': False},                          # Real hardware mode
-            # ARM 1 is the LEFT arm (body +y, TacTip B1); ARM 2 is the RIGHT arm (body -y, B2).
+            # Arm 1 = TacTip B1 (/tactip_left/*), arm 2 = B2 (/tactip_right/*).
             {'arm1_force_topic': '/tactip_left/force'},
             {'arm2_force_topic': '/tactip_right/force'},
             {'arm1_pose_topic': '/tactip_left/pose'},
             {'arm2_pose_topic': '/tactip_right/pose'},
+            {'odometry_topic': odometry_topic},
         ],
         arguments=['--ros-args', '--log-level', 'info']
     )
