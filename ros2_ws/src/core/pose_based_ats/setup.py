@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             'pose_based_ats = pose_based_ats.pose_based_ats:main',
             'velocity_based_ats = pose_based_ats.velocity_based_ats:main',
+            'dual_arm_tactile_controller = pose_based_ats.dual_arm_tactile_controller:main',
         ],
     },
 )
