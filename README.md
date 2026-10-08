@@ -6,7 +6,7 @@ sensor. The system flies to a surface, establishes contact, and then servos the 
 together to track a tactile reference (contact depth, shear, orientation) while sliding along
 the surface.
 
-This repository is a ROS 2 (Humble) workspace: the `ros2_ws/src` tree contains every node that
+This repository is a ROS 2 (Jazzy) workspace: the `ros2_ws/src` tree contains every node that
 runs on the onboard companion computer, plus a Gazebo simulation of the platform.
 
 > **New here? Start with the [documentation](docs/README.md).** The `docs/` folder is the
