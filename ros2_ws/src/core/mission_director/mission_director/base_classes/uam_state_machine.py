@@ -253,6 +253,25 @@ class UAMStateMachine(Node):
         self.vehicle_local_position = msg
     
     def servo_state_callback(self, msg: JointState):
+        if len(msg.name) >= 6:
+            canonical_names = [
+                'shoulder_joint_1', 'elbow_joint_1', 'forearm_joint_1',
+                'shoulder_joint_2', 'elbow_joint_2', 'forearm_joint_2'
+            ]
+            if list(msg.name) != canonical_names:
+                name_to_idx = {name: i for i, name in enumerate(msg.name)}
+                missing = [n for n in canonical_names if n not in name_to_idx]
+                if missing:
+                    self.get_logger().warn(
+                        f"servo_state joint names {list(msg.name)} do not contain expected "
+                        f"{missing} -- defaulting those to 0.0", throttle_duration_sec=5.0)
+                ordered_msg = JointState()
+                ordered_msg.header = msg.header
+                ordered_msg.name = canonical_names
+                ordered_msg.position = [msg.position[name_to_idx[n]] if n in name_to_idx and len(msg.position) > name_to_idx[n] else 0.0 for n in canonical_names]
+                ordered_msg.velocity = [msg.velocity[name_to_idx[n]] if n in name_to_idx and len(msg.velocity) > name_to_idx[n] else 0.0 for n in canonical_names]
+                self.servo_state = ordered_msg
+                return
         self.servo_state = msg
 
     #--------------------------------------------------------------------------
