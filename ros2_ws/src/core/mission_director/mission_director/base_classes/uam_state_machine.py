@@ -277,12 +277,15 @@ class UAMStateMachine(Node):
     #--------------------------------------------------------------------------
     # State Machine state executors
     #--------------------------------------------------------------------------
-    def state_entrypoint(self, next_state='emergency'):
+    def state_entrypoint(self, next_state='emergency', target_heading=None):
         self.handle_state(state_number=0)
         self.home_position[0] = self.vehicle_local_position.x
         self.home_position[1] = self.vehicle_local_position.y
         self.home_position[2] = self.vehicle_local_position.z
-        self.home_position[3] = self.vehicle_local_position.heading        
+        if target_heading is not None:
+            self.home_position[3] = target_heading
+        elif self.home_position[3] == 0.0:
+            self.home_position[3] = self.vehicle_local_position.heading        
 
         if (not self.sim and self.home_position[0] == 0.0 and self.home_position[1] == 0.0):        
             self.get_logger().info(f"[ENTRYPOINT] Waiting for position fix!, vehicle_x {self.vehicle_local_position.x:.4f}, vehicle_y {self.vehicle_local_position.y:.4f}", throttle_duration_sec=1)
@@ -331,14 +334,16 @@ class UAMStateMachine(Node):
         elif not self.armed and self.offboard:
             self.get_logger().info('[3] Not armed but offboard -- waiting', throttle_duration_sec=1)
 
-    def state_takeoff(self, target_altitude = 1.5, next_state='emergency'):
+    def state_takeoff(self, target_altitude = 1.5, next_state='emergency', target_heading=None):
         self.handle_state(state_number=4)
 
         # First state loop
         if self.first_state_loop:
             self.takeoff_altitude = -abs(target_altitude)
             self.home_position[2] = self.takeoff_altitude
-            self.get_logger().info(f'[4] Vehicle local position heading: {self.home_position[3]} rad')
+            if target_heading is not None:
+                self.home_position[3] = target_heading
+            self.get_logger().info(f'[4] Vehicle local position heading: {self.home_position[3]} rad ({np.rad2deg(self.home_position[3]):.1f} deg)')
             self.get_logger().info(f'[4] Takeoff z-coord: {self.home_position[2]} m')
             self.first_state_loop = False
 
@@ -353,7 +358,7 @@ class UAMStateMachine(Node):
             self.transition_to_state(new_state=next_state)
             self.flying = True
 
-    def state_land(self, landing_speed=0.5, next_state='emergency'):
+    def state_land(self, landing_speed=0.5, next_state='emergency', target_heading=None):
         self.handle_state(state_number=5)
         self.publish_trajectory_position_setpoint(*self.land_position)
         self.land_position[2] += landing_speed / self.frequency  # Increase z (down) at landing speed
@@ -363,7 +368,12 @@ class UAMStateMachine(Node):
             self.land_position[0] = self.vehicle_local_position.x
             self.land_position[1] = self.vehicle_local_position.y
             self.land_position[2] = self.vehicle_local_position.z
-            self.land_position[3] = self.vehicle_local_position.heading
+            if target_heading is not None:
+                self.land_position[3] = target_heading
+            elif self.hover_position[3] != 0.0:
+                self.land_position[3] = self.hover_position[3]
+            else:
+                self.land_position[3] = self.vehicle_local_position.heading
             self.get_logger().info(f'[5] Landing from altitude: {self.land_position[2]} m at speed {landing_speed} m/s')
             self.first_state_loop = False
 
@@ -374,7 +384,7 @@ class UAMStateMachine(Node):
             self.transition_to_state(new_state=next_state)
             self.flying = False
 
-    def state_hover(self, duration_sec: float, next_state='emergency'):
+    def state_hover(self, duration_sec: float, next_state='emergency', target_heading=None):
         self.handle_state(state_number=10)
 
         # First state loop
@@ -382,8 +392,13 @@ class UAMStateMachine(Node):
             self.hover_position[0] = self.vehicle_local_position.x
             self.hover_position[1] = self.vehicle_local_position.y
             self.hover_position[2] = self.vehicle_local_position.z
-            self.hover_position[3] = self.vehicle_local_position.heading
-            self.get_logger().info(f'[5] Hovering at altitude: {self.home_position[2]:.2f} m for {duration_sec} seconds')
+            if target_heading is not None:
+                self.hover_position[3] = target_heading
+            elif self.home_position[3] != 0.0:
+                self.hover_position[3] = self.home_position[3]
+            else:
+                self.hover_position[3] = self.vehicle_local_position.heading
+            self.get_logger().info(f'[5] Hovering at altitude: {self.hover_position[2]:.2f} m for {duration_sec} seconds, heading: {np.rad2deg(self.hover_position[3]):.1f} deg')
             self.first_state_loop = False
 
         self.get_logger().info(f'Hovering... {(datetime.datetime.now()-self.state_start_time).seconds:.1f}/{duration_sec} sec', throttle_duration_sec=1)
@@ -402,7 +417,7 @@ class UAMStateMachine(Node):
         next_state (str, optional): Next state to transition to after completion. Defaults to 'emergency'.
         epsilon (float, optional): Position error threshold for completion. Defaults to 0.1.
     """
-    def state_move_arms(self, q_des: list, next_state='emergency', epsilon=0.2): # keep at 0.2 
+    def state_move_arms(self, q_des: list, next_state='emergency', epsilon=0.2, target_heading=None, timeout=15.0): # keep at 0.2
         self.handle_state(state_number=11)
         error = 0.0
         # First state loop
@@ -410,10 +425,18 @@ class UAMStateMachine(Node):
             self.hover_position[0] = self.vehicle_local_position.x
             self.hover_position[1] = self.vehicle_local_position.y
             self.hover_position[2] = self.vehicle_local_position.z
-            self.hover_position[3] = self.vehicle_local_position.heading
-            self.get_logger().info(f'[11] Hovering at altitude: {self.home_position[2]:.2f} m while moving arms to states {q_des} in mode {self.manipulator_mode}')
+            if target_heading is not None:
+                self.hover_position[3] = target_heading
+            elif self.home_position[3] != 0.0:
+                self.hover_position[3] = self.home_position[3]
+            else:
+                self.hover_position[3] = self.vehicle_local_position.heading
+            self.get_logger().info(f'[11] Hovering at altitude: {self.hover_position[2]:.2f} m while moving arms to states {q_des} in mode {self.manipulator_mode}')
             self.first_state_loop = False
-        
+
+        if self.flying:
+            self.publish_trajectory_position_setpoint(*self.hover_position)
+
         if self.manipulator_mode=='position': # If the servos are controlled in position mode
             self.publish_servo_position_references(q_des)
         elif self.manipulator_mode=='velocity': # If the servos are controlled in velocity mode
@@ -430,10 +453,18 @@ class UAMStateMachine(Node):
             else:
                 self.publish_servo_velocity_references([0.0 for x in q_des])  # Stop the servos if within epsilon
 
+        elapsed = (datetime.datetime.now() - self.state_start_time).total_seconds()
         # State transition
+        # Note on `timeout`: convergence needs sqrt(sum|e_i|) < epsilon, i.e. sum|e_i| < epsilon^2
+        # (0.04 rad over all joints at the default epsilon). The largest dual-arm transition
+        # (land_arms -> pre_grasp_arms) moves a shoulder ~3.9 rad, which at the configured
+        # max_speeds of 1.2 rad/s takes ~3.3 s saturated plus a ~2 s exponential tail at kp=2.0 --
+        # so a timeout below ~6 s fires before the arms are ever in place.
         if not self.offboard and self.fcu_on and self.flying:
             self.transition_to_state('emergency')
-        elif (error < epsilon) or self.input_state == 1: # If error is small enough or input state is 1
+        elif (error < epsilon) or (elapsed > timeout) or self.input_state == 1:
+            if elapsed > timeout and error >= epsilon:
+                self.get_logger().warn(f"Arm motion timed out after {timeout:.1f}s with error {error:.3f} rad, continuing to {next_state}")
             self.transition_to_state(new_state=next_state)
 
     """ Move the UAM to a specified position using position control mode until a transition condition is met.
