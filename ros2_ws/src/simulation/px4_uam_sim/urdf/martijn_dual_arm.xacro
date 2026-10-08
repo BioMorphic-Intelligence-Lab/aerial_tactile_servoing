@@ -1,6 +1,18 @@
 <?xml version="1.0"?>
 <robot name="martijn" xmlns:xacro="http://ros.org/wiki/xacro">
   <xacro:property name="uses_real_torques" value="true"/>
+  <!-- Forearm carbon tube, forearm joint -> tube end. The TacTip adds 52 mm on top (dome centre
+       40.75 mm past the tube end + 11.25 mm dome radius), so the dome apex sits at tube + 0.052.
+       MUST match grasp.tube_m in ats_bringup/config/grasp_geometry.yaml. Gazebo loads the
+       generated martijn_dual_arm.sdf, not this file, so regenerate it from this folder with the
+       workspace sourced (xacro needs it to resolve the mesh paths):
+         source ~/aerial_tactile_servoing/ros2_ws/install/setup.bash
+         xacro martijn_dual_arm.xacro > /tmp/d.urdf && gz sdf -p /tmp/d.urdf > martijn_dual_arm.sdf
+       0.278 is the original tube; the ordered replacement is 7 cm shorter, 0.208. -->
+  <xacro:property name="forearm_tube_length" value="0.208"/>
+  <!-- Collision box and inertia follow the tube: 0.27 m and 1.2446e-4 kg m^2 at the original. -->
+  <xacro:property name="forearm_box_length" value="${forearm_tube_length - 0.008}"/>
+  <xacro:property name="forearm_inertia" value="${0.00012446 * (forearm_box_length / 0.27) ** 2}"/>
 
   <link name="base_link">
     <collision>
@@ -29,6 +41,7 @@
       <sensor name="air_pressure_sensor" type="air_pressure">
         <always_on>1</always_on>
         <update_rate>50</update_rate>
+        <gz_frame_id>base_link</gz_frame_id>
         <air_pressure>
           <pressure>
             <noise type="gaussian">
@@ -41,6 +54,7 @@
       <sensor name="imu_sensor" type="imu">
         <always_on>1</always_on>
         <update_rate>1000</update_rate>
+        <gz_frame_id>base_link</gz_frame_id>
         <imu>
           <angular_velocity>
             <x>
@@ -99,6 +113,29 @@
       <sensor name="navsat_sensor" type="navsat">
         <always_on>1</always_on>
         <update_rate>100</update_rate>
+        <gz_frame_id>base_link</gz_frame_id>
+      </sensor>
+      <sensor name="magnetometer_sensor" type="magnetometer">
+        <gz_frame_id>base_link</gz_frame_id>
+        <always_on>1</always_on>
+        <update_rate>100</update_rate>
+        <magnetometer>
+          <x>
+            <noise type="gaussian">
+              <stddev>0.0001</stddev>
+            </noise>
+          </x>
+          <y>
+            <noise type="gaussian">
+              <stddev>0.0001</stddev>
+            </noise>
+          </y>
+          <z>
+            <noise type="gaussian">
+              <stddev>0.0001</stddev>
+            </noise>
+          </z>
+        </magnetometer>
       </sensor>
     </gazebo>
   
@@ -282,7 +319,7 @@
     <child link="elbow_link_1"/>
     <origin xyz="0 0 0.0125" rpy="1.5708 1.5708 3.14"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-1.5708" upper="1.5708" velocity="2" effort="100"/>
+    <limit lower="-1.5708" upper="2.0" velocity="2" effort="100"/>
     <dynamics damping="0.01" friction="0.1"/>
   </joint>  
   <link name="motor_link_elbow_1">
@@ -317,9 +354,9 @@
   </joint>
   <link name="forearm_link_1">
     <collision>
-      <origin xyz="-0.135 0 0" rpy="0 0 0"/>
+      <origin xyz="${-forearm_box_length / 2} 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.27 0.024 0.054"/>
+        <box size="${forearm_box_length} 0.024 0.054"/>
       </geometry>
     </collision>
     <visual>
@@ -332,11 +369,11 @@
       </material>      
     </visual>
     <inertial>
-      <origin xyz="-0.135 0 0" rpy="0 0 0"/>
+      <origin xyz="${-forearm_box_length / 2} 0 0" rpy="0 0 0"/>
       <mass value="0.03"/>
       <inertia ixx="4.9e-07" ixy="0.0" ixz="0.0"
-        iyy="0.00012446" iyz="0.0"
-        izz="0.00012446"/>
+        iyy="${forearm_inertia}" iyz="0.0"
+        izz="${forearm_inertia}"/>
     </inertial>
   </link>
   <joint name="forearm_joint_1" type="revolute">
@@ -344,8 +381,62 @@
     <child link="forearm_link_1"/>
     <origin xyz="-0.31 0 0" rpy="0 0 0"/>
     <axis xyz="0 -1 0"/>
-    <limit lower="-1.9" upper="1.9" velocity="20" effort="100"/>
+    <limit lower="-2.1" upper="2.1" velocity="20" effort="100"/>
     <dynamics damping="0.0001" friction="0.0"/>    
+  </joint>  
+
+  <!-- TacTip 1: Mounted co-axially (0 deg) on the end of forearm tube -->
+  <link name="tactip_link_1">
+    <!-- Tube length comes from the `forearm_tube_length` property at the top of this file. The
+         dome centre lies 0.04075 m past the tube end and the apex 0.052 m past it, so the apex
+         is 0.330 m from the forearm joint on the original tube (the in-situ L_3 measured in
+         torque_observer.py). Dome radius 0.01125 m from the measured 22.5 mm dome diameter;
+         housing OD 25 mm. -->
+    <collision>
+      <origin xyz="-0.04075 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.01125"/>
+      </geometry>
+      <surface>
+        <friction>
+          <ode>
+            <!-- Silicone dome on printed plastic. Placeholder:  -->
+            <mu>1.0</mu>
+            <mu2>1.0</mu2>
+          </ode>
+        </friction>
+      </surface>
+    </collision>
+    <!-- Black silicone contact dome -->
+    <visual>
+      <origin xyz="-0.04075 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.01125"/>
+      </geometry>
+      <material name="tactip_dome_1">
+        <color rgba="0.15 0.15 0.15 1.0"/>
+      </material>
+    </visual>
+    <!-- White printed housing -->
+    <visual>
+      <origin xyz="-0.02038 0 0" rpy="0 1.5708 0"/>
+      <geometry>
+        <cylinder radius="0.0125" length="0.04075"/>
+      </geometry>
+      <material name="tactip_housing_1">
+        <color rgba="0.95 0.95 0.95 1.0"/>
+      </material>
+    </visual>
+    <inertial>
+      <origin xyz="-0.02038 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <inertia ixx="1e-5" ixy="0" ixz="0" iyy="1e-5" iyz="0" izz="1e-5"/>
+    </inertial>
+  </link>
+  <joint name="tactip_joint_1" type="fixed">
+    <parent link="forearm_link_1"/>
+    <child link="tactip_link_1"/>
+    <origin xyz="${-forearm_tube_length} 0 0" rpy="0 0 0"/>
   </joint>  
   
 
@@ -443,7 +534,7 @@
     <child link="elbow_link_2"/>
     <origin xyz="0 0 0.0125" rpy="1.5708 1.5708 0"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-1.5708" upper="1.5708" velocity="2" effort="100"/>
+    <limit lower="-1.5708" upper="2.0" velocity="2" effort="100"/>
     <dynamics damping="0.01" friction="0.1"/>
   </joint>  
   <link name="motor_link_elbow_2">
@@ -478,9 +569,9 @@
   </joint>
   <link name="forearm_link_2">
     <collision>
-      <origin xyz="-0.135 0 0" rpy="0 0 0"/>
+      <origin xyz="${-forearm_box_length / 2} 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.27 0.024 0.054"/>
+        <box size="${forearm_box_length} 0.024 0.054"/>
       </geometry>
     </collision>
     <visual>
@@ -493,11 +584,11 @@
       </material>      
     </visual>
     <inertial>
-      <origin xyz="-0.135 0 0" rpy="0 0 0"/>
+      <origin xyz="${-forearm_box_length / 2} 0 0" rpy="0 0 0"/>
       <mass value="0.03"/>
       <inertia ixx="4.9e-07" ixy="0.0" ixz="0.0"
-        iyy="0.00012446" iyz="0.0"
-        izz="0.00012446"/>
+        iyy="${forearm_inertia}" iyz="0.0"
+        izz="${forearm_inertia}"/>
     </inertial>
   </link>
   <joint name="forearm_joint_2" type="revolute">
@@ -505,8 +596,58 @@
     <child link="forearm_link_2"/>
     <origin xyz="-0.31 0 0" rpy="0 0 0"/>
     <axis xyz="0 -1 0"/>
-    <limit lower="-1.9" upper="1.9" velocity="20" effort="100"/>
+    <limit lower="-2.1" upper="2.1" velocity="20" effort="100"/>
     <dynamics damping="0.0001" friction="0.0"/>    
+  </joint>  
+
+  <!-- TacTip 2: Mounted co-axially (0 deg) on the end of forearm tube -->
+  <link name="tactip_link_2">
+    <!-- MEASURED geometry  -->
+    <collision>
+      <origin xyz="-0.04075 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.01125"/>
+      </geometry>
+      <surface>
+        <friction>
+          <ode>
+            <!-- Silicone dome on printed plastic.  -->
+            <mu>1.0</mu>
+            <mu2>1.0</mu2>
+          </ode>
+        </friction>
+      </surface>
+    </collision>
+    <!-- Black silicone contact dome -->
+    <visual>
+      <origin xyz="-0.04075 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.01125"/>
+      </geometry>
+      <material name="tactip_dome_2">
+        <color rgba="0.15 0.15 0.15 1.0"/>
+      </material>
+    </visual>
+    <!-- White printed housing -->
+    <visual>
+      <origin xyz="-0.02038 0 0" rpy="0 1.5708 0"/>
+      <geometry>
+        <cylinder radius="0.0125" length="0.04075"/>
+      </geometry>
+      <material name="tactip_housing_2">
+        <color rgba="0.95 0.95 0.95 1.0"/>
+      </material>
+    </visual>
+    <inertial>
+      <origin xyz="-0.02038 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <inertia ixx="1e-5" ixy="0" ixz="0" iyy="1e-5" iyz="0" izz="1e-5"/>
+    </inertial>
+  </link>
+  <joint name="tactip_joint_2" type="fixed">
+    <parent link="forearm_link_2"/>
+    <child link="tactip_link_2"/>
+    <origin xyz="${-forearm_tube_length} 0 0" rpy="0 0 0"/>
   </joint>  
 
 
@@ -565,10 +706,10 @@
 -->
     <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
 	<joint_name>shoulder_joint_1</joint_name>
-	<joint_name>shoulder_joint_2</joint_name>
 	<joint_name>elbow_joint_1</joint_name>
-	<joint_name>elbow_joint_2</joint_name>
 	<joint_name>forearm_joint_1</joint_name>
+	<joint_name>shoulder_joint_2</joint_name>
+	<joint_name>elbow_joint_2</joint_name>
 	<joint_name>forearm_joint_2</joint_name>
     </plugin>
     <plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">
