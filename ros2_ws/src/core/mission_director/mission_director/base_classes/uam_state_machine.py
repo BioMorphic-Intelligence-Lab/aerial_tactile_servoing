@@ -258,13 +258,13 @@ class UAMStateMachine(Node):
                 'shoulder_joint_1', 'elbow_joint_1', 'forearm_joint_1',
                 'shoulder_joint_2', 'elbow_joint_2', 'forearm_joint_2'
             ]
-            if list(msg.name) != canonical_names:
-                name_to_idx = {name: i for i, name in enumerate(msg.name)}
-                missing = [n for n in canonical_names if n not in name_to_idx]
-                if missing:
-                    self.get_logger().warn(
-                        f"servo_state joint names {list(msg.name)} do not contain expected "
-                        f"{missing} -- defaulting those to 0.0", throttle_duration_sec=5.0)
+            name_to_idx = {name: i for i, name in enumerate(msg.name)}
+            # Reorder only when the message carries the URDF joint names (Gazebo). The Dynamixel
+            # driver names its joints q0..q5, already in the canonical order of its config, and
+            # is passed through as is -- filling those with 0.0 would make every arm move think
+            # the joints sit at zero.
+            if list(msg.name) != canonical_names \
+                    and all(n in name_to_idx for n in canonical_names):
                 ordered_msg = JointState()
                 ordered_msg.header = msg.header
                 ordered_msg.name = canonical_names
