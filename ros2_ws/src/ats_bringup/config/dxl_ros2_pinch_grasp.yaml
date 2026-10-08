@@ -1,0 +1,22 @@
+/dxl_driver:
+  ros__parameters:
+    driver:
+      frequency: 100.0
+
+    servos:
+      ids: [31, 32, 33, 41, 42, 43] # Servo IDs
+      operating_modes: [1, 1, 1, 1, 1, 1] # Driver operating mode, [1 is velocity control]
+      homing_modes: [0, 0, 0, 0, 0, 0] # Homing mode, [0 is no homing]
+      directions: [-1, -1, 1, 1, 1, 1] # Direction of rotation for each servo [-1, 1]
+      max_speeds: [1.2, 1.2, 1.2, 1.2, 1.2, 1.2] # Maximum allowable speed in rad/s
+      gear_ratios: [4.0, 1.0, 1.765, 4.0, 1.0, 1.765] # Gear ratio between servo horn and output shaft
+      # DESIGN: Forearm limits raised from +-1.85 to +-2.1. The working angle is 1.95, 0.15 inside it. The 
+      # forearm no longer carries the force loop (the SHOULDER squeezes), so the driver's velocity taper no longer matters
+      # for the grasp: 75% speed at 1.95, and the shoulders sit ~0.96 rad from their limits.
+      # SHOULDER RANGES: arm 1 -1.0..+5.0, arm 2 -5.0..+1.0.
+      # The grasp pose is +4.04 / -4.04; the same physical poses written the other way round (-2.24 / +2.24)
+      # are out of range, and the driver freezes an out-of-range joint. Every shoulder angle
+      # commanded anywhere in the stack must use this winding.
+      min_angles: [-1.0, -0.52, -2.1, -5.0, -0.52, -2.1] # Minimum angle limit in rad (if both set to zero, no limits are applied)
+      max_angles: [5.0, 0.52, 2.1, 1.0, 0.52, 2.1] # Maximum angle limit in rad (if both set to zero, no limits are applied)
+      start_offsets: [1.77, 0.0, -1.826, -1.77, 0.0, 1.831] # Start offset in rad added to the initial position after homing
