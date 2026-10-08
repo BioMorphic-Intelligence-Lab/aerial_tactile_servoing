@@ -9,6 +9,7 @@
 
   <depend>rclpy</depend>
   <depend>px4_msgs</depend>
+  <exec_depend>pose_based_ats</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
