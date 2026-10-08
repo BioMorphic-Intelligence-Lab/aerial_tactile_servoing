@@ -9,7 +9,8 @@ The grasp controller needs two things, both from the same chain:
     grasp axis (the line joining the pads) is the direction the squeeze acts along. Both are read
     off the chain rather than linearised, so a re-measured tube or a re-posed forearm stays right.
 
-ARM NAMING: arm 1 is LEFT (body +y, TacTip B1); arm 2 is RIGHT (body -y, B2).
+ARM NAMING: arm 1 = TacTip B1 = servos 31/32/33 (/tactip_left/*), grasping on the body -y
+side; arm 2 = B2 = 41/42/43 (/tactip_right/*), on +y. "Left"/"right" are topic labels only.
 
 Frame chain, per arm:
 

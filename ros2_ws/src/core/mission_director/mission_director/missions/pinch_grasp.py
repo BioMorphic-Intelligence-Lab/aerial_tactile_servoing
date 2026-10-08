@@ -24,7 +24,8 @@ class PinchGraspMission(TactileMissionDirector):
     While grasping, the controller owns all six joints and this mission owns the drone, holding it
     on a POSITION setpoint -> the grasp states do not call state_hover or state_move_uam_to_position
 
-    ARM NAMING: arm 1 is LEFT (body +y, B1), arm 2 is RIGHT (body -y, B2).
+    ARM NAMING: arm 1 = TacTip B1 = servos 31/32/33 (/tactip_left/*), grasping on the body -y
+    side; arm 2 = B2 = 41/42/43 (/tactip_right/*), on +y. "Left"/"right" are topic labels only.
 
     Geometry comes from ats_bringup/config/grasp_geometry.yaml -- change the pose there, not here.
     """

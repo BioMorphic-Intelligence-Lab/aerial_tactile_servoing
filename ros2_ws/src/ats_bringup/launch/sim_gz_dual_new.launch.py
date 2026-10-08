@@ -156,7 +156,7 @@ def generate_launch_description():
             {'frequency': 30.0},                     # matches the TacTip stream
             {'sim': True},                           # fake tactile data: closes on position,
                                                      # publishes no mass estimate
-            # ARM 1 is the LEFT arm (body +y, TacTip B1); ARM 2 is the RIGHT arm (body -y, B2).
+            # Arm 1 = TacTip B1 (/tactip_left/*), arm 2 = B2 (/tactip_right/*).
             {'arm1_force_topic': '/tactip_left/force'},
             {'arm2_force_topic': '/tactip_right/force'},
             {'arm1_pose_topic': '/tactip_left/pose'},
