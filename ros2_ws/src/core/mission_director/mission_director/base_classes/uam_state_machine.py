@@ -9,9 +9,11 @@ from sensor_msgs.msg import JointState
 from px4_msgs.msg import TrajectorySetpoint
 from px4_msgs.msg import OffboardControlMode
 from px4_msgs.msg import VehicleCommand
+from px4_msgs.msg import VehicleCommandAck
 from px4_msgs.msg import VehicleStatus
 from px4_msgs.msg import VehicleOdometry
 from px4_msgs.msg import VehicleLocalPosition
+from px4_msgs.msg import VehicleControlMode
 
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 
@@ -52,9 +54,13 @@ class UAMStateMachine(Node):
         self.pub_offboard_control_mode = self.create_publisher(OffboardControlMode, '/fmu/in/offboard_control_mode',10)
         self.pub_vehicle_command = self.create_publisher(VehicleCommand, '/fmu/in/vehicle_command', 10)
 
-        self.sub_vehicle_status = self.create_subscription(VehicleStatus, '/fmu/out/vehicle_status_v1', self.vehicle_status_callback, px4_qos_profile)
+        self.sub_vehicle_status = self.create_subscription(VehicleStatus, '/fmu/out/vehicle_status', self.vehicle_status_callback, px4_qos_profile)
+        self.sub_vehicle_status_v1 = self.create_subscription(VehicleStatus, '/fmu/out/vehicle_status_v1', self.vehicle_status_callback, px4_qos_profile)
+        self.sub_vehicle_control_mode = self.create_subscription(VehicleControlMode, '/fmu/out/vehicle_control_mode', self.vehicle_control_mode_callback, px4_qos_profile)
+        self.sub_vehicle_command_ack = self.create_subscription(VehicleCommandAck, '/fmu/out/vehicle_command_ack_v1', self.vehicle_command_ack_callback, px4_qos_profile)
         self.sub_vehicle_odometry = self.create_subscription(VehicleOdometry, '/fmu/out/vehicle_odometry', self.vehicle_odometry_callback, px4_qos_profile)
         self.sub_vehicle_local_position = self.create_subscription(VehicleLocalPosition, '/fmu/out/vehicle_local_position', self.vehicle_local_position_callback, px4_qos_profile)
+        self.sub_vehicle_local_position_v1 = self.create_subscription(VehicleLocalPosition, '/fmu/out/vehicle_local_position_v1', self.vehicle_local_position_callback, px4_qos_profile)
 
         # Manipulator interfaces
         self.pub_servo_references = self.create_publisher(JointState, '/servo/in/state', 10)
@@ -224,6 +230,22 @@ class UAMStateMachine(Node):
 
         self.vehicle_status = msg
     
+    def vehicle_control_mode_callback(self, msg: VehicleControlMode):
+        self.armed = bool(msg.flag_armed)
+        self.offboard = bool(msg.flag_control_offboard_enabled)
+    
+    def vehicle_command_ack_callback(self, msg: VehicleCommandAck):
+        # Note: only VEHICLE_CMD_DO_SET_MODE is handled optimistically here -- this
+        # node only ever requests offboard mode (see sim_engage_offboard_mode), so the
+        # ack is unambiguous. VEHICLE_CMD_COMPONENT_ARM_DISARM is intentionally NOT
+        # handled the same way: VehicleCommandAck carries no param1, so an accepted
+        # ack can't tell an arm request from a disarm request apart. self.armed is
+        # instead derived authoritatively from vehicle_status/vehicle_control_mode.
+        if msg.result == VehicleCommandAck.VEHICLE_CMD_RESULT_ACCEPTED:
+            if msg.command == VehicleCommand.VEHICLE_CMD_DO_SET_MODE:
+                self.offboard = True
+                self.get_logger().info("[ACK] Offboard mode confirmed accepted by PX4")
+    
     def vehicle_odometry_callback(self, msg: VehicleOdometry):
         self.vehicle_odometry = msg
 
@@ -243,13 +265,13 @@ class UAMStateMachine(Node):
         self.home_position[2] = self.vehicle_local_position.z
         self.home_position[3] = self.vehicle_local_position.heading        
 
-        if (self.home_position[0] == 0.0 and self.home_position[1] == 0.0):        
+        if (not self.sim and self.home_position[0] == 0.0 and self.home_position[1] == 0.0):        
             self.get_logger().info(f"[ENTRYPOINT] Waiting for position fix!, vehicle_x {self.vehicle_local_position.x:.4f}, vehicle_y {self.vehicle_local_position.y:.4f}", throttle_duration_sec=1)
         elif len(self.servo_state.position)==0:
             self.get_logger().info(f"[ENTRYPOINT] Got position fix but no servo state yet!", throttle_duration_sec=1)
 
         # State transition
-        if (self.home_position[0] != 0.0 and self.home_position[1] != 0.0 and len(self.servo_state.position)>0):
+        if ((self.sim or (self.home_position[0] != 0.0 and self.home_position[1] != 0.0)) and len(self.servo_state.position)>0):
             self.get_logger().info(f'Got position fix! \t x: {self.home_position[0]:.3f} [m] \t y: {self.home_position[1]:.3f} [m] \t {np.rad2deg(self.home_position[3]):.2f} [deg]')
             self.transition_to_state(new_state=next_state)
         elif self.input_state == 1:
@@ -269,23 +291,26 @@ class UAMStateMachine(Node):
 
         self.get_logger().info('[3] Waiting for arming and offboard mode', throttle_duration_sec=1)
 
+        # PX4 requires active stream of offboard setpoints before & during offboard switch
+        self.publish_offboard_position_mode()
+        self.publish_trajectory_position_setpoint(*self.home_position)
+
         if self.sim:
-            if not self.offboard and self.counter%self.frequency==0:
-                self.get_logger().info("[3] Sending sim offboard command")
-                self.sim_engage_offboard_mode()
-                self.counter = 0
-            if not self.armed and self.offboard and self.counter%self.frequency==0:
-                self.get_logger().info("[3] Sending sim arm command")
-                self.sim_arm_vehicle()
-                self.counter = 0
+            if self.counter % int(self.frequency) == 0:
+                if not self.offboard:
+                    self.get_logger().info("[3] Sending sim offboard command")
+                    self.sim_engage_offboard_mode()
+                if not self.armed:
+                    self.get_logger().info("[3] Sending sim arm command")
+                    self.sim_arm_vehicle()
 
         # State transition
-        if self.armed and not self.offboard:
+        if (self.armed and self.offboard) or self.input_state == 1:
+            self.transition_to_state(new_state=next_state)
+        elif self.armed and not self.offboard:
             self.get_logger().info('[3] Armed but not offboard -- waiting', throttle_duration_sec=1)
         elif not self.armed and self.offboard:
             self.get_logger().info('[3] Not armed but offboard -- waiting', throttle_duration_sec=1)
-        elif (self.armed and self.offboard) or self.input_state == 1:
-            self.transition_to_state(new_state=next_state)
 
     def state_takeoff(self, target_altitude = 1.5, next_state='emergency'):
         self.handle_state(state_number=4)
