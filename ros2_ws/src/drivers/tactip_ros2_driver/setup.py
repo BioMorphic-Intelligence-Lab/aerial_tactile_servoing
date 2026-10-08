@@ -4,7 +4,12 @@ import os
 
 package_name = 'tactip_ros2_driver'
 
+# Default model, used when a node does not set the 'model_dir' parameter (single-arm missions).
 model_name = 'simple_cnn_C2_2026'
+
+#  multiple driver instances (e.g. the dual-arm TacTips, which are physically different sensors
+# with their own force limits and image processing) can each load their own model via 'model_dir'.
+model_dirs = sorted(d for d in glob('resource/models/*') if os.path.isdir(d))
 
 setup(
     name=package_name,
@@ -13,8 +18,13 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/model', glob('resource/models/' + model_name + '/*')),
+        ('share/' + package_name + '/model', glob('resource/models/' + model_name + '/*.json')
+                                           + glob('resource/models/' + model_name + '/*.pth')),
         ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
+    ] + [
+        ('share/' + package_name + '/models/' + os.path.basename(d),
+         glob(d + '/*.json') + glob(d + '/*.pth'))
+        for d in model_dirs
     ],
     install_requires=[
         'setuptools', 
