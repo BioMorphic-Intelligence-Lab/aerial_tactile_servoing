@@ -12,7 +12,7 @@ from geometry_msgs.msg import TwistStamped, TransformStamped, WrenchStamped
 from std_msgs.msg import Float64, Int8
 from tf2_ros import TransformBroadcaster
 
-from std_srvs.srv import SetBool
+from std_srvs.srv import SetBool, Trigger
 
 from .tactip import TacTip
 
@@ -34,6 +34,30 @@ class TactipDriver(Node):
         self.declare_parameter('save_directory', 'Please set a save_directory in the launch file')
         self.declare_parameter('zero_when_no_contact', True)
         self.declare_parameter('fake_data', False)
+        # TF frame names. Parameterised so multiple driver instances don't all broadcast the same parent->child edge with conflicting data.
+        self.declare_parameter('sensor_frame', 'present_sensor_frame')
+        self.declare_parameter('contact_frame', 'present_contact_frame_tactipdriver')
+        self.sensor_frame = self.get_parameter('sensor_frame').get_parameter_value().string_value
+        self.contact_frame = self.get_parameter('contact_frame').get_parameter_value().string_value
+        # Model directory: Empty keeps the single-model behaviour. B1 and B2 have different force normalisation limits
+        # and different image processing, so each sensor must load its own model.
+        self.declare_parameter('model_dir', '')
+        # Rotation about Z from the model's output frame to the sensor housing (red mark) frame,
+        # measured per sensor. Fz and vector magnitudes are invariant to it; only in-plane directions (Fx/Fy) are affected. 
+        self.declare_parameter('tactip_angle_deg', 0.0)
+        self.tactip_angle_deg = self.get_parameter('tactip_angle_deg').get_parameter_value().double_value
+        self.r_internal = R.from_euler('z', self.tactip_angle_deg, degrees=True)
+        # Force tare. The model reports a small non-zero force with nothing touching the tip, and
+        # `zero_when_no_contact` publishes exact zeros in that state, so the bias is invisible on
+        # the topic and must be removed here, on the RAW prediction. Runs once at startup with the
+        # sensor untouched; call the `tare_force` service to redo it
+        self.declare_parameter('force_tare_enable', True)
+        self.declare_parameter('force_tare_samples', 15)
+        self.declare_parameter('force_tare_delay_s', 2.0)
+        self.force_tare = np.zeros(3)
+        self._tare_buf = []
+        self._tare_start = time.time()
+        self._tare_done = not self.get_parameter('force_tare_enable').get_parameter_value().bool_value
         self.fake_data = self.get_parameter('fake_data').get_parameter_value().bool_value
         self.image_save_interval = self.get_parameter('save_interval').get_parameter_value().double_value
         self.ssim_threshold = self.get_parameter('ssim_contact_threshold').get_parameter_value().double_value
@@ -44,7 +68,8 @@ class TactipDriver(Node):
         self.get_logger().info(BASE_MODEL_PATH)
         if not self.fake_data:
             # Initialize TacTip sensor
-            self.sensor = TacTip(self.get_parameter('source').get_parameter_value().integer_value)
+            self.sensor = TacTip(self.get_parameter('source').get_parameter_value().integer_value,
+                                 model_dir=self.get_parameter('model_dir').get_parameter_value().string_value)
             self.get_logger().info(f"Reading from /dev/video{self.get_parameter('source').get_parameter_value().integer_value}" )
             self.get_logger().info(f"Sensor processing params: {self.sensor.sensor_params}")
             # Reference image
@@ -89,6 +114,11 @@ class TactipDriver(Node):
             'set_ssim_ref',             # service name
             self.get_ssim_ref_callback  # callback
         )
+        self.srv_tare_force = self.create_service(
+            Trigger,                    # service type
+            'tare_force',               # service name
+            self.tare_force_callback    # callback
+        )
 
         # Set up timer
         self.cycle_counter = 0
@@ -117,6 +147,11 @@ class TactipDriver(Node):
         else:
             sensor_image = self.sensor.process()
         
+        # Collect the force tare before the contact branch below - the no-contact branch skips
+        # prediction entirely, so the tare would never see a frame if it ran after it.
+        if not self._tare_done:
+            self._update_force_tare(sensor_image)
+
         # Get SSIM
         ssim_score = ssim(self.ref_image_ssim, sensor_image.squeeze())
         msg = Float64()
@@ -185,8 +220,8 @@ class TactipDriver(Node):
         # Broadcast the TF
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = "present_sensor_frame"
-        t.child_frame_id = "present_contact_frame_tactipdriver"
+        t.header.frame_id = self.sensor_frame
+        t.child_frame_id = self.contact_frame
         t.transform.translation.x = float(translation_inv[0])/1000.
         t.transform.translation.y = float(translation_inv[1])/1000.
         t.transform.translation.z = float(translation_inv[2])/1000.
@@ -199,14 +234,44 @@ class TactipDriver(Node):
         # ADDED FORCE 
         force_msg = WrenchStamped()
         force_msg.header.stamp = self.get_clock().now().to_msg()
-        force_msg.header.frame_id = "present_sensor_frame"
-        force_msg.wrench.force.x = float(data[12])
-        force_msg.wrench.force.y = float(data[13])
-        force_msg.wrench.force.z = float(data[14])
+        force_msg.header.frame_id = self.sensor_frame
+        # The model predicts force in the sensor's INTERNAL CAMERA frame; rotate into the sensor
+        # housing frame. 
+        raw_force = np.array([float(data[12]), float(data[13]), float(data[14])]) - self.force_tare
+        fx, fy, fz = self.r_internal.apply(raw_force)
+        force_msg.wrench.force.x = float(fx)
+        force_msg.wrench.force.y = float(fy)
+        force_msg.wrench.force.z = float(fz)
         self.publisher_force_.publish(force_msg)
 
+    def _update_force_tare(self, sensor_image):
+        """Average the model's raw force output with nothing touching the tip, and use it as the
+        zero. Called once per cycle until enough frames are gathered."""
+        if (time.time() - self._tare_start) < self.get_parameter('force_tare_delay_s').get_parameter_value().double_value:
+            return
+        data = self.sensor.predict(sensor_image)
+        self._tare_buf.append([float(data[12]), float(data[13]), float(data[14])])
+        n_target = self.get_parameter('force_tare_samples').get_parameter_value().integer_value
+        if len(self._tare_buf) >= n_target:
+            self.force_tare = np.mean(np.asarray(self._tare_buf), axis=0)
+            self._tare_buf = []
+            self._tare_done = True
+            self.get_logger().info(
+                f"Force tare over {n_target} frames: Fx {self.force_tare[0]:+.3f}, "
+                f"Fy {self.force_tare[1]:+.3f}, Fz {self.force_tare[2]:+.3f} N -- subtracted from "
+                "raw predictions from now on.")
 
-    def publish_zero_data(self):  
+    def tare_force_callback(self, request, response):
+        """Redo the force tare. The tip must not be touching anything when this is called."""
+        self._tare_buf = []
+        self._tare_start = time.time()
+        self._tare_done = False
+        response.success = True
+        response.message = 'Force tare restarted -- keep the TacTip clear of contact.'
+        self.get_logger().info(response.message)
+        return response
+
+    def publish_zero_data(self):
         if self.get_parameter('verbose').get_parameter_value().bool_value and self.dimension == 3:
             self.get_logger().info(f"[P_SC] Z (mm): 0.00 \t Rx (deg): 0.00 \t Ry (deg): 0.00 (no contact)")
         elif self.get_parameter('verbose').get_parameter_value().bool_value and self.dimension == 5:
@@ -229,8 +294,8 @@ class TactipDriver(Node):
         # Broadcast the TF
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = "present_sensor_frame"
-        t.child_frame_id = "present_contact_frame_tactipdriver"
+        t.header.frame_id = self.sensor_frame
+        t.child_frame_id = self.contact_frame
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
         t.transform.translation.z = 0.0
@@ -243,7 +308,7 @@ class TactipDriver(Node):
         # forces
         zero_force_msg = WrenchStamped()
         zero_force_msg.header.stamp = self.get_clock().now().to_msg()
-        zero_force_msg.header.frame_id = "present_sensor_frame"
+        zero_force_msg.header.frame_id = self.sensor_frame
 
         zero_force_msg.wrench.force.x = 0.0
         zero_force_msg.wrench.force.y = 0.0
@@ -347,8 +412,8 @@ class TactipDriver(Node):
         # Broadcast the TF
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = "present_sensor_frame"
-        t.child_frame_id = "present_contact_frame_tactipdriver_fake"
+        t.header.frame_id = self.sensor_frame
+        t.child_frame_id = self.contact_frame + "_fake"
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
         t.transform.translation.z = -3.0
@@ -360,7 +425,7 @@ class TactipDriver(Node):
 
         zero_force_msg = WrenchStamped()
         zero_force_msg.header.stamp = self.get_clock().now().to_msg()
-        zero_force_msg.header.frame_id = "present_sensor_frame"
+        zero_force_msg.header.frame_id = self.sensor_frame
         zero_force_msg.wrench.force.x = 0.0
         zero_force_msg.wrench.force.y = 0.0
         zero_force_msg.wrench.force.z = 0.0
