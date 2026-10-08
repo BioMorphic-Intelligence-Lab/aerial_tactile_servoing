@@ -59,7 +59,7 @@ def _build(context, *args, **kwargs):
         sim_launch = os.path.join(
             get_package_share_directory("px4_uam_sim"),
             "launch",
-            "gz_martijn_one_arm.launch.py",
+            "gz_martijn_single_arm.launch.py",
         )
         actions.append(
             IncludeLaunchDescription(
@@ -189,7 +189,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "log_path",
-                default_value="/home/martijn/aerial_tactile_servoing/data/rosbags",
+                default_value=os.path.join(os.path.expanduser("~"), "aerial_tactile_servoing", "data", "rosbags"),
                 description="Directory the recorded rosbag is written to.",
             ),
             DeclareLaunchArgument(

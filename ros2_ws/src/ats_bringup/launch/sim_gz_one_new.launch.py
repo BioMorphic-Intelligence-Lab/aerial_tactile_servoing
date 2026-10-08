@@ -20,7 +20,7 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # Add the paths to the simulation and controller launch files
-    sim_launch_path = os.path.join(get_package_share_directory('px4_uam_sim'), 'launch', 'gz_martijn_one_arm.launch.py')
+    sim_launch_path = os.path.join(get_package_share_directory('px4_uam_sim'), 'launch', 'gz_martijn_single_arm.launch.py')
     ld.add_action(IncludeLaunchDescription(
         PythonLaunchDescriptionSource(sim_launch_path),
         launch_arguments={
@@ -46,7 +46,7 @@ def generate_launch_description():
     # Add the logging
     if logging:
         rosbag_name = 'ros2bag_sim_'+datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        rosbag_path = f'/home/martijn/aerial_tactile_servoing/data/rosbags/{rosbag_name}'
+        rosbag_path = os.path.join(os.path.expanduser('~'), 'aerial_tactile_servoing', 'data', 'rosbags', rosbag_name)
         rosbag_record = ExecuteProcess(
             cmd=['ros2', 'bag', 'record', '-o', rosbag_path, '-a'], 
             output='screen', 
@@ -56,8 +56,8 @@ def generate_launch_description():
 
     mission_director = Node(
         package="mission_director",
-        executable="wallfollow_vbats_mission",
-        name="wallfollow_vbats_mission",
+        executable="vbats",
+        name="mission_director",
         output="screen",
         parameters=[
             {'sm.frequency': 100.0},
