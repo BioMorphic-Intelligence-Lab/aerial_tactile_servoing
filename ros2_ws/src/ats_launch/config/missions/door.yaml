@@ -38,6 +38,7 @@
 /controller:
   ros__parameters:
     frequency: 100.0
+    arm_lengths: [0.12025, 0.336, 0.255]
     Kp_depth: 175.0
     Ki_depth: 20.0
     Kd_depth: 2.0
