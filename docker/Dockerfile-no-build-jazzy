@@ -2,9 +2,6 @@
 # We use 
 FROM ros:jazzy-ros-base
 
-# Set the shell to bash (required for ROS 2 sourcing)
-# RUN rm /bin/sh && ln -s /bin/bash /bin/sh
-
 # Set environment variables
 ENV ROS_DISTRO=jazzy
 ENV ROS_DOMAIN_ID=75
@@ -24,31 +21,6 @@ RUN apt-get update && apt-get install -y \
     python3-rosdep \
     && rm -rf /var/lib/apt/lists/*
 
-# Install GPIO C library
-# RUN git clone https://github.com/orangepi-xunlong/wiringOP.git
-# WORKDIR /wiringOP
-# RUN ./build clean && ./build && echo "BOARD=orangepi5" | sudo tee /etc/orangepi-release
-
-# Configure user
-# ARG USERNAME=ats-devcontainer
-# ARG USER_UID=1000
-# ARG USER_GID=$USER_UID
-
-# Create the user
-#RUN groupadd --gid $USER_GID $USERNAME \
-#    && useradd -s /bin/bash --uid $USER_UID --gid $USER_GID -m $USERNAME \
-#    && mkdir /home/$USERNAME/ros2_ws \
-#    && chown $USER_UID:$USER_GID /home/$USERNAME/ros2_ws
-
-# Set up sudo
-#RUN apt-get update && apt-get install -y sudo \
-#    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
-#    && chmod 0440 /etc/sudoers.d/$USERNAME \
-#    && rm -rf /var/lib/apt/lists/*
-
-# Switch user from root to $USERNAME
-#USER $USERNAME
-
 # Install python dependencies (for TacTip driver)
 RUN pip3 install -U --break-system-packages \
     numpy==1.26.4 \
@@ -61,36 +33,7 @@ RUN pip3 install -U --break-system-packages \
     matplotlib==3.9.2 \
     seaborn==0.13.2
 
-WORKDIR /ros2_ws/aerial_tactile_servoing
+WORKDIR /aerial_tactile_servoing/ros2_ws
 
-# Change working directory to /ros2_ws
-#WORKDIR /ros2_ws
-#RUN sudo chmod 777 -R .
+COPY docker/bashrc /root/.bashrc
 
-# Copy the workspace source code into the container
-#COPY src src
-
-# Get the repository
-#ARG REPO_URL=https://github.com/mbrummelhuis/aerial_tactile_servoing.git
-#RUN git clone --depth 1 --recursive $REPO_URL
-# Idk why but docker submodule update --init --recursive doesn't work
-
-#WORKDIR /home/orangepi
-
-# Install any ROS 2 package dependencies
-#RUN rosdep update \
-#    && rosdep install --from-paths src --ignore-src -r -y
-
-# Build the workspace
-#RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build"
-
-# Copy bashrc for argument completion
-#COPY docker/bashrc /home/$USERNAME/.bashrc
-
-# Define entrypoint bash script
-# First copy the entrypoint script into the container and then execute it with the CMD
-#COPY docker/entrypoint-no-build.sh /entrypoint.sh
-#ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
-
-# CMD is executed and replaced to any arguments passed
-#CMD [ "Please specify a ROS2 launch package and file: <package name> <launch file>" ]

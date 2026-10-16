@@ -28,9 +28,9 @@
     dimension: 5
     verbose: false
     test_model_time: false
-    save_debug_image: true
+    save_debug_image: false
     save_interval: 10.0
-    ssim_contact_threshold: 0.65
+    ssim_contact_threshold: 0.8
     save_directory: /home/martijn/aerial_tactile_servoing/data/tactip_images
     zero_when_no_contact: true
     fake_data: false
@@ -38,19 +38,23 @@
 /controller:
   ros__parameters:
     frequency: 100.0
-    Kp_depth: 40.0
-    Ki_depth: 12.0
+    Kp_depth: 175.0
+    Ki_depth: 20.0
     Kd_depth: 2.0
     Kp_shear: 20.0
     Ki_shear: 2.5
     Kd_shear: 2.0
-    Kp_angular: 0.75
+    Kp_angular: 0.8
     Ki_angular: 0.0
     Kd_angular: 0.45
-    nominal_state: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7854, 0.0, 0.7854]  # elbows at pi/4
-    torque_feedforward_gain: 0.0
+    Kp_secondary: 3.5
+    IK_weights_contact: [25., 25., 10., 10., 1., 20., 1.]
+    IK_weights_flight: [25., 25., 10., 10., 5., 20., 5.]
+    fade_time_ik_weights: 5.0
+    nominal_state: [0., 0., 0., 0., 0., 0., 0.7854, 0.0, 0.7854]
     alpha: 0.1
     windup_clip: 0.15
+    Kp_alt: 0.5
     test_execution_time: false
 
 /planner:

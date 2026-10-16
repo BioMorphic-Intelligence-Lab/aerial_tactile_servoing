@@ -8,13 +8,13 @@ from scipy.spatial.transform import Rotation as R
 
 from tf2_ros import TransformBroadcaster
 from std_msgs.msg import Int8, Int32
-from geometry_msgs.msg import TwistStamped, TransformStamped, Vector3Stamped
+from geometry_msgs.msg import TwistStamped, TransformStamped
 from sensor_msgs.msg import JointState
 from px4_msgs.msg import VehicleOdometry, TrajectorySetpoint
 
 L_1 = 0.12025  # Distance from body frame to first servo axis
 L_2 = 0.336 # Distance from first servo axis to second servo axis
-L_3 = 0.327 # Distance from second servo axis to TacTip sensor
+L_3 = 0.325 # Distance from second servo axis to TacTip sensor
 
 class VelocityBasedATS(Node):
     def __init__(self):

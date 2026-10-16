@@ -32,8 +32,8 @@ def generate_launch_description():
                 launch_arguments={
                     "md_executable": "door",
                     "mission_params": os.path.join(pkg, "config", "missions", "door.yaml"),
-                    "servo_config": os.path.join(pkg, "config", "servo", "vbats.yaml"),
                     "rosbag_prefix": "dooropening",
+                    "morphology": "single_arm",
                     "sim": "false",
                     "fcu_on": LaunchConfiguration("fcu_on"),
                     "logging": LaunchConfiguration("logging"),

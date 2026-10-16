@@ -52,9 +52,9 @@ class UAMStateMachine(Node):
         self.pub_offboard_control_mode = self.create_publisher(OffboardControlMode, '/fmu/in/offboard_control_mode',10)
         self.pub_vehicle_command = self.create_publisher(VehicleCommand, '/fmu/in/vehicle_command', 10)
 
-        self.sub_vehicle_status = self.create_subscription(VehicleStatus, '/fmu/out/vehicle_status_v1', self.vehicle_status_callback, px4_qos_profile)
+        self.sub_vehicle_status = self.create_subscription(VehicleStatus, '/fmu/out/vehicle_status_v4', self.vehicle_status_callback, px4_qos_profile)
         self.sub_vehicle_odometry = self.create_subscription(VehicleOdometry, '/fmu/out/vehicle_odometry', self.vehicle_odometry_callback, px4_qos_profile)
-        self.sub_vehicle_local_position = self.create_subscription(VehicleLocalPosition, '/fmu/out/vehicle_local_position', self.vehicle_local_position_callback, px4_qos_profile)
+        self.sub_vehicle_local_position = self.create_subscription(VehicleLocalPosition, '/fmu/out/vehicle_local_position_v1', self.vehicle_local_position_callback, px4_qos_profile)
 
         # Manipulator interfaces
         self.pub_servo_references = self.create_publisher(JointState, '/servo/in/state', 10)
@@ -241,7 +241,7 @@ class UAMStateMachine(Node):
         self.home_position[0] = self.vehicle_local_position.x
         self.home_position[1] = self.vehicle_local_position.y
         self.home_position[2] = self.vehicle_local_position.z
-        self.home_position[3] = self.vehicle_local_position.heading        
+        self.home_position[3] = self.vehicle_local_position.heading
 
         if (self.home_position[0] == 0.0 and self.home_position[1] == 0.0):        
             self.get_logger().info(f"[ENTRYPOINT] Waiting for position fix!, vehicle_x {self.vehicle_local_position.x:.4f}, vehicle_y {self.vehicle_local_position.y:.4f}", throttle_duration_sec=1)
@@ -266,6 +266,7 @@ class UAMStateMachine(Node):
 
     def state_wait_for_arming(self, next_state='emergency'):
         self.handle_state(state_number=3)
+        self.publish_trajectory_position_setpoint(*self.home_position)
 
         self.get_logger().info('[3] Waiting for arming and offboard mode', throttle_duration_sec=1)
 
@@ -333,7 +334,7 @@ class UAMStateMachine(Node):
     def state_hover(self, duration_sec: float, next_state='emergency'):
         self.handle_state(state_number=10)
 
-        # First state loop
+        # Run once when the state is called for the first time.
         if self.first_state_loop:
             self.hover_position[0] = self.vehicle_local_position.x
             self.hover_position[1] = self.vehicle_local_position.y
@@ -342,6 +343,8 @@ class UAMStateMachine(Node):
             self.get_logger().info(f'[5] Hovering at altitude: {self.home_position[2]:.2f} m for {duration_sec} seconds')
             self.first_state_loop = False
 
+        # Keep publishing position at first state loop as position reference
+        self.publish_trajectory_position_setpoint(*self.hover_position)
         self.get_logger().info(f'Hovering... {(datetime.datetime.now()-self.state_start_time).seconds:.1f}/{duration_sec} sec', throttle_duration_sec=1)
 
         # State transition
@@ -361,7 +364,8 @@ class UAMStateMachine(Node):
     def state_move_arms(self, q_des: list, next_state='emergency', epsilon=0.2): # keep at 0.2 
         self.handle_state(state_number=11)
         error = 0.0
-        # First state loop
+
+        # Run once when the state is called for the first time.
         if self.first_state_loop:
             self.hover_position[0] = self.vehicle_local_position.x
             self.hover_position[1] = self.vehicle_local_position.y
@@ -369,6 +373,9 @@ class UAMStateMachine(Node):
             self.hover_position[3] = self.vehicle_local_position.heading
             self.get_logger().info(f'[11] Hovering at altitude: {self.home_position[2]:.2f} m while moving arms to states {q_des} in mode {self.manipulator_mode}')
             self.first_state_loop = False
+
+        # Keep publishing position at first state loop as position reference
+        self.publish_trajectory_position_setpoint(*self.hover_position)
         
         if self.manipulator_mode=='position': # If the servos are controlled in position mode
             self.publish_servo_position_references(q_des)
@@ -429,42 +436,42 @@ class UAMStateMachine(Node):
         next_state (str, optional): Next state to transition to after completion. Defaults to 'emergency'.
     """
     def state_approach_wall_position(self, approach_speed: list, approach_heading=None, transition: bool=False, next_state='emergency'):
-                self.handle_state(state_number=21)
+        self.handle_state(state_number=21)
 
-                # First state loop
-                if self.first_state_loop:
-                    self.running_position[0] = self.vehicle_local_position.x
-                    self.running_position[1] = self.vehicle_local_position.y
-                    self.running_position[2] = self.vehicle_local_position.z
-                    if approach_heading is None:
-                        self.running_position[3] = self.vehicle_local_position.heading
-                        self.get_logger().info(f'[21] Approaching contact surface at {approach_speed} m/s \t {self.running_position[3]:.3f} rad (no heading provided)')
-                    else:
-                        self.running_position[3] = approach_heading
-                        self.get_logger().info(f'[21] Approaching contact surface at {approach_speed} m/s \t {self.running_position[3]:.3f} rad')
-                    self.first_state_loop = False
+        # First state loop
+        if self.first_state_loop:
+            self.running_position[0] = self.vehicle_local_position.x
+            self.running_position[1] = self.vehicle_local_position.y
+            self.running_position[2] = self.vehicle_local_position.z
+            if approach_heading is None:
+                self.running_position[3] = self.vehicle_local_position.heading
+                self.get_logger().info(f'[21] Approaching contact surface at {approach_speed} m/s \t {self.running_position[3]:.3f} rad (no heading provided)')
+            else:
+                self.running_position[3] = approach_heading
+                self.get_logger().info(f'[21] Approaching contact surface at {approach_speed} m/s \t {self.running_position[3]:.3f} rad')
+            self.first_state_loop = False
 
-                    if len(approach_speed) !=3:
-                        self.get_logger().error(f'Approach speed must be a list of 3 (vx, vy, vz). Got {approach_speed}')
-                        self.transition_to_state('emergency')
-                
-                # Update position setpoint
-                self.running_position[0] += approach_speed[0] / self.frequency  # Increase x at approach
-                self.running_position[1] += approach_speed[1] / self.frequency  # Increase y at approach
-                self.running_position[2] += approach_speed[2] / self.frequency  # Increase z at approach
-                self.get_logger().info(f'Approaching... XYZ setpoint: {self.running_position[0]:.2f}, {self.running_position[1]:.2f}, {self.running_position[2]:.2f} m', throttle_duration_sec=1)
-                self.publish_trajectory_position_setpoint(
-                    self.running_position[0],
-                    self.running_position[1],
-                    self.running_position[2],
-                    self.running_position[3]
-                )
+            if len(approach_speed) !=3:
+                self.get_logger().error(f'Approach speed must be a list of 3 (vx, vy, vz). Got {approach_speed}')
+                self.transition_to_state('emergency')
+        
+        # Update position setpoint
+        self.running_position[0] += approach_speed[0] / self.frequency  # Increase x at approach
+        self.running_position[1] += approach_speed[1] / self.frequency  # Increase y at approach
+        self.running_position[2] += approach_speed[2] / self.frequency  # Increase z at approach
+        self.get_logger().info(f'Approaching... XYZ setpoint: {self.running_position[0]:.2f}, {self.running_position[1]:.2f}, {self.running_position[2]:.2f} m', throttle_duration_sec=1)
+        self.publish_trajectory_position_setpoint(
+            self.running_position[0],
+            self.running_position[1],
+            self.running_position[2],
+            self.running_position[3]
+        )
 
-                # State transition
-                if not self.offboard and self.fcu_on:
-                    self.transition_to_state('emergency')
-                elif transition or self.input_state==1:
-                    self.transition_to_state(new_state=next_state)
+        # State transition
+        if not self.offboard and self.fcu_on:
+            self.transition_to_state('emergency')
+        elif transition or self.input_state==1:
+            self.transition_to_state(new_state=next_state)
 
     def state_approach_wall_velocity(self, approach_speed: list, transition: bool=False, next_state='emergency'): # Better way is to command a negative z velocity on the end-effector and run it through the inverse kinematics
         self.handle_state(state_number=22)
