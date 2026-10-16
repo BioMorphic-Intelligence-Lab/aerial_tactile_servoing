@@ -35,16 +35,21 @@ class DoorMission(TactileMissionDirector):
         self.declare_parameter('im.door_open_angle', 1.5)  # [rad] |door angle| beyond which the door is open
         self.door_open_angle = self.get_parameter('im.door_open_angle').get_parameter_value().double_value
 
-        self.door_angle_value = None
+        self.create_subscription(PoseStamped, '/mocap/door/pose', self.door_callback, 10)
+        self.door_pose = None
 
         self.get_logger().info('DoorMission initialized.')
 
     def door_angle(self):
         """Yaw of the door in the mocap frame [rad], or 0.0 if no pose yet."""
-        if self.door_angle_value is None:
+        if self.door_pose is None:
+            self.get_logger().info('[MD-Door] No door pose, is the door mocap publishing?')
             return 0.0
         q = self.door_pose.pose.orientation
         return R.from_quat([q.x, q.y, q.z, q.w]).as_euler('xyz')[2]
+
+    def door_callback(self,msg):
+        self.door_pose = msg
 
     def execute(self):
         match self.FSM_state:

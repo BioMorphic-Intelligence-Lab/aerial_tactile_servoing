@@ -306,7 +306,7 @@ class UAMStateMachine(Node):
         if not self.offboard and self.fcu_on:
             self.get_logger().info(f'Not in offboard mode, transitioning to emergency state. Offboard {self.offboard}, FCU {self.fcu_on}')
             self.transition_to_state('emergency')
-        elif abs(current_altitude)+0.1 > abs(self.home_position[2]) or self.input_state==1:
+        elif (abs(current_altitude)+0.1 > abs(self.home_position[2]) and abs(self.vehicle_local_position.heading-self.home_position[3])< 0.1) or self.input_state==1:
             self.transition_to_state(new_state=next_state)
             self.flying = True
 
@@ -340,7 +340,7 @@ class UAMStateMachine(Node):
             self.hover_position[1] = self.vehicle_local_position.y
             self.hover_position[2] = self.vehicle_local_position.z
             self.hover_position[3] = self.vehicle_local_position.heading
-            self.get_logger().info(f'[5] Hovering at altitude: {self.home_position[2]:.2f} m for {duration_sec} seconds')
+            self.get_logger().info(f'[5] Hovering at altitude: {self.hover_position[2]:.2f} m, yaw {self.hover_position[3]} for {duration_sec} seconds')
             self.first_state_loop = False
 
         # Keep publishing position at first state loop as position reference
@@ -371,7 +371,7 @@ class UAMStateMachine(Node):
             self.hover_position[1] = self.vehicle_local_position.y
             self.hover_position[2] = self.vehicle_local_position.z
             self.hover_position[3] = self.vehicle_local_position.heading
-            self.get_logger().info(f'[11] Hovering at altitude: {self.home_position[2]:.2f} m while moving arms to states {q_des} in mode {self.manipulator_mode}')
+            self.get_logger().info(f'[11] Hovering at altitude: {self.hover_position[2]:.2f} m while moving arms to states {q_des} in mode {self.manipulator_mode}')
             self.first_state_loop = False
 
         # Keep publishing position at first state loop as position reference
