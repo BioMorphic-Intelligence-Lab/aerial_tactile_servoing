@@ -95,8 +95,8 @@ class UAMStateMachine(Node):
     def publish_trajectory_position_setpoint(self, x: float, y: float, z: float, yaw: float, yawspeed: float = 0.):
         # If clipping is not zero, clip the position
         if self.position_clip > 0.1:
-            x_clipped = np.clip(x, -self.position_clip, self.position_clip)
-            y_clipped = np.clip(y, -self.position_clip, self.position_clip)
+            x_clipped = np.clip(x, -self.position_clip+self.home_position[0], self.position_clip+self.home_position[0])
+            y_clipped = np.clip(y, -self.position_clip+self.home_position[1], self.position_clip+self.home_position[1])
             z_clipped = np.clip(z, -self.position_clip, 0.0) # Negative up
             if (x != x_clipped) or (y != y_clipped) or (z != z_clipped):
                 self.get_logger().warn(f"Position setpoint clipped to ({x_clipped:.2f}, {y_clipped:.2f}, {z_clipped:.2f}) from ({x:.2f}, {y:.2f}, {z:.2f})", throttle_duration_sec=1)
