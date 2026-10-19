@@ -63,16 +63,85 @@ echo "  from: $REMOTE_USER@$REMOTE_HOST:$REMOTE_DATA_DIR/"
 echo "  to:   $LOCAL_DATA_DIR/"
 echo
 
+# Per-run itemized record of what rsync actually transferred, used to build the
+# "Downloaded" report below. Kept separate from the terminal/log output so the
+# live progress view stays clean. Cleaned up on exit.
+RUN_LOG="$(mktemp)"
+trap 'rm -f "$RUN_LOG"' EXIT
+
 # Trailing slashes: copy the CONTENTS of the remote data dir into the local one.
-# -a          archive (recursive, preserves times/perms) — handles files & dirs
-# --partial   keep partly-transferred files so the next run resumes them
-# --info=...  concise per-file + overall progress
+# -a                 archive (recursive, preserves times/perms) — files & dirs
+# --partial          keep partly-transferred files so the next run resumes them
+# --info=...         concise overall progress on the terminal
+# --log-file[-format] write one 'XFER|<itemize>|<path>' line per updated item to
+#                    RUN_LOG (independent of stdout) so we can report precisely
+#                    what was downloaded.
 rsync -a --partial --human-readable \
     --info=progress2,name0,stats1 \
+    --log-file="$RUN_LOG" --log-file-format='XFER|%i|%n' \
     "${RSYNC_EXTRA[@]}" \
     -e "ssh -i $SSH_KEY" \
     "$REMOTE_USER@$REMOTE_HOST:$REMOTE_DATA_DIR/" \
     "$LOCAL_DATA_DIR/" 2>&1 | tee -a "$LOG_FILE"
+
+# ==== REPORT WHAT WAS DOWNLOADED ====
+# Parse the per-run log. Each transferred item was logged (behind rsync's own
+# timestamp/pid prefix) as 'XFER|<itemize>|<path>'. A leading '>' in the
+# itemize code means the item was received from the drone, i.e. downloaded.
+declare -A folder_got       # downloaded-file count per top-level folder
+downloaded_files=()         # every downloaded file, relative to the data dir
+top_level_files=()          # downloaded files sitting directly in the data dir
+
+while IFS= read -r entry; do
+    entry="${entry#XFER|}"              # -> '<code>|<path>'
+    code="${entry%%|*}"
+    path="${entry#*|}"
+    [[ "$code" == '>'* ]] || continue           # only received (downloaded) files
+    [[ -n "$path" && "$path" != */ ]] || continue   # skip dirs / blank lines
+    downloaded_files+=("$path")
+    if [[ "$path" == */* ]]; then
+        top="${path%%/*}"
+        folder_got["$top"]=$(( ${folder_got["$top"]:-0} + 1 ))
+    else
+        top_level_files+=("$path")
+    fi
+done < <(grep -o 'XFER|.*' "$RUN_LOG" || true)
+
+# Build the report. A top-level folder is collapsed to a single line when every
+# file it now holds locally came from this run ("entirely downloaded");
+# otherwise the specific files that were downloaded under it are listed. Files
+# that live directly in the data dir are always listed individually.
+report=()
+if (( ${#folder_got[@]} )); then
+    for top in $(printf '%s\n' "${!folder_got[@]}" | sort); do
+        want=${folder_got["$top"]}
+        have=$(find "$LOCAL_DATA_DIR/$top" -type f 2>/dev/null | wc -l)
+        if (( have == want )); then
+            report+=("$top/   (entire folder — $want file(s))")
+        else
+            for p in "${downloaded_files[@]}"; do
+                [[ "$p" == "$top/"* ]] && report+=("$p")
+            done
+        fi
+    done
+fi
+if (( ${#top_level_files[@]} )); then
+    for p in "${top_level_files[@]}"; do report+=("$p"); done
+fi
+
+echo
+if (( ${#report[@]} == 0 )); then
+    echo "Nothing to download — local data already up to date."
+else
+    if [[ "$MODE" == "dry-run" ]]; then
+        echo "Would download:"
+    else
+        echo "Downloaded:"
+    fi
+    for line in "${report[@]}"; do
+        echo "  $line"
+    done
+fi
 
 echo
 if [[ "$MODE" == "dry-run" ]]; then
