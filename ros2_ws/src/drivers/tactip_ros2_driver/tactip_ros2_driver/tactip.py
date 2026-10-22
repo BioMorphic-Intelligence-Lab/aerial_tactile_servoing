@@ -13,23 +13,13 @@ from .dependencies.label_encoder import BASE_MODEL_PATH
 from .dependencies.labelled_model import LabelledModel
 
 
-def resolve_model_dir(model_dir):
-    """None -> the default model directory; an absolute path -> itself; a bare name ->
-    share/tactip_ros2_driver/models/<name>."""
-    if not model_dir:
-        return BASE_MODEL_PATH
-    if os.path.isabs(model_dir):
-        return model_dir
-    return os.path.join(os.path.dirname(BASE_MODEL_PATH), 'models', model_dir)
-
-
 class TacTip:
-    def __init__(self, source = 4, model_dir = None):
+    def __init__(self, source, model_name):
         """model_dir: absolute path to a model directory, or a bare name resolved against
         share/tactip_ros2_driver/models/. None keeps the single-model path so existing
         single-arm missions are unaffected. B1 and B2 are physically different sensors with their
         own force limits and image processing, so each instance must load its own model."""
-        self.model_path = resolve_model_dir(model_dir)
+        self.model_path = os.path.join(BASE_MODEL_PATH,model_name)
 
         # Params are loaded before opening the camera so the exposure below can come from them.
         self.model_label_params = {}
@@ -40,10 +30,10 @@ class TacTip:
 
         # set up the camera
         self.source = source
-        #self.cam = cv2. VideoCapture(self.source)
         self.cam = cv2.VideoCapture(self.source, cv2.CAP_V4L2)
-        #for _ in range(10):
-        #    self.cam.read()
+        self.cam.open(self.source, cv2.CAP_V4L2)
+        for _ in range(10):
+            self.cam.read()
 
         # Ask for the frame size the model was trained on. OpenCV otherwise opens the camera in its
         # DEFAULT mode, which is not necessarily its maximum -> and a smaller frame would silently
@@ -76,7 +66,7 @@ class TacTip:
         if self.expected_size is not None:
             ok, probe = self.cam.read()
             if not ok or probe is None:
-                raise Exception(f"Camera /dev/video{self.source} opened but returned no frame.")
+                raise Exception(f"Camera /dev/video{self.source} opened but returned no frame (ok: {ok}).")
             h, w = probe.shape[:2]
             if (w, h) != self.expected_size:
                 raise Exception(

@@ -1,7 +1,6 @@
 import rclpy
 from rclpy.node import Node
 import time
-import datetime
 import os
 
 import numpy as np
@@ -12,93 +11,66 @@ from geometry_msgs.msg import TwistStamped, TransformStamped, WrenchStamped
 from std_msgs.msg import Float64, Int8
 from tf2_ros import TransformBroadcaster
 
-from std_srvs.srv import SetBool, Trigger
+from std_srvs.srv import SetBool
 
 from .tactip import TacTip
-
-from .dependencies.label_encoder import BASE_MODEL_PATH
 
 class TactipDriver(Node):
     def __init__(self):
         super().__init__('tactip_driver')
 
         # Parameters
-        self.declare_parameter('source', 0)
+        # Sensor-specific
+        self.declare_parameter('sources', [0])
+        self.declare_parameter('dimensions', [8])
+        self.declare_parameter('ssim_contact_thresholds', [0.9])
+        self.declare_parameter('model_names', ['model_name'])
+
+        # Node-level
         self.declare_parameter('frequency', 10.)
-        self.declare_parameter('dimension', 8)
+        self.declare_parameter('fake_data', False)
         self.declare_parameter('verbose', True)
         self.declare_parameter('test_model_time', False)
-        self.declare_parameter('save_debug_image', False)
-        self.declare_parameter('save_interval', 1.)
-        self.declare_parameter('ssim_contact_threshold', 0.9)
-        self.declare_parameter('save_directory', 'Please set a save_directory in the launch file')
         self.declare_parameter('zero_when_no_contact', True)
-        self.declare_parameter('fake_data', False)
-        # TF frame names. Parameterised so multiple driver instances don't all broadcast the same parent->child edge with conflicting data.
-        self.declare_parameter('sensor_frame', 'present_sensor_frame')
-        self.declare_parameter('contact_frame', 'present_contact_frame_tactipdriver')
-        self.sensor_frame = self.get_parameter('sensor_frame').get_parameter_value().string_value
-        self.contact_frame = self.get_parameter('contact_frame').get_parameter_value().string_value
-        # Model directory: Empty keeps the single-model behaviour. B1 and B2 have different force normalisation limits
-        # and different image processing, so each sensor must load its own model.
-        self.declare_parameter('model_dir', '')
-        # Rotation about Z from the model's output frame to the sensor housing (red mark) frame,
-        # measured per sensor. Fz and vector magnitudes are invariant to it; only in-plane directions (Fx/Fy) are affected. 
-        self.declare_parameter('tactip_angle_deg', 0.0)
-        self.tactip_angle_deg = self.get_parameter('tactip_angle_deg').get_parameter_value().double_value
-        self.r_internal = R.from_euler('z', self.tactip_angle_deg, degrees=True)
-        # Force tare. The model reports a small non-zero force with nothing touching the tip, and
-        # `zero_when_no_contact` publishes exact zeros in that state, so the bias is invisible on
-        # the topic and must be removed here, on the RAW prediction. Runs once at startup with the
-        # sensor untouched; call the `tare_force` service to redo it
-        self.declare_parameter('force_tare_enable', True)
-        self.declare_parameter('force_tare_samples', 15)
-        self.declare_parameter('force_tare_delay_s', 2.0)
-        self.force_tare = np.zeros(3)
-        self._tare_buf = []
-        self._tare_start = time.time()
-        self._tare_done = not self.get_parameter('force_tare_enable').get_parameter_value().bool_value
+
+        # Grabbing the parameters
         self.fake_data = self.get_parameter('fake_data').get_parameter_value().bool_value
-        self.image_save_interval = self.get_parameter('save_interval').get_parameter_value().double_value
-        self.ssim_threshold = self.get_parameter('ssim_contact_threshold').get_parameter_value().double_value
-        self.dimension = self.get_parameter('dimension').get_parameter_value().integer_value
+        self.ssim_thresholds = self.get_parameter('ssim_contact_thresholds').get_parameter_value().double_array_value
+        self.model_names = self.get_parameter('model_names').get_parameter_value().string_array_value
+        self.dimensions = self.get_parameter('dimensions').get_parameter_value().integer_array_value
+
+        # Initializing lists
+        self.sensors = []
+        self.sensor_frames = []
+        self.contact_frames = []
+        self.pose_publishers_ = []
+        self.wrench_publishers_ = []
+        self.ssim_publishers_ = []
+        self.contact_publishers_ = []
+        self.ref_ssim_images_ = []
+
+        # Other node data
+        self.fake_channels = None
 
         # Node feedback
-        self.get_logger().info("Tactip driver initialized with dimension: "+str(self.dimension))
-        self.get_logger().info(BASE_MODEL_PATH)
+        self.get_logger().info("Tactip driver initialized with dimensions: "+str(self.dimensions))
+
+        # Initialize the sensor(s)
         if not self.fake_data:
-            # Initialize TacTip sensor
-            self.sensor = TacTip(self.get_parameter('source').get_parameter_value().integer_value,
-                                 model_dir=self.get_parameter('model_dir').get_parameter_value().string_value)
-            self.get_logger().info(f"Reading from /dev/video{self.get_parameter('source').get_parameter_value().integer_value}" )
-            self.get_logger().info(f"Sensor processing params: {self.sensor.sensor_params}")
-            # Reference image
-            self.ref_image_ssim = self.sensor.process().squeeze()
+            # Initialize TacTip sensors
+            for i, s in enumerate(self.get_parameter('sources').get_parameter_value().integer_array_value):
+                self.sensors.append(TacTip(s,self.model_names[i]))
+                self.get_logger().info(f"Start sensor {i}, reading from /dev/video{s}" )
+                self.get_logger().info(f"Sensor processing params: {self.sensors[-1].sensor_params}")
+
+                # Reference SSIM image
+                self.ref_ssim_images_.append(self.sensors[-1].process().squeeze())
+            # Create publishers
+            self.create_publishers_(list(self.get_parameter('sources').get_parameter_value().integer_array_value))
         else:
-            self.get_logger().info("Using fake data mode. No camera input.")
-
-        # Set up period image saving if enabled in launch
-        if self.get_parameter('save_debug_image').get_parameter_value().bool_value and not self.fake_data:
-            # Set up image save directory and make if it does not exist
-            self.image_outfile_path = os.path.join(self.get_parameter('save_directory').get_parameter_value().string_value, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
-            self.get_logger().info(f'Saving debug images in {self.image_outfile_path}')
-            if not os.path.exists(self.image_outfile_path):
-                os.makedirs(self.image_outfile_path)
-            self.img_counter = 0
-            if len(os.listdir(self.image_outfile_path)) != 0: # If directory is not empty, exit to avoid overwriting data
-                self.get_logger().info(os.listdir(self.image_outfile_path))
-                self.get_logger().error("Directory not empty. Please delete or move data before proceeding.")
-                self.get_logger().error("Node will now exit. Please kill stack with  Ctrl+C.")
-                return
-            else:
-                with open(os.path.join(self.image_outfile_path, 'image_list.csv'), 'w') as f:
-                    f.writelines([f"Image number, contact, shear_x, shear_y, pose_z, pose_Rx, pose_Ry, shear_Rz \n"]) # Create empty csv file to log images
-
-        # publishers
-        self.publisher_pose_ = self.create_publisher(TwistStamped, '/tactip/pose', 10)
-        self.publisher_ssim_ = self.create_publisher(Float64, '/tactip/ssim', 10)
-        self.publisher_contact_ = self.create_publisher(Int8, '/tactip/contact', 10)
-        self.publisher_force_ = self.create_publisher(WrenchStamped, '/tactip/force', 10)
+            self.fake_channels = len(self.get_parameter('sources').get_parameter_value().integer_array_value)
+            self.get_logger().info(f"Using fake data mode on {self.fake_channels}. No camera input.")
+            self.create_publishers_(range(self.fake_channels))             
 
         # Broadcaster TF
         self.broadcaster_tf = TransformBroadcaster(self)
@@ -108,18 +80,13 @@ class TactipDriver(Node):
             self.get_logger().info("Testing model execution time. It will run 1000 predictions through the model and print the average time taken.")
             self.test_model_execution_time()
 
-        # Start service
+        # Start service to refresh SSIM of all images
         self.srv_get_ssim_ref = self.create_service(
             SetBool,                    # service type
             'set_ssim_ref',             # service name
             self.get_ssim_ref_callback  # callback
         )
-        self.srv_tare_force = self.create_service(
-            Trigger,                    # service type
-            'tare_force',               # service name
-            self.tare_force_callback    # callback
-        )
-
+ 
         # Set up timer
         self.cycle_counter = 0
         self.frequency = self.get_parameter('frequency').get_parameter_value().double_value
@@ -129,57 +96,28 @@ class TactipDriver(Node):
     def timer_callback(self):
         # Fake data hijack
         if self.fake_data:
-            self.publish_fake_data()
+            for i in range(self.fake_channels):
+                self.publish_fake_data(index=i)
             return
 
-        # read the data
-        # Save an image every second
-        if self.get_parameter('save_debug_image').get_parameter_value().bool_value and self.cycle_counter%int(self.frequency*self.image_save_interval) == 0:
-            raw_outfile = os.path.join(self.image_outfile_path,'raw_image'+str(self.img_counter)+'.png')
-            proc_outfile = os.path.join(self.image_outfile_path,'sensor_image'+str(self.img_counter)+'.png')
-            sensor_image = self.sensor.process(raw_outfile=raw_outfile, proc_outfile=proc_outfile)
-            if self.get_parameter('verbose').get_parameter_value().bool_value:
-                self.get_logger().info(f"Saving image number {self.img_counter} in location {raw_outfile}")
-            self.img_counter += 1
-            self.cycle_counter = 0
+        # Evaluate for each sensor
+        for i, sensor in enumerate(self.sensors):
+            sensor_image = sensor.process()
+            ssim_score = ssim(self.ref_ssim_images_[i], sensor_image.squeeze())
 
-        # Just read data without saving
-        else:
-            sensor_image = self.sensor.process()
-        
-        # Collect the force tare before the contact branch below - the no-contact branch skips
-        # prediction entirely, so the tare would never see a frame if it ran after it.
-        if not self._tare_done:
-            self._update_force_tare(sensor_image)
-
-        # Get SSIM
-        ssim_score = ssim(self.ref_image_ssim, sensor_image.squeeze())
-        msg = Float64()
-        msg.data = ssim_score
-        self.publisher_ssim_.publish(msg)
-
-        # Deduce contact, if contact, publish real data
-        if ssim_score < self.ssim_threshold:
-            contact = True
-            self.publish_real_data(sensor_image, contact)
-        else:
-            contact = False
-            if self.get_parameter('zero_when_no_contact').get_parameter_value().bool_value:
-                self.publish_zero_data()
+            # Deduce contact, if contact, publish real data
+            if ssim_score < self.ssim_thresholds[i]: # contact true
+                self.publish_real_data_(index=i, sensor_image=sensor_image, ssim=ssim_score)
             else:
-                self.publish_real_data(sensor_image, contact)
-        msg = Int8()
-        msg.data = contact
-        self.publisher_contact_.publish(msg)
+                if self.get_parameter('zero_when_no_contact').get_parameter_value().bool_value:
+                    self.publish_zero_data_(index=i, ssim=ssim_score)
+                else:
+                    self.publish_real_data_(index=i, sensor_image=sensor_image, ssim=ssim_score)
 
         self.cycle_counter +=1
 
-    def publish_real_data(self, sensor_image, contact:bool):
-        data = self.sensor.predict(sensor_image)
-
-        if self.get_parameter('save_debug_image').get_parameter_value().bool_value and self.cycle_counter%int(self.frequency*self.image_save_interval) == 0:
-            with open(os.path.join(self.image_outfile_path, 'image_list.csv'), 'a') as f:
-                f.writelines([f"{self.img_counter}, {contact}, {data[6]:.2f}, {data[7]:.2f}, {data[2]:.2f}, {data[3]:.2f}, {data[4]:.2f}, {data[11]:.2f} \n"]) # Log image data
+    def publish_real_data_(self, index: int, sensor_image, ssim: float):
+        data = self.sensors[index].predict(sensor_image)
 
         # Convention: Tactip outputs own pose in the contact frame (P_CS)
         data[2] = -data[2]  # Invert Z to comply with convention -
@@ -188,159 +126,56 @@ class TactipDriver(Node):
         data[6] = -data[6]  # Invert shear x to comply with convention
         data[7] = data[7]  # Invert shear y to comply with convention -
 
-        # Alternative convention: Tactip outputs pose of contact in sensor frame (P_SC)
-        # data[2] = data[2]  # Invert Z to comply with convention
-        
+        if self.dimensions[index]>6:
+            wrench = [data[12], data[13], data[14], 0.0, 0.0, 0.0] # fx, fy, fz
+        else:
+            wrench = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
-        if self.get_parameter('verbose').get_parameter_value().bool_value and self.dimension == 3:
-            self.get_logger().info(f"[P_CS] Z (mm): {data[2]:.2f} \t Rx (deg): {data[3]:.2f} \t Ry (deg): {data[4]:.2f}")
-        
-        elif self.get_parameter('verbose').get_parameter_value().bool_value and self.dimension == 5:
-            self.get_logger().info(f"[P_CS] X (mm): {data[6]:.2f} \t Y (mm): {data[7]:.2f} \t Z (mm): {data[2]:.2f} \t Rx (deg): {data[3]:.2f} \t Ry (deg): {data[4]:.2f}")
+        self.publish_data_(index=index,
+                           ssim=ssim,
+                           pose=[data[6], data[7], data[2], data[3], data[4], 0.0],
+                           wrench=wrench)
 
-        # publish the data
-        # The model outputs are in mm and deg, so convert to SI
-        msg = TwistStamped()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.twist.linear.x = data[6] # in mm
-        msg.twist.linear.y = data[7] # in mm
-        msg.twist.linear.z = data[2] # in mm
-        msg.twist.angular.x = data[3] # in deg
-        msg.twist.angular.y = data[4] # in deg
-        msg.twist.angular.z = 0.0 # in deg
-        self.publisher_pose_.publish(msg)
-        #self.get_logger().info(f"Published data: {msg}")
+    def publish_zero_data_(self, index, ssim):
+        self.publish_data_(index=index,
+                            ssim=ssim,
+                            pose=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                            wrench=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
-        # Invert the transform
-        q = R.from_euler('xyz', [np.deg2rad(data[3]), np.deg2rad(data[4]), np.deg2rad(data[5])]).as_quat()
-        q_inv = np.array([-q[0], -q[1], -q[2], q[3]])
-        R_inv = R.from_quat(q_inv).as_matrix()
-        translation_inv = - (R_inv @ np.array([data[6],data[7],data[2]]))
-
-        # Broadcast the TF
-        t = TransformStamped()
-        t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = self.sensor_frame
-        t.child_frame_id = self.contact_frame
-        t.transform.translation.x = float(translation_inv[0])/1000.
-        t.transform.translation.y = float(translation_inv[1])/1000.
-        t.transform.translation.z = float(translation_inv[2])/1000.
-        t.transform.rotation.x = float(q_inv[0])
-        t.transform.rotation.y = float(q_inv[1])
-        t.transform.rotation.z = float(q_inv[2])
-        t.transform.rotation.w = float(q_inv[3])
-        self.broadcaster_tf.sendTransform(t) 
-
-        # ADDED FORCE 
-        force_msg = WrenchStamped()
-        force_msg.header.stamp = self.get_clock().now().to_msg()
-        force_msg.header.frame_id = self.sensor_frame
-        # The model predicts force in the sensor's INTERNAL CAMERA frame; rotate into the sensor
-        # housing frame. 
-        raw_force = np.array([float(data[12]), float(data[13]), float(data[14])]) - self.force_tare
-        fx, fy, fz = self.r_internal.apply(raw_force)
-        force_msg.wrench.force.x = float(fx)
-        force_msg.wrench.force.y = float(fy)
-        force_msg.wrench.force.z = float(fz)
-        self.publisher_force_.publish(force_msg)
-
-    def _update_force_tare(self, sensor_image):
-        """Average the model's raw force output with nothing touching the tip, and use it as the
-        zero. Called once per cycle until enough frames are gathered."""
-        if (time.time() - self._tare_start) < self.get_parameter('force_tare_delay_s').get_parameter_value().double_value:
-            return
-        data = self.sensor.predict(sensor_image)
-        self._tare_buf.append([float(data[12]), float(data[13]), float(data[14])])
-        n_target = self.get_parameter('force_tare_samples').get_parameter_value().integer_value
-        if len(self._tare_buf) >= n_target:
-            self.force_tare = np.mean(np.asarray(self._tare_buf), axis=0)
-            self._tare_buf = []
-            self._tare_done = True
-            self.get_logger().info(
-                f"Force tare over {n_target} frames: Fx {self.force_tare[0]:+.3f}, "
-                f"Fy {self.force_tare[1]:+.3f}, Fz {self.force_tare[2]:+.3f} N -- subtracted from "
-                "raw predictions from now on.")
-
-    def tare_force_callback(self, request, response):
-        """Redo the force tare. The tip must not be touching anything when this is called."""
-        self._tare_buf = []
-        self._tare_start = time.time()
-        self._tare_done = False
-        response.success = True
-        response.message = 'Force tare restarted -- keep the TacTip clear of contact.'
-        self.get_logger().info(response.message)
-        return response
-
-    def publish_zero_data(self):
-        if self.get_parameter('verbose').get_parameter_value().bool_value and self.dimension == 3:
-            self.get_logger().info(f"[P_SC] Z (mm): 0.00 \t Rx (deg): 0.00 \t Ry (deg): 0.00 (no contact)")
-        elif self.get_parameter('verbose').get_parameter_value().bool_value and self.dimension == 5:
-            self.get_logger().info(f"[P_SC] X (mm): 0.00 \t Y (mm): 0.00 \t Z (mm): 0.00 \t Rx (deg): 0.00 \t Ry (deg): 0.00 (no contact)")
-
-        if self.get_parameter('save_debug_image').get_parameter_value().bool_value and self.cycle_counter%int(self.frequency*self.image_save_interval) == 0:
-            with open(os.path.join(self.image_outfile_path, 'image_list.csv'), 'a') as f:
-                f.writelines([f"{self.img_counter}, {False}, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00 \n"]) # Log image data
-
-        msg = TwistStamped()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.twist.linear.x = 0.0
-        msg.twist.linear.y = 0.0
-        msg.twist.linear.z = 0.0
-        msg.twist.angular.x = 0.0
-        msg.twist.angular.y = 0.0
-        msg.twist.angular.z = 0.0
-        self.publisher_pose_.publish(msg)
-
-        # Broadcast the TF
-        t = TransformStamped()
-        t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = self.sensor_frame
-        t.child_frame_id = self.contact_frame
-        t.transform.translation.x = 0.0
-        t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.0
-        t.transform.rotation.x = 0.0
-        t.transform.rotation.y = 0.0
-        t.transform.rotation.z = 0.0
-        t.transform.rotation.w = 1.0
-        self.broadcaster_tf.sendTransform(t)
-
-        # forces
-        zero_force_msg = WrenchStamped()
-        zero_force_msg.header.stamp = self.get_clock().now().to_msg()
-        zero_force_msg.header.frame_id = self.sensor_frame
-
-        zero_force_msg.wrench.force.x = 0.0
-        zero_force_msg.wrench.force.y = 0.0
-        zero_force_msg.wrench.force.z = 0.0
-
-        self.publisher_force_.publish(zero_force_msg)
-
+    def publish_fake_data(self, index):
+        self.publish_data_(
+            index=index,
+            ssim=0.3,
+            pose=[0.0, 0.0, -3.0, 0.0, 0.0, 0.0],
+            wrench=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
     def test_model_execution_time(self, iterations = 1000):
         start_time = time.time()
-        capture_time = []
-        predict_time = []
+        capture_time = np.zeros((len(self.sensors), iterations))
+        predict_time = np.zeros((len(self.sensors), iterations))
         for i in range(iterations):
-            capture_start_time = time.time()
-            processed_image = self.sensor.process()
-            capture_end_time = time.time()
-            _ = self.sensor.predict(processed_image)
-            predict_end_time = time.time()
-            capture_time.append(capture_end_time - capture_start_time)
-            predict_time.append(predict_end_time - capture_end_time)
+            for s, sensor in enumerate(self.sensors):
+                capture_start_time = time.time()
+                processed_image = sensor.process()
+                capture_end_time = time.time()
+                _ = sensor.predict(processed_image)
+                predict_end_time = time.time()
+                capture_time[s, i] = capture_end_time - capture_start_time
+                predict_time[s, i] = predict_end_time - capture_end_time
         end_time = time.time()
-        self.get_logger().info(f"Time taken for {iterations} iterations: {end_time - start_time} [seconds]")
+        self.get_logger().info(f"Total time taken for {iterations} iterations: {end_time - start_time} [seconds]")
         self.get_logger().info(f"Average time taken: {(end_time - start_time)/iterations} [seconds/it]")
         self.get_logger().info(f"Iterations per second: {iterations/(end_time - start_time)} [it/s]")
-        self.get_logger().info(f"Average capture time: {sum(capture_time)/iterations} [seconds/it]")
-        self.get_logger().info(f"Average predict time: {sum(predict_time)/iterations} [seconds/it]")
+        for s, sensor in enumerate(self.sensors):
+            self.get_logger().info(f"[{s}] Average capture time: {sum(capture_time[s,:])/iterations} [seconds/it]")
+            self.get_logger().info(f"[{s}] Average predict time: {sum(predict_time[s,:])/iterations} [seconds/it]")
 
     def get_ssim_ref_callback(self, request, response):
         # This is a dummy service callback. You can implement functionality to update the reference image or return the current reference image's SSIM score.
         self.get_logger().info("Received request for SSIM reference.")
         if request.data:
-            self.ref_image_ssim = self.sensor.process().squeeze()
+            for i, sensor in enumerate(self.sensors):
+                self.ref_ssim_images_[i] = sensor.process().squeeze()
         response.success = True
         return response
     
@@ -385,51 +220,81 @@ class TactipDriver(Node):
         P_CS[3,1] = 0
         P_CS[3,2] = 0
         P_CS[3,3] = 1
-    
-    def publish_fake_data(self):
-        # Generate fake data for testing without camera
+
+    def publish_data_(self, index: int, ssim:float=None, pose: list=None, wrench: list=None):
+        if len(pose)>6:
+            self.get_logger().warn(f"Pose too large, ignoring extra data")
+
+        # Output the data if verbose set to True
+        if self.get_parameter('verbose').get_parameter_value().bool_value:
+            self.print_data_(index, pose, wrench)
+        
+        msg_ssim = Float64()
+        msg_ssim.data = ssim
+        self.ssim_publishers_[index].publish(msg_ssim)
+
+        msg_contact = Int8()
+        msg_contact.data = int(ssim < self.ssim_thresholds[index])
+        self.contact_publishers_[index].publish(msg_contact)
+
         msg = TwistStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
-        t = time.time()
-        msg.twist.linear.x = 0.0 # in mm
-        msg.twist.linear.y = 0.0 # in mm
-        msg.twist.linear.z = -3.0 # in mm
-        msg.twist.angular.x = 0.0 # in deg
-        msg.twist.angular.y = 0.0 # in deg
-        msg.twist.angular.z = 0.0 # in deg
-        self.publisher_pose_.publish(msg)
+        msg.twist.linear.x = pose[0]
+        msg.twist.linear.y = pose[1]
+        msg.twist.linear.z = pose[2]
+        msg.twist.angular.x = pose[3]
+        msg.twist.angular.y = pose[4]
+        msg.twist.angular.z = pose[5]
+        self.pose_publishers_[index].publish(msg)
 
-        ssim_score = 0.3
-        msg_ssim = Float64()
-        msg_ssim.data = ssim_score
-        self.publisher_ssim_.publish(msg_ssim)
-
-        contact = ssim_score < self.ssim_threshold
-        msg_contact = Int8()
-        msg_contact.data = contact
-        self.publisher_contact_.publish(msg_contact)
+        # Invert the transform in quaternion form
+        q = R.from_euler('xyz', [np.deg2rad(pose[3]), np.deg2rad(pose[4]), np.deg2rad(pose[5])]).as_quat()
+        q_inv = np.array([-q[0], -q[1], -q[2], q[3]])
+        R_inv = R.from_quat(q_inv).as_matrix()
+        translation_inv = - (R_inv @ np.array([pose[0], pose[1], pose[2]]))
 
         # Broadcast the TF
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = self.sensor_frame
-        t.child_frame_id = self.contact_frame + "_fake"
-        t.transform.translation.x = 0.0
-        t.transform.translation.y = 0.0
-        t.transform.translation.z = -3.0
-        t.transform.rotation.x = 0.0
-        t.transform.rotation.y = 0.0
-        t.transform.rotation.z = 0.0
-        t.transform.rotation.w = 1.0
-        self.broadcaster_tf.sendTransform(t)
+        t.header.frame_id = self.sensor_frames[index]
+        t.child_frame_id = self.contact_frames[index]
+        t.transform.translation.x = float(translation_inv[0])/1000.
+        t.transform.translation.y = float(translation_inv[1])/1000.
+        t.transform.translation.z = float(translation_inv[2])/1000.
+        t.transform.rotation.x = float(q_inv[0])
+        t.transform.rotation.y = float(q_inv[1])
+        t.transform.rotation.z = float(q_inv[2])
+        t.transform.rotation.w = float(q_inv[3])
+        self.broadcaster_tf.sendTransform(t) 
 
-        zero_force_msg = WrenchStamped()
-        zero_force_msg.header.stamp = self.get_clock().now().to_msg()
-        zero_force_msg.header.frame_id = self.sensor_frame
-        zero_force_msg.wrench.force.x = 0.0
-        zero_force_msg.wrench.force.y = 0.0
-        zero_force_msg.wrench.force.z = 0.0
-        self.publisher_force_.publish(zero_force_msg)
+        if self.wrench_publishers_ and wrench:
+            wrench_msg = WrenchStamped()
+            wrench_msg.header.stamp = self.get_clock().now().to_msg()
+            wrench_msg.header.frame_id = self.contact_frames[index]
+            wrench_msg.wrench.force.x = wrench[0]
+            wrench_msg.wrench.force.y = wrench[1]
+            wrench_msg.wrench.force.z = wrench[2]
+            wrench_msg.wrench.torque.x = wrench[3]
+            wrench_msg.wrench.torque.y = wrench[4]
+            wrench_msg.wrench.torque.z = wrench[5]
+            self.wrench_publishers_[index].publish(wrench_msg)
+    
+    def print_data_(self, index: int, pose: list, wrench: list):
+            if self.dimensions[index]<=6:
+                self.get_logger().info(f"Outputs for Tactip {index}: \n Pose x {pose[0]:.2f}, y {pose[1]:.2f}, z {pose[2]:.2f}, Rx {pose[3]:.2f}, Ry {pose[4]:.2f}, Rz {pose[5]:.2f}")
+            elif self.dimensions[index]>6:
+                self.get_logger().info(f"Outputs for Tactip {index}: \n Pose x {pose[0]:.2f}, y {pose[1]:.2f}, z {pose[2]:.2f}, Rx {pose[3]:.2f}, Ry {pose[4]:.2f}, Rz {pose[5]:.2f}\n Wrench Fx {wrench[0]:.2f}, Fy {wrench[1]:.2f}, Fz {wrench[2]:.2f}, Tx {wrench[3]:.2f}, Ty {wrench[4]:.2f}, Tz {wrench[5]:.2f}")        
+
+    def create_publishers_(self, indices: list):
+        for i, s in enumerate(indices):
+            self.pose_publishers_.append(self.create_publisher(TwistStamped, '/tactip'+str(s)+'/pose', 10))
+            self.ssim_publishers_.append(self.create_publisher(Float64, '/tactip'+str(s)+'/ssim', 10))
+            self.contact_publishers_.append(self.create_publisher(Int8, '/tactip'+str(s)+'/contact', 10))
+            if self.dimensions[i] > 6:
+                self.wrench_publishers_.append(self.create_publisher(WrenchStamped, '/tactip'+str(s)+'/wrench', 10))
+            self.sensor_frames.append('present_sensor'+str(s))
+            self.contact_frames.append('present_contact'+str(s))
+        return
 
 def main(args=None):
     rclpy.init(args=args)

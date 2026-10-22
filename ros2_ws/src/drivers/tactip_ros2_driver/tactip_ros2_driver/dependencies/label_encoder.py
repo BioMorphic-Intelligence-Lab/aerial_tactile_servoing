@@ -17,7 +17,7 @@ from .parse_args import parse_args
 
 # models are located one directory up and then in the models directory
 package_share_dir = get_package_share_directory('tactip_ros2_driver')
-BASE_MODEL_PATH = os.path.join(package_share_dir, 'model')
+BASE_MODEL_PATH = os.path.join(package_share_dir, 'models')
 
 class LabelEncoder:
 

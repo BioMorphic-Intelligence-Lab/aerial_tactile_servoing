@@ -2,7 +2,6 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import ExecuteProcess
 
-import os
 import datetime
 
 logging = False
@@ -30,16 +29,14 @@ def generate_launch_description():
         name='tactip_driver',
         output='screen',
         parameters=[
-            {'source': 0},
-            {'frequency': 20.},
-            {'dimension': 5},
-            {'verbose': True},
-            {'test_model_time': False},
-            {'save_debug_image': False},
-            {'save_interval': 5.},
-            {'ssim_contact_threshold': 0.8},
-            {'save_directory': os.path.join('/home','martijn','aerial_tactile_servoing','data','tactip_images')},
+            {'sources': [4, 6]},
+            {'dimensions': [8, 8]},
+            {'ssim_contact_thresholds': [0.8, .8]},
+            {'model_names': ['simple_cnn_B1', 'simple_cnn_B2']},
+            {'frequency': 10.},
             {'fake_data': False},
+            {'verbose': True},
+            {'test_model_time': True},
             {'zero_when_no_contact': True},
         ],
         arguments=['--ros-args', '--log-level', 'info']
