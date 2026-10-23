@@ -14,7 +14,7 @@
     im:
       tactile_servoing_time: 180.0        # [s] max servoing duration
       no_contact_timeout: 10.0            # [s] lost-contact grace period
-      takeoff_altitude: 1.5               # [m]
+      takeoff_altitude: 1.2               # [m]
       pre_contact_arm_position: [1.0472, 0.0, 0.5236]  # [rad] q1,q2,q3 (pi/3, 0, pi/6)
       land_arm_position: [1.57, 0.0, -1.57]            # [rad]
       approach_speed: [0.0, 0.05, 0.0]    # [m/s] end-effector approach velocity
@@ -38,28 +38,29 @@
 /controller:
   ros__parameters:
     frequency: 100.0
+    arm_lengths: [0.12025, 0.336, 0.255]
     Kp_depth: 175.0
-    Ki_depth: 20.0
+    Ki_depth: 35.0
     Kd_depth: 2.0
     Kp_shear: 20.0
     Ki_shear: 2.5
     Kd_shear: 2.0
-    Kp_angular: 0.8
+    Kp_angular: 1.0
     Ki_angular: 0.0
     Kd_angular: 0.45
     Kp_secondary: 3.5
     IK_weights_contact: [25., 25., 10., 10., 1., 20., 1.]
-    IK_weights_flight: [25., 25., 10., 10., 5., 20., 5.]
+    IK_weights_flight: [15., 15., 10., 10., 5., 20., 5.]
     fade_time_ik_weights: 5.0
-    nominal_state: [0., 0., 0., 0., 0., 0., 0.7854, 0.0, 0.7854]
+    nominal_state: [0., 0., 0., 0., 0., 0., 1.0472, 0.0, 0.5236]
     alpha: 0.1
-    windup_clip: 0.15
+    windup_clip: 0.35
     Kp_alt: 0.5
     test_execution_time: false
 
 /planner:
   ros__parameters:
     frequency: 100.0
-    default_depth: -3.3        # default contact depth in mm
+    default_depth: -3.85        # default contact depth in mm
     mission_preset: default    # mission preset (e.g. 'blockref_x', 'slide_x', ...)
     verbose: false

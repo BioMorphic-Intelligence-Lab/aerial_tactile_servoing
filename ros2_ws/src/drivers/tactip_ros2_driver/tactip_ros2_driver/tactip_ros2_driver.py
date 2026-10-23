@@ -287,13 +287,13 @@ class TactipDriver(Node):
 
     def create_publishers_(self, indices: list):
         for i, s in enumerate(indices):
-            self.pose_publishers_.append(self.create_publisher(TwistStamped, '/tactip'+str(s)+'/pose', 10))
-            self.ssim_publishers_.append(self.create_publisher(Float64, '/tactip'+str(s)+'/ssim', 10))
-            self.contact_publishers_.append(self.create_publisher(Int8, '/tactip'+str(s)+'/contact', 10))
+            self.pose_publishers_.append(self.create_publisher(TwistStamped, '/tactip/'+str(i)+'/pose', 10))
+            self.ssim_publishers_.append(self.create_publisher(Float64, '/tactip/'+str(i)+'/ssim', 10))
+            self.contact_publishers_.append(self.create_publisher(Int8, '/tactip/'+str(i)+'/contact', 10))
             if self.dimensions[i] > 6:
-                self.wrench_publishers_.append(self.create_publisher(WrenchStamped, '/tactip'+str(s)+'/wrench', 10))
-            self.sensor_frames.append('present_sensor'+str(s))
-            self.contact_frames.append('present_contact'+str(s))
+                self.wrench_publishers_.append(self.create_publisher(WrenchStamped, '/tactip/'+str(i)+'/wrench', 10))
+            self.sensor_frames.append('present_sensor_'+str(i))
+            self.contact_frames.append('present_contact_'+str(i))
         return
 
 def main(args=None):

@@ -5,3 +5,7 @@ export ROS_DOMAIN_ID=75
 # Source install/set.bash if it has been built
 [ -f /aerial_tactile_servoing/ros2_ws/install/setup.bash ] && \
 source /aerial_tactile_servoing/ros2_ws/install/setup.bash
+
+alias torqueoff='ros2 service call /set_torque_enable dxl_driver/srv/SetTorqueEnable "{set_torque_enable: false}"'
+alias torqueon='ros2 service call /set_torque_enable dxl_driver/srv/SetTorqueEnable "{set_torque_enable: true}"'
+alias homeservos='ros2 service call /set_home_position dxl_driver/srv/SetHomePosition "{set_home_position: true}"'
