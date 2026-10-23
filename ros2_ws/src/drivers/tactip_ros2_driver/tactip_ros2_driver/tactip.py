@@ -77,6 +77,9 @@ class TacTip:
             print(f"[TacTip] /dev/video{self.source} confirmed at {w}x{h}, "
                   f"mask radius {self.sensor_params.get('circle_mask_radius')} px, "
                   f"thresh {self.sensor_params.get('thresh')}")
+        else:
+            print(f"[TacTip] /dev/video{self.source} bbox {bbox}")
+            print(self.sensor_params)
 
         if self.model_label_params == {}:
             raise Exception("Model label params not found")

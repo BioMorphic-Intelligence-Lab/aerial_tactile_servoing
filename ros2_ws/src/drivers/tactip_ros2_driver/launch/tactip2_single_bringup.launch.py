@@ -32,7 +32,7 @@ def generate_launch_description():
             {'sources': [6]},
             {'dimensions': [8]},
             {'ssim_contact_thresholds': [0.8]},
-            {'model_names': ['simple_cnn_B1']},
+            {'model_names': ['simple_cnn_B2']},
             {'frequency': 10.},
             {'fake_data': False},
             {'verbose': True},

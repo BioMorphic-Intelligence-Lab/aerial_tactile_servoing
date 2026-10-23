@@ -164,11 +164,11 @@ class TactipDriver(Node):
                 predict_time[s, i] = predict_end_time - capture_end_time
         end_time = time.time()
         self.get_logger().info(f"Total time taken for {iterations} iterations: {end_time - start_time} [seconds]")
-        self.get_logger().info(f"Average time taken: {(end_time - start_time)/iterations} [seconds/it]")
-        self.get_logger().info(f"Iterations per second: {iterations/(end_time - start_time)} [it/s]")
+        self.get_logger().info(f"Average time taken: {(end_time - start_time)/iterations:.3f} [seconds/it]")
+        self.get_logger().info(f"Iterations per second: {iterations/(end_time - start_time):.2f} [Hz]")
         for s, sensor in enumerate(self.sensors):
-            self.get_logger().info(f"[{s}] Average capture time: {sum(capture_time[s,:])/iterations} [seconds/it]")
-            self.get_logger().info(f"[{s}] Average predict time: {sum(predict_time[s,:])/iterations} [seconds/it]")
+            self.get_logger().info(f"[{s}] Average capture time: {sum(capture_time[s,:])/iterations*1000:.4f} [ms/it]")
+            self.get_logger().info(f"[{s}] Average predict time: {sum(predict_time[s,:])/iterations*1000:.4f} [ms/it]")
 
     def get_ssim_ref_callback(self, request, response):
         # This is a dummy service callback. You can implement functionality to update the reference image or return the current reference image's SSIM score.

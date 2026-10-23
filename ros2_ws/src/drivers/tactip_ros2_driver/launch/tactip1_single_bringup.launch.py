@@ -28,6 +28,7 @@ def generate_launch_description():
         executable='tactip_ros2_driver',
         name='tactip_driver',
         output='screen',
+        emulate_tty=True, # Directs python print statements to the terminal
         parameters=[
             {'sources': [4]},
             {'dimensions': [8]},
