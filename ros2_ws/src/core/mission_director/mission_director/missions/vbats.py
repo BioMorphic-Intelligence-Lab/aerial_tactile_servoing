@@ -41,7 +41,7 @@ class VbatsMission(TactileMissionDirector):
                 self.state_entrypoint(next_state="arms_takeoff_position")
 
             case "arms_takeoff_position":
-                self.state_move_arms(q_des=self.pre_contact_arm_position, next_state="wait_for_arm_offboard")
+                self.state_move_arms_joint_position(q_des=self.pre_contact_arm_position, next_state="wait_for_arm_offboard")
 
             case "wait_for_arm_offboard":
                 if not self.got_ref and not self.sim:
@@ -55,7 +55,7 @@ class VbatsMission(TactileMissionDirector):
                 self.state_hover(duration_sec=1, next_state="pre_contact_arm_position")
 
             case "pre_contact_arm_position":
-                self.state_move_arms(q_des=self.pre_contact_arm_position, next_state="approach")
+                self.state_move_arms_joint_position(q_des=self.pre_contact_arm_position, next_state="approach")
 
             case "approach":
                 self.state_approach_wall_position(
@@ -94,7 +94,7 @@ class VbatsMission(TactileMissionDirector):
                 self.state_disengage_wall_velocity(disengage_speed=self.disengage_speed, duration_sec=5.0, next_state="land_arms_position")
 
             case "land_arms_position":
-                self.state_move_arms(q_des=self.land_arm_position, next_state="land")
+                self.state_move_arms_joint_position(q_des=self.land_arm_position, next_state="land")
 
             case "land":
                 self.state_land(next_state="done")

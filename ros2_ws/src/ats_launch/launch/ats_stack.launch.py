@@ -136,24 +136,34 @@ def _build(context, *args, **kwargs):
     )
     actions.append(
         Node(
-            package="pose_based_ats",
-            executable="velocity_based_ats",
-            name="controller",
+            package="manipulator_controller",
+            executable="manipulator_controller",
+            name="manipulator",
             output="screen",
             parameters=[mission_params],
-            arguments=_LOG_ARGS,
+            arguments=_LOG_ARGS,            
         )
     )
-    actions.append(
-        Node(
-            package="ats_planner",
-            executable="ats_planner",
-            name="planner",
-            output="screen",
-            parameters=[mission_params],
-            arguments=_LOG_ARGS,
-        )
-    )
+    # actions.append(
+    #     Node(
+    #         package="pose_based_ats",
+    #         executable="velocity_based_ats",
+    #         name="controller",
+    #         output="screen",
+    #         parameters=[mission_params],
+    #         arguments=_LOG_ARGS,
+    #     )
+    # )
+    # actions.append(
+    #     Node(
+    #         package="ats_planner",
+    #         executable="ats_planner",
+    #         name="planner",
+    #         output="screen",
+    #         parameters=[mission_params],
+    #         arguments=_LOG_ARGS,
+    #     )
+    # )
 
     # --- Optional rosbag recording -------------------------------------------
     if LaunchConfiguration("logging").perform(context).lower() == "true":

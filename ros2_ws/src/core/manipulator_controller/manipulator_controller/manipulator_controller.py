@@ -4,118 +4,243 @@ from rclpy.node import Node
 
 import numpy as np
 from sensor_msgs.msg import JointState
-from geometry_msgs.msg import TwistStamped
-
-L1 = 0.110
-L2 = 0.330
-L3 = 0.273
+from geometry_msgs.msg import PointStamped
+import itertools
 
 class ManipulatorController(Node):
     def __init__(self):
         """
-        Kinematic controller for the arm in the UAM's body frame. No timer but is driven by commands on the EE cartesian position
-        or velocity.
+        Kinematic controller for the arm in the UAM's body frame. 
         """
+        # Param definitions
         super().__init__('manipulator_controller')
+        self.declare_parameter('frequency', 10.)
         self.declare_parameter('minimum_pivot_distance', 1.5)
+        self.declare_parameter('pivot_ramp', 1.0)
+        self.declare_parameter('verbose', False)
+        self.declare_parameter('n_arms', 1)
+        self.declare_parameter('kp', 2.0)
+        self.declare_parameter('kd', 0.3)
+        self.declare_parameter('tolerance', 0.2)
+        self.declare_parameter('link_lengths', [0.12025, 0.336, 0.325])
 
+        # Param grabbing
+        self.frequency = self.get_parameter('frequency').get_parameter_value().double_value
         self.min_pivot_distance = self.get_parameter('minimum_pivot_distance').get_parameter_value().double_value
+        self.pivot_ramp = self.get_parameter('pivot_ramp').get_parameter_value().double_value
+        self.verbose = self.get_parameter('verbose').get_parameter_value().bool_value
+        self.n_arms = self.get_parameter('n_arms').get_parameter_value().integer_value
+        self.kp = self.get_parameter('kp').get_parameter_value().double_value # Arm position control proportional gain
+        self.kd = self.get_parameter('kd').get_parameter_value().double_value # Arm position control derivative gain
+        self.tol = self.get_parameter('tolerance').get_parameter_value().double_value
+        self.arm_params = {
+            'link_lengths': self.get_parameter('link_lengths').get_parameter_value().double_array_value,
+        }
 
         # Servo interface
         self.subscriber_servo = self.create_subscription(JointState, '/servo/out/state', self.callback_servo, 10)
         self.publisher_servo = self.create_publisher(JointState, '/servo/in/state', 10)
 
         # Controller interface
-        self.subscriber_ee_position = self.create_subscription(TwistStamped, '/manipulator/in/position', self.callback_position, 10)
-        self.subscriber_ee_velocity = self.create_subscription(TwistStamped, '/manipulator/in/velocity', self.callback_velocity, 10)
+        self.task_pos_subscribers_ = []
+        self.joint_pos_subscribers_ = []
+        self.task_vel_subscribers_ = []
+        self.joint_vel_subscribers_ = []
 
+        self.task_pos_publishers_ = []
+        self.task_vel_publishers_ = []
+        self.arms = [Arm(i, self.arm_params) for i in range(self.n_arms)]
+        for arm in self.arms:
+            self.task_pos_subscribers_.append(self.create_subscription(PointStamped, '/manipulator/in/arm_'+str(arm.index)+'/task/position', arm.on_task_position, 10))
+            self.joint_pos_subscribers_.append(self.create_subscription(JointState, '/manipulator/in/arm_'+str(arm.index)+'/joint/position', arm.on_joint_position, 10))
+            self.task_vel_subscribers_.append(self.create_subscription(PointStamped, '/manipulator/in/arm_'+str(arm.index)+'/task/velocity', arm.on_task_velocity, 10))
+            self.joint_vel_subscribers_.append(self.create_subscription(JointState, '/manipulator/in/arm_'+str(arm.index)+'/joint/velocity', arm.on_joint_velocity, 10))
+
+            self.task_pos_publishers_.append(self.create_publisher(PointStamped, '/manipulator/out/arm_'+str(arm.index)+'/task/position', 10))
+            self.task_vel_publishers_.append(self.create_publisher(PointStamped, '/manipulator/out/arm_'+str(arm.index)+'/task/velocity', 10))
         # Data
         self.servo_state = None
 
+        # Timer
+        self.get_logger().info("Starting manipulator controller...")
+        self.period = 1./self.frequency
+        self.timer = self.create_timer(self.period, self.execute)
+
+    def execute(self):
+        if self.servo_state is None:
+            return
+
+        cmd_servo = [0.0] * self.n_arms * 3
+        for arm in self.arms:
+            if arm.q_cmd is not None and arm.qdot_cmd is None: # Commanded intended q -> position mode
+                # Run control loop to determine cmd_servo
+                qdot_cmd = []
+                error = 0.
+
+                for i in range(len(arm.q_cmd)):
+                    qd = (self.kp*(arm.q_cmd[i] - arm.q_present[i]) - self.kd*arm.qdot_present[i]) # Simple P controller to reach target position
+                    qdot_cmd.append(qd)
+                    error += abs(arm.q_cmd[i]-arm.q_present[i])**2
+                error = np.sqrt(error)
+
+                if error <= self.tol:
+                    qdot_cmd = [0.0 for x in arm.q_cmd]  # Stop the servos if within epsilon
+
+                if len(qdot_cmd) ==3:
+                    cmd_servo[arm.joint_slice] = qdot_cmd
+                else:
+                    self.get_logger().warn(f"[Manipulator] qdot_cmd is not length 3: {len(qdot_cmd)}")
+
+            elif arm.q_cmd is None and arm.qdot_cmd is not None: # Commanded intended qdot -> velocity mode
+                if len(arm.qdot_cmd) == 3:
+                    cmd_servo[arm.joint_slice] = arm.qdot_cmd
+                else:
+                    self.get_logger().warn(f"[Manipulator] qdot_cmd is not length 3: {len(qdot_cmd)}")
+
+            else: # if no commands were published yet
+                self.get_logger().warn(f"[Arm {arm.index}] q_cmd = {arm.q_cmd}, qdot_cmd = {arm.qdot_cmd}", throttle_duration_sec=1)
+
+        # Publish servo velocities to servo driver node
+        self.publish_servo_velocities(cmd_servo)
+
+        # Publish most recent arm position and velocities
+        for i, arm in enumerate(self.arms):
+            arm.update()
+            self.publish_arm_task_positions(i)
+            self.publish_arm_task_velocities(i)
+
     def callback_servo(self, msg):
-        """
-        Update the servo data
+        """ Update the servo data
         """
         self.servo_state = msg
+        for arm in self.arms:
+            arm.q_present = msg.position[arm.joint_slice]
+            arm.qdot_present = msg.velocity[arm.joint_slice]
 
-    def callback_position(self, msg):
-        solutions_1 = self.position_inverse_kinematics([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z])
-        solutions_2 = self.position_inverse_kinematics([msg.twist.angular.x, msg.twist.angular.y, msg.twist.angular.z])
+    def publish_arm_task_positions(self, index):
+            positions = self.arms[index].task_positions
+            if len(positions) != 3:
+                self.get_logger().warn("Position vector is not 3")
+                return
+            msg = PointStamped()
+            msg.point.x, msg.point.y, msg.point.z = positions
+            msg.header.stamp = self.get_clock().now().to_msg()
+            self.task_pos_publishers_[index].publish(msg)   
+     
+    def publish_arm_task_velocities(self, index):
+            velocities = self.arms[index].task_velocities
+            if len(velocities) != 3:
+                self.get_logger().warn("Position vector is not 3")
+                return
+            msg = PointStamped()
+            msg.point.x, msg.point.y, msg.point.z = velocities
+            msg.header.stamp = self.get_clock().now().to_msg()
+            self.task_vel_publishers_[index].publish(msg)        
 
-        # If there are solutions and the servo_state is set
-        if solutions_1 and solutions_2 and self.servo_state:
-            lowest_diff = np.inf
-            for solution1 in solutions_1:
-                diff = np.linalg.norm(np.array(solution1) - np.array(self.servo_state.position[0:3]))
-                if diff < lowest_diff:
-                    lowest_diff = diff
-                    best_solution1 = solution1
-            
-            lowest_diff = np.inf
-            for solution2 in solutions_2:
-                diff = np.linalg.norm(np.array(solution2) - np.array(self.servo_state.position[3:6]))
-                if diff < lowest_diff:
-                    lowest_diff = diff
-                    best_solution2 = solution2
+    def publish_servo_velocities(self, velocities):
+        if self.n_arms > 1:
+            velocities = self.apply_collision_guard(velocities)
 
-            back_calculated1 = self.position_forward_kinematics(*best_solution1)
-            back_calculated2 = self.position_forward_kinematics(*best_solution2)
+        msg = JointState()
+        msg.name = ['q'+str(i+1) for i in range(len(velocities))]
+        msg.position = [0.0 for i in range(len(velocities))]
+        msg.velocity = velocities
+        msg.effort = [0.0 for i in range(len(velocities))]
+        msg.header.stamp = self.get_clock().now().to_msg()
+        self.publisher_servo.publish(msg)
 
-            self.get_logger().info("--- ARM 1 ---", throttle_duration_sec=1)
-            self.get_logger().info(f"Current joint positions: {self.servo_state.position[0]:.2f} \t {self.servo_state.position[1]:.2f} \t {self.servo_state.position[2]:.2f}", throttle_duration_sec=1)
-            self.get_logger().info(f"Commanded joint positions: {best_solution1[0]:.2f} \t {best_solution1[1]:.2f} \t {best_solution1[2]:.2f}", throttle_duration_sec=1)
-            self.get_logger().info(f"Back-calculated manipulator XYZ: {back_calculated1[0]:.2f}, {back_calculated1[1]:.2f}, {back_calculated1[2]:.2f}", throttle_duration_sec=1)
-            self.get_logger().info("--- ARM 2 ---", throttle_duration_sec=1)
-            self.get_logger().info(f"Current joint positions: {self.servo_state.position[3]:.2f} \t {self.servo_state.position[4]:.2f} \t {self.servo_state.position[5]:.2f}", throttle_duration_sec=1)
-            self.get_logger().info(f"Commanded joint positions: {best_solution2[0]:.2f} \t {best_solution2[1]:.2f} \t {best_solution2[2]:.2f}", throttle_duration_sec=1)
-            self.get_logger().info(f"Back-calculated manipulator XYZ: {back_calculated2[0]:.2f}, {back_calculated2[1]:.2f}, {back_calculated2[2]:.2f}", throttle_duration_sec=1)
-            
-            self.publish_servo_positions(best_solution1 + best_solution2)
-        
-        elif not solutions_1 or not solutions_2 and self.servo_state:
+    def apply_collision_guard(self, cmd_servo):
+        for a, b in itertools.combinations(self.arms, 2):
+            h, l = (a, b) if a.q_present[0] >= b.q_present[0] else (b, a)   # high / low side
+            ih, il = h.index * 3, l.index * 3
+            gap = h.q_present[0] - l.q_present[0]
+
+            # high arm closes when moving negative; low arm closes when moving positive.
+            # Scale ONLY the closing component -> opening stays at full speed.
+            scale = float(np.clip((gap - self.min_pivot_distance) / self.pivot_ramp, 0.0, 1.0))
+            if cmd_servo[ih] < 0.0:
+                cmd_servo[ih] *= scale
+            if cmd_servo[il] > 0.0:
+                cmd_servo[il] *= scale
+
+        return cmd_servo
+
+class Arm:
+    def __init__(self, index, arm_params):
+        self.index = index
+        self.link_lengths = arm_params['link_lengths']
+        self.joint_slice = slice(index*3, index*3+3)
+        self.q_present = None
+        self.q_cmd = None
+        self.qdot_present = None
+        self.qdot_cmd = None
+
+        self.task_positions = None
+        self.task_velocities = None
+
+    def on_task_position(self, msg):
+        solution = self.position_inverse_kinematics(target_position=[msg.point.x, msg.point.y, msg.point.z])
+        if solution is not None:
+            self.q_cmd = solution
+            self.qdot_cmd = None
+        else:
             return
 
-        elif not self.servo_state:
-            self.get_logger().error(f'Servo state not set!')
-            return
+    def on_joint_position(self, msg):
+        self.q_cmd = [msg.position[0], msg.position[1], msg.position[2]]
+        self.qdot_cmd = None
 
-    def callback_velocity(self, msg):
-        #self.get_logger().info("--- ARM 1 ---", throttle_duration_sec=1)
-        solution1 = self.velocity_inverse_kinematics([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z], arm=1)
-        #self.get_logger().info("--- ARM 2 ---", throttle_duration_sec=1)
-        solution2 = self.velocity_inverse_kinematics([msg.twist.angular.x, msg.twist.angular.y, msg.twist.angular.z], arm=2)
+    def on_task_velocity(self, msg):
+        self.qdot_cmd = self.velocity_inverse_kinematics(target_velocity=[msg.point.x, msg.point.y, msg.point.z])
+        self.q_cmd = None
 
-        if solution1 and solution2 and self.servo_state:
-            self.publish_servo_velocities(solution1 + solution2)
-            #self.get_logger().info(f'Velocity solutions: arm 1 {solution1[0]:.2f}, {solution1[1]:.2f}, {solution1[2]:.2f} \t arm 2 {solution2[0]:.2f}, {solution2[1]:.2f}, {solution2[2]:.2f}', throttle_duration_sec=1)
-        elif not self.servo_state:
-            self.get_logger().error(f'Servo state not set!')
-            return
+    def on_joint_velocity(self, msg):
+        self.qdot_cmd = [msg.velocity[0], msg.velocity[1], msg.velocity[2]]
+        self.q_cmd = None
+
+    def update(self):
+        self.task_positions = self.position_forward_kinematics()
+        self.task_velocities = self.velocity_forward_kinematics()
+
+    def position_forward_kinematics(self):
+        q_1 = self.q_present[0]
+        q_2 = self.q_present[1]
+        q_3 = self.q_present[2]
+        x_BS = -self.link_lengths[1]*np.sin(q_2) - self.link_lengths[2]*np.sin(q_2)*np.cos(q_3)
+        y_BS = self.link_lengths[0]*np.sin(q_1) + self.link_lengths[1]*np.sin(q_1)*np.cos(q_2) + self.link_lengths[2]*np.sin(q_1)*np.cos(q_2)*np.cos(q_3) + self.link_lengths[2]*np.sin(q_3)*np.cos(q_1)
+        z_BS = -self.link_lengths[0]*np.cos(q_1) - self.link_lengths[1]*np.cos(q_1)*np.cos(q_2) + self.link_lengths[2]*np.sin(q_1)*np.sin(q_3) - self.link_lengths[2]*np.cos(q_1)*np.cos(q_2)*np.cos(q_3)
+        return [x_BS, y_BS, z_BS]
+
+    def velocity_forward_kinematics(self):
+        return self.jacobian() @ np.array(self.qdot_present)        
 
     def position_inverse_kinematics(self, target_position:list, tol = 1e-9) -> list:
+        if self.q_present is None:
+            return None
+
         X = target_position[0]
         Y = target_position[1]
         Z = target_position[2]
         # Step 1: compute D
         S = X**2 + Y**2 + Z**2
-        D = S - (L1**2 + L2**2 + L3**2)
+        D = S - (self.link_lengths[0]**2 + self.link_lengths[1]**2 + self.link_lengths[2]**2)
         
         # Step 2: quadratic coefficients for u = cos(q3)
-        a = 4 * L3**2 * (L2**2 - L1**2)
-        b = -4 * L2 * L3 * (D + 2 * L1**2)
-        c = D**2 - 4 * L1**2 * L2**2 + 4 * L1**2 * X**2
+        a = 4 * self.link_lengths[2]**2 * (self.link_lengths[1]**2 - self.link_lengths[0]**2)
+        b = -4 * self.link_lengths[1] * self.link_lengths[2] * (D + 2 * self.link_lengths[0]**2)
+        c = D**2 - 4 * self.link_lengths[0]**2 * self.link_lengths[1]**2 + 4 * self.link_lengths[0]**2 * X**2
 
         solutions = []
 
         # Step 3: solve quadratic
-        if abs(a) < tol:  # degenerate to linear
+        if abs(a) < tol:  # degenerate to linearf
             if abs(b) < tol:
-                return []  # no equation to solve
+                return None  # no equation to solve
             u_roots = [-c / b]
         else:
             disc = b**2 - 4*a*c
             if disc < -tol:
-                return []  # no real solutions
+                return None  # no real solutions
             elif abs(disc) < tol:
                 u_roots = [-b / (2*a)]
             else:
@@ -131,19 +256,19 @@ class ManipulatorController(Node):
 
             for s3_sign in [1, -1]:
                 s3 = s3_sign * math.sqrt(max(0.0, 1 - u**2))
-                C = L2 + L3 * u
+                C = self.link_lengths[1] + self.link_lengths[2] * u
 
                 if abs(C) < tol:
                     continue  # singular, skip or handle separately
 
                 # q2 from atan2 form
                 num = -X
-                den = (D - 2 * L2 * L3 * u) / (2 * L1)
+                den = (D - 2 * self.link_lengths[1] * self.link_lengths[2] * u) / (2 * self.link_lengths[0])
                 q2 = math.atan2(num, den)
 
                 # compute A, B
-                A = L1 + C * math.cos(q2)
-                B = L3 * s3
+                A = self.link_lengths[0] + C * math.cos(q2)
+                B = self.link_lengths[2] * s3
 
                 # q1
                 q1 = math.atan2(Y, -Z) - math.atan2(B, A)
@@ -152,95 +277,48 @@ class ManipulatorController(Node):
                 q3 = math.atan2(s3, u)
                 solutions.append((q1, q2, q3))
 
-        return solutions
-    
-    def velocity_inverse_kinematics(self, target_velocity:list, arm=1) -> list:
-        if arm == 1:
-            q1 = self.servo_state.position[0]
-            q2 = self.servo_state.position[1]
-            q3 = self.servo_state.position[2]
-        elif arm == 2:
-            q1 = self.servo_state.position[3]
-            q2 = self.servo_state.position[4]
-            q3 = self.servo_state.position[5]            
+        # Step 5: Find lowest Euclidean distance solution
+        lowest_diff = np.inf
+        if not solutions:
+            return None
+        else:
+            for solution in solutions:
+                diff = np.linalg.norm(np.array(solution) - np.array(self.q_present[0:3]))
+                if diff < lowest_diff:
+                    lowest_diff = diff
+                    best_solution = solution
 
-        #self.get_logger().info(f'Current states: {q1:.2f} rad \t {q2:.2f} rad \t {q3:.2f} rad ', throttle_duration_sec=1)
+        return best_solution
 
-         # Evaluate jacobian
-        jacobian = np.empty((3,3))
-        jacobian[0,0]=0.0
-        jacobian[0,1]=-L2*math.cos(q2) - L3*math.cos(q2)*math.cos(q3)
-        jacobian[0,2]=L3*math.sin(q2)*math.sin(q3)
-        jacobian[1,0]=L1*math.cos(q1) + L2*math.cos(q1)*math.cos(q2) - L3*math.sin(q1)*math.sin(q3) + L3*math.cos(q1)*math.cos(q2)*math.cos(q3)
-        jacobian[1,1]=-L2*math.sin(q1)*math.sin(q2) - L3*math.sin(q1)*math.sin(q2)*math.cos(q3)
-        jacobian[1,2]=-L3*math.sin(q1)*math.sin(q3)*math.cos(q2) + L3*math.cos(q1)*math.cos(q3)
-        jacobian[2,0]=L1*math.sin(q1) + L2*math.sin(q1)*math.cos(q2) + L3*math.sin(q1)*math.cos(q2)*math.cos(q3) + L3*math.sin(q3)*math.cos(q1)
-        jacobian[2,1]=L2*math.sin(q2)*math.cos(q1) + L3*math.sin(q2)*math.cos(q1)*math.cos(q3)
-        jacobian[2,2]=L3*math.sin(q1)*math.cos(q3) + L3*math.sin(q3)*math.cos(q1)*math.cos(q2)
+    def velocity_inverse_kinematics(self, target_velocity:list) -> list:
+        if self.q_present is None:
+            return
+
+        jacobian = self.jacobian()
         
         # Evaluate jacobian
         jacobian_pinv = np.linalg.pinv(jacobian)
         joint_velocities = jacobian_pinv @ np.array(target_velocity)
 
-        #self.get_logger().info(f'Velocities: {joint_velocities[0]:.4f} rad \t {joint_velocities[1]:.4f} rad \t {joint_velocities[2]:.4f} rad ', throttle_duration_sec=1)
-
-        EE_velocity = jacobian @ joint_velocities
-
-        self.get_logger().info(f'Velocity IK for arm {arm} \n \
-                               Joint positions: {q1:.2f}, {q2:.2f}, {q3:.2f} \n \
-                               Commanded velocity: {target_velocity[0]:.2f}, {target_velocity[1]:.2f}, {target_velocity[2]:.2f}, \n \
-                               Resulting joint velocities: {joint_velocities[0]:.4f}, {joint_velocities[1]:.4f}, {joint_velocities[2]:.4f} \n \
-                               Back calculated EE velocity: {EE_velocity[0]:.2f}, {EE_velocity[1]:.2f}, {EE_velocity[2]:.2f}', throttle_duration_sec=1)
-
         return joint_velocities.tolist() 
-    
-    def publish_servo_positions(self, positions): # TODO publish current velocities
-        # Clip for safety
-        clipped_positions = np.empty(len(positions))
-        clipped_positions[0] = np.clip(positions[0], -np.pi, np.pi)
-        clipped_positions[1] = np.clip(positions[1], -0.6, 0.6)
-        clipped_positions[2] = np.clip(positions[2], -1.85, 1.85)
-        clipped_positions[3] = np.clip(positions[3], -np.pi, np.pi)
-        clipped_positions[4] = np.clip(positions[4], -0.6, 0.6)
-        clipped_positions[5] = np.clip(positions[5], -1.85, 1.85)
 
-        # Test if not colliding on ring gear
-        if abs(positions[0] - positions[3]) < self.min_pivot_distance: # Left arm (2) runs in negative half, Right arm (1) runs in positive half
-            self.get_logger().error(f"(P) Ring gear collision risk: {positions[0]:.2f}, {positions[3]:.2f}")
-            clipped_positions[0] = self.servo_state.position[0]
-            clipped_positions[3] = self.servo_state.position[3]
-        elif abs(positions[0] - positions[3]) > 2*np.pi-self.min_pivot_distance:
-            self.get_logger().error(f"(P) Ring gear collision risk: {positions[0]:.2f}, {positions[3]:.2f}")
-            clipped_positions[0] = self.servo_state.position[0]
-            clipped_positions[3] = self.servo_state.position[3]
-            
-        msg = JointState()
-        msg.name = ['q'+str(i) for i in range(len(clipped_positions))]
-        msg.position = clipped_positions
-        msg.velocity = [0.0 for i in range(len(clipped_positions))]
-        msg.effort = [0.0 for i in range(len(clipped_positions))]
-        msg.header.stamp = self.get_clock().now().to_msg()
-        self.publisher_servo.publish(msg)
-    
-    def publish_servo_velocities(self, velocities): # TODO publish current positions
-        # In case of collision stop the arms
-        if abs(self.servo_state.position[0] - self.servo_state.position[3]) < self.min_pivot_distance: # Left arm (2) runs in negative half, Right arm (1) runs in positive half
-            self.get_logger().error(f"(V) Ring gear collision risk: {self.servo_state.position[0]:.2f}, {self.servo_state.position[3]:.2f}")
-            velocities = [0.0 for i in range(len(velocities))]
+    def jacobian(self):
+        jac = np.empty((3,3))
+        q1 = self.q_present[0]
+        q2 = self.q_present[1]
+        q3 = self.q_present[2]
 
-        msg = JointState()
-        msg.name = ['q'+str(i) for i in range(len(velocities))]
-        msg.position = [0.0 for i in range(len(velocities))]
-        msg.velocity = velocities
-        msg.effort = [0.0 for i in range(len(velocities))]
-        msg.header.stamp = self.get_clock().now().to_msg()
-        self.publisher_servo.publish(msg)
-
-    def position_forward_kinematics(self, q_1, q_2, q_3):
-        x_BS = -L2*np.sin(q_2) - L3*np.sin(q_2)*np.cos(q_3)
-        y_BS = L1*np.sin(q_1) + L2*np.sin(q_1)*np.cos(q_2) + L3*np.sin(q_1)*np.cos(q_2)*np.cos(q_3) + L3*np.sin(q_3)*np.cos(q_1)
-        z_BS = -L1*np.cos(q_1) - L2*np.cos(q_1)*np.cos(q_2) + L3*np.sin(q_1)*np.sin(q_3) - L3*np.cos(q_1)*np.cos(q_2)*np.cos(q_3)
-        return [x_BS, y_BS, z_BS]
+        # Evaluate jacobian
+        jac[0,0]=0.0
+        jac[0,1]=-self.link_lengths[1]*math.cos(q2) - self.link_lengths[2]*math.cos(q2)*math.cos(q3)
+        jac[0,2]=self.link_lengths[2]*math.sin(q2)*math.sin(q3)
+        jac[1,0]=self.link_lengths[0]*math.cos(q1) + self.link_lengths[1]*math.cos(q1)*math.cos(q2) - self.link_lengths[2]*math.sin(q1)*math.sin(q3) + self.link_lengths[2]*math.cos(q1)*math.cos(q2)*math.cos(q3)
+        jac[1,1]=-self.link_lengths[1]*math.sin(q1)*math.sin(q2) - self.link_lengths[2]*math.sin(q1)*math.sin(q2)*math.cos(q3)
+        jac[1,2]=-self.link_lengths[2]*math.sin(q1)*math.sin(q3)*math.cos(q2) + self.link_lengths[2]*math.cos(q1)*math.cos(q3)
+        jac[2,0]=self.link_lengths[0]*math.sin(q1) + self.link_lengths[1]*math.sin(q1)*math.cos(q2) + self.link_lengths[2]*math.sin(q1)*math.cos(q2)*math.cos(q3) + self.link_lengths[2]*math.sin(q3)*math.cos(q1)
+        jac[2,1]=self.link_lengths[1]*math.sin(q2)*math.cos(q1) + self.link_lengths[2]*math.sin(q2)*math.cos(q1)*math.cos(q3)
+        jac[2,2]=self.link_lengths[2]*math.sin(q1)*math.cos(q3) + self.link_lengths[2]*math.sin(q3)*math.cos(q1)*math.cos(q2)
+        return jac
 
 def main():
     rclpy.init(args=None)

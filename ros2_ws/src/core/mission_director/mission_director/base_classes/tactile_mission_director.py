@@ -99,7 +99,9 @@ class TactileMissionDirector(UAMStateMachine):
             self.vehicle_trajectory_setpoint.velocity[2],
             self.vehicle_trajectory_setpoint.yawspeed,
         )
-        self.publish_servo_velocity_references(self.servo_reference.velocity)
+
+        for n in range(self.n_arms):
+            self.publish[n].publish(self.servo_reference.velocity[n*3:n*3+3])
 
     def lost_contact(self):
         """True when contact has been absent longer than the grace period."""

@@ -53,7 +53,7 @@ class TactipDriver(Node):
         self.fake_channels = None
 
         # Node feedback
-        self.get_logger().info("Tactip driver initialized with dimensions: "+str(self.dimensions))
+        self.get_logger().info(f"Tactip driver initialized with dimensions: {list(self.dimensions)} and ssim thresholds: {self.ssim_thresholds}")
 
         # Initialize the sensor(s)
         if not self.fake_data:
@@ -69,7 +69,7 @@ class TactipDriver(Node):
             self.create_publishers_(list(self.get_parameter('sources').get_parameter_value().integer_array_value))
         else:
             self.fake_channels = len(self.get_parameter('sources').get_parameter_value().integer_array_value)
-            self.get_logger().info(f"Using fake data mode on {self.fake_channels}. No camera input.")
+            self.get_logger().info(f"Using fake data mode on {self.fake_channels} channels. No camera input.")
             self.create_publishers_(range(self.fake_channels))             
 
         # Broadcaster TF
@@ -287,11 +287,11 @@ class TactipDriver(Node):
 
     def create_publishers_(self, indices: list):
         for i, s in enumerate(indices):
-            self.pose_publishers_.append(self.create_publisher(TwistStamped, '/tactip/'+str(i)+'/pose', 10))
-            self.ssim_publishers_.append(self.create_publisher(Float64, '/tactip/'+str(i)+'/ssim', 10))
-            self.contact_publishers_.append(self.create_publisher(Int8, '/tactip/'+str(i)+'/contact', 10))
+            self.pose_publishers_.append(self.create_publisher(TwistStamped, '/tactip_'+str(i)+'/pose', 10))
+            self.ssim_publishers_.append(self.create_publisher(Float64, '/tactip_'+str(i)+'/ssim', 10))
+            self.contact_publishers_.append(self.create_publisher(Int8, '/tactip_'+str(i)+'/contact', 10))
             if self.dimensions[i] > 6:
-                self.wrench_publishers_.append(self.create_publisher(WrenchStamped, '/tactip/'+str(i)+'/wrench', 10))
+                self.wrench_publishers_.append(self.create_publisher(WrenchStamped, '/tactip_'+str(i)+'/wrench', 10))
             self.sensor_frames.append('present_sensor_'+str(i))
             self.contact_frames.append('present_contact_'+str(i))
         return

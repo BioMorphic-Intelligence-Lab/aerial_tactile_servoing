@@ -34,7 +34,7 @@ class HoverMission(TactileMissionDirector):
                 self.state_entrypoint(next_state="arms_takeoff_position")
 
             case "arms_takeoff_position":
-                self.state_move_arms(q_des=self.pre_contact_arm_position, next_state="wait_for_arm_offboard")
+                self.state_move_arms_joint_position(q_des=self.pre_contact_arm_position, next_state="wait_for_arm_offboard")
 
             case "wait_for_arm_offboard":
                 if not self.got_ref and not self.sim:
@@ -48,7 +48,7 @@ class HoverMission(TactileMissionDirector):
                 self.state_hover(duration_sec=self.hover_time, next_state="land_arms_position")
 
             case "land_arms_position":
-                self.state_move_arms(q_des=self.land_arm_position, next_state="land")
+                self.state_move_arms_joint_position(q_des=self.land_arm_position, next_state="land")
 
             case "land":
                 self.state_land(next_state="done")
