@@ -13,6 +13,9 @@
   <!-- Collision box and inertia follow the tube: 0.27 m and 1.2446e-4 kg m^2 at the original. -->
   <xacro:property name="forearm_box_length" value="${forearm_tube_length - 0.008}"/>
   <xacro:property name="forearm_inertia" value="${0.00012446 * (forearm_box_length / 0.27) ** 2}"/>
+  <!-- ForearmLink.stl is drawn for the original tube and reaches 0.273 m from the joint; its visual
+       is stretched along the tube to end at forearm_tube_length. Visual only. -->
+  <xacro:property name="forearm_mesh_length" value="0.273"/>
 
   <link name="base_link">
     <collision>
@@ -362,7 +365,8 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="$(find px4_uam_sim)/meshes/ForearmLink.stl"/>
+        <mesh filename="$(find px4_uam_sim)/meshes/ForearmLink.stl"
+              scale="${forearm_tube_length / forearm_mesh_length} 1 1"/>
       </geometry>
       <material name="darkgray">
         <color rgba="0.2 0.2 0.2 1"/>
@@ -577,7 +581,8 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="$(find px4_uam_sim)/meshes/ForearmLink.stl"/>
+        <mesh filename="$(find px4_uam_sim)/meshes/ForearmLink.stl"
+              scale="${forearm_tube_length / forearm_mesh_length} 1 1"/>
       </geometry>
       <material name="darkgray">
         <color rgba="0.2 0.2 0.2 1"/>

@@ -365,7 +365,7 @@
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <mesh>
-            <scale>1 1 1</scale>
+            <scale>0.76190500000000005 1 1</scale>
             <uri>/home/hapham/aerial_tactile_servoing/ros2_ws/install/px4_uam_sim/share/px4_uam_sim/meshes/ForearmLink.stl</uri>
           </mesh>
         </geometry>
@@ -609,7 +609,7 @@
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <mesh>
-            <scale>1 1 1</scale>
+            <scale>0.76190500000000005 1 1</scale>
             <uri>/home/hapham/aerial_tactile_servoing/ros2_ws/install/px4_uam_sim/share/px4_uam_sim/meshes/ForearmLink.stl</uri>
           </mesh>
         </geometry>
