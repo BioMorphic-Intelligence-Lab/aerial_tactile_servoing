@@ -29,9 +29,10 @@ class PinchGraspMission(TactileMissionDirector):
                 self.state_entrypoint(next_state="joint_position")
 
             case "pre_grasp_config":
-                self.state_move_arms_joint_position(q_des=self.pre_contact_arm_position, next_state="approach_grasp")
+                self.state_move_arms_joint_position(q_des=self.pre_grasp_arm_position, next_state="approach_grasp")
 
             case "approach_grasp":
+                self.get_logger().info(f"{self.tactip_contact_}")
                 if abs(self.arm_task_positions_[0][1]) < 0.2 or abs(self.arm_task_positions_[1][1]) < 0.2:
                     transition = True
                 elif all(self.tactip_contact_):
@@ -41,8 +42,10 @@ class PinchGraspMission(TactileMissionDirector):
                 self.state_move_arms_task_velocity(pdot_des=[0.0, -0.05, 0.0, 0.0, 0.05, 0.0], transition=transition, next_state="control_grasp")
 
             case "control_grasp":
-                # TODO: Implement grasp controller here
-                self.state_do_nothing(next_state="done")
+                self.state_hover(duration_sec=20., next_state="release")
+
+            case "release":
+                    self.state_move_arms_joint_position(q_des=self.land_arm_position, next_state="done")
 
             case "done":
                 self.get_logger().info("Mission completed successfully.", throttle_duration_sec=5.)
