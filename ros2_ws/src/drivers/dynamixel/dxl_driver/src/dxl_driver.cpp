@@ -688,7 +688,7 @@ bool DXLDriver::write_home_position_at_current_position()
 
         // Update homing offset with current position
         int32_t new_homing_offset = -(pos_rad2int(servodata_[i].id, servodata_[i].present_position) - homing_offset - pos_rad2int(servodata_[i].id, servodata_[i].start_offset));
-        RCLCPP_INFO(this->get_logger(), "[ID: %i] Home position was %d, new home position %d", servodata_[i].id, homing_offset, new_homing_offset);
+        RCLCPP_INFO(this->get_logger(), "[ID: %i] Home position was %d, new home position %d (difference %d)", servodata_[i].id, homing_offset, new_homing_offset, (homing_offset-new_homing_offset));
         dxl_comm_result = packetHandler->write4ByteTxRx(
             portHandler,
             servodata_[i].id,

@@ -295,7 +295,7 @@ class UAMStateMachine(Node):
         if (self.home_position[0] != 0.0 and self.home_position[1] != 0.0 and len(self.servo_state.position)>0):
             self.get_logger().info(f'Got position fix! \t x: {self.home_position[0]:.3f} [m] \t y: {self.home_position[1]:.3f} [m] \t {np.rad2deg(self.home_position[3]):.2f} [deg]')
             self.transition_to_state(new_state=next_state)
-        elif self.input_state == 1:
+        elif self.input_state == 1 or self.fcu_on==False:
             self.get_logger().info('Bypassing position fix wait')
             self.transition_to_state(new_state=next_state)
 

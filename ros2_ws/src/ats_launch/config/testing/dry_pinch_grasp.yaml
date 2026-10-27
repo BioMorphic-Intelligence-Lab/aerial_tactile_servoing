@@ -20,25 +20,23 @@
       # launch owns them. vbats.launch.py -> real, fcu_on arg (default true);
       # vbats_sim.launch.py -> sim, fcu_on forced off by the base class.
     im:
+      n_tactips: 2
       tactile_servoing_time: 180.0        # [s] max servoing duration
       no_contact_timeout: 10.0            # [s] lost-contact grace period
-      n_tactips: 2
+      # --- Pinch grasp implementation
       takeoff_altitude: 1.0               # [m]
       pre_contact_arm_position: [1.0472, 0.0, 0.5236, -1.0472, 0.0, -0.5236]  # [rad] q1,q2,q3 (pi/3, 0, pi/6)
+      pre_grasp_arm_position: [2.0943, 0.0, 1.0, -2.0943, 0.0, -1.0]
       land_arm_position: [1.57, 0.0, -1.57, -1.57, 0.0, 1.57]            # [rad]
-      approach_speed: [0.0, 0.05, 0.0]    # [m/s] end-effector approach velocity
-      approach_heading_deg: 0.0          # [deg]
-      disengage_speed: 0.15               # [m/s]
-      ee_x_abort_threshold: -1.0          # [m] abort servoing past this ee x
 
 /tactip_driver:
   ros__parameters:
-    sources: [4, 6]
+    sources: [0, 2]
     dimensions: [8, 8]
     ssim_contact_thresholds: [0.8, 0.8]
     model_names: ['simple_cnn_B1', 'simple_cnn_B2']
     frequency: 15.0
-    fake_data: true
+    fake_data: false
     verbose: false
     test_model_time: false
     zero_when_no_contact: true
@@ -53,7 +51,7 @@
     kp: 2.0
     kd: 0.3
     tolerance: 0.01
-    link_lengths: [0.12025, 0.336, 0.325]
+    link_lengths: [0.12025, 0.336, 0.255]
 
 /controller:
   ros__parameters:

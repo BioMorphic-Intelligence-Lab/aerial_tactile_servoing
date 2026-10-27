@@ -29,14 +29,14 @@ def generate_launch_description():
         name='tactip_driver',
         output='screen',
         parameters=[
-            {'sources': [4, 6]},
+            {'sources': [0, 2]},
             {'dimensions': [8, 8]},
-            {'ssim_contact_thresholds': [0.8, .8]},
+            {'ssim_contact_thresholds': [0.8, 0.8]},
             {'model_names': ['simple_cnn_B1', 'simple_cnn_B2']},
             {'frequency': 10.},
             {'fake_data': False},
-            {'verbose': True},
-            {'test_model_time': True},
+            {'verbose': False},
+            {'test_model_time': False},
             {'zero_when_no_contact': True},
         ],
         arguments=['--ros-args', '--log-level', 'info']
