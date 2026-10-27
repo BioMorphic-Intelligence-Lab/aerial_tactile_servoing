@@ -349,7 +349,7 @@ class UAMStateMachine(Node):
         if not self.offboard and self.fcu_on:
             self.get_logger().info(f'Not in offboard mode, transitioning to emergency state. Offboard {self.offboard}, FCU {self.fcu_on}')
             self.transition_to_state('emergency')
-        elif (abs(current_altitude)+0.1 > abs(self.home_position[2]) and abs(self.vehicle_local_position.heading-self.home_position[3])< 0.1) or self.input_state==1:
+        elif (abs(current_altitude)+0.1 > abs(self.home_position[2]) and abs(self.vehicle_local_position.heading-self.home_position[3])< 0.05) or self.input_state==1:
             self.transition_to_state(new_state=next_state)
             self.flying = True
 

@@ -13,35 +13,45 @@
     sm:
       frequency: 100.0
       position_clip: 3.0
-      manipulator_mode: velocity
+      n_arms: 2
+      tolerance: 0.1
       # sm.sim and sm.fcu_on are NOT set here: they describe the run environment
       # (simulation vs hardware, flight controller in the loop or not), so the
       # launch owns them. vbats.launch.py -> real, fcu_on arg (default true);
       # vbats_sim.launch.py -> sim, fcu_on forced off by the base class.
     im:
+      n_tactips: 2
       tactile_servoing_time: 180.0        # [s] max servoing duration
       no_contact_timeout: 10.0            # [s] lost-contact grace period
+      # --- Pinch grasp implementation
       takeoff_altitude: 1.0               # [m]
       pre_contact_arm_position: [1.0472, 0.0, 0.5236, -1.0472, 0.0, -0.5236]  # [rad] q1,q2,q3 (pi/3, 0, pi/6)
+      pre_grasp_arm_position: [2.0943, 0.0, 1.0, -2.0943, 0.0, -1.0]
       land_arm_position: [1.57, 0.0, -1.57, -1.57, 0.0, 1.57]            # [rad]
-      approach_speed: [0.0, 0.05, 0.0]    # [m/s] end-effector approach velocity
-      approach_heading_deg: 0.0          # [deg]
-      disengage_speed: 0.15               # [m/s]
-      ee_x_abort_threshold: -1.0          # [m] abort servoing past this ee x
 
 /tactip_driver:
   ros__parameters:
-    source: 0
+    sources: [0, 2]
+    dimensions: [8, 8]
+    ssim_contact_thresholds: [0.8, 0.8]
+    model_names: ['simple_cnn_B1', 'simple_cnn_B2']
     frequency: 15.0
-    dimension: 5
+    fake_data: true
     verbose: false
     test_model_time: false
-    save_debug_image: true
-    save_interval: 10.0
-    ssim_contact_threshold: 0.65
-    save_directory: /home/martijn/aerial_tactile_servoing/data/tactip_images
     zero_when_no_contact: true
-    fake_data: false
+
+/manipulator:
+  ros__parameters:
+    frequency: 50.
+    minimum_pivot_distance: 1.0
+    pivot_ramp: 1.0
+    verbose: false
+    n_arms: 2
+    kp: 2.0
+    kd: 0.3
+    tolerance: 0.01
+    link_lengths: [0.12025, 0.336, 0.325]
 
 /controller:
   ros__parameters:

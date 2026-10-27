@@ -10,18 +10,51 @@ import itertools
 class ManipulatorController(Node):
     def __init__(self):
         """
-        Kinematic controller for the arm in the UAM's body frame. 
+        Joint-velocity controller for the UAM's 3-DOF arm(s).
+
+        Drives one or more serial arms (q1, q2, q3 per arm) by streaming joint
+        velocity commands to the servo driver. The servos always run in velocity mode,
+        so every control mode below ultimately resolves to a joint-velocity
+        command on /servo/in/state; joint feedback comes back on
+        /servo/out/state.
+
+        Each arm exposes four command interfaces (indexed by arm):
+          * /manipulator/in/arm_<i>/joint/position  (JointState) -- target joint
+            angles, tracked by a PD law: qdot = kp*(q_cmd - q) - kd*qdot, zeroed
+            once the joint error is within `tolerance`.
+          * /manipulator/in/arm_<i>/joint/velocity  (JointState) -- joint rates
+            passed straight through.
+          * /manipulator/in/arm_<i>/task/position   (PointStamped) -- an
+            end-effector position [x, y, z] in the arm base frame, converted to a
+            joint target via the analytic inverse kinematics.
+          * /manipulator/in/arm_<i>/task/velocity   (PointStamped) -- an
+            end-effector velocity, mapped to joint rates via the pseudo-inverse
+            of the arm Jacobian.
+        The most recent command wins; a position command clears any standing
+        velocity command and vice versa.
+
+        Each cycle (at `frequency` Hz) the node also publishes the measured
+        end-effector pose and velocity from forward kinematics on
+        /manipulator/out/arm_<i>/task/{position,velocity}.
+
+        For multi-arm morphologies (n_arms > 1) a collision guard scales down
+        only the *closing* joint velocities as the arms' base joints come within
+        `minimum_pivot_distance` (ramped over `pivot_ramp`), so opposed arms do
+        not drive into each other while still allowing them to open at full
+        speed. Link geometry is set by `link_lengths`.
+
+        TODO: Implement singularity guards and out of workspace guards (for position commands)
         """
         # Param definitions
         super().__init__('manipulator_controller')
-        self.declare_parameter('frequency', 10.)
-        self.declare_parameter('minimum_pivot_distance', 1.5)
-        self.declare_parameter('pivot_ramp', 1.0)
-        self.declare_parameter('verbose', False)
-        self.declare_parameter('n_arms', 1)
-        self.declare_parameter('kp', 2.0)
-        self.declare_parameter('kd', 0.3)
-        self.declare_parameter('tolerance', 0.2)
+        self.declare_parameter('frequency', 10.) # Hz
+        self.declare_parameter('minimum_pivot_distance', 1.5) # rad
+        self.declare_parameter('pivot_ramp', 1.0) # dimensionless
+        self.declare_parameter('verbose', False) # boolean
+        self.declare_parameter('n_arms', 1) # integer
+        self.declare_parameter('kp', 2.0) # joint position control p gain
+        self.declare_parameter('kd', 0.3) # joint position control d gain
+        self.declare_parameter('tolerance', 0.2) # 
         self.declare_parameter('link_lengths', [0.12025, 0.336, 0.325])
 
         # Param grabbing

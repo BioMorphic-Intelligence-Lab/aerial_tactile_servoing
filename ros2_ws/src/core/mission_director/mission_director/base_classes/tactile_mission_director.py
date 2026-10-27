@@ -2,6 +2,7 @@ import datetime
 
 import rclpy
 import tf2_ros
+import numpy as np
 
 from std_msgs.msg import Int8
 from std_srvs.srv import SetBool
@@ -34,21 +35,27 @@ class TactileMissionDirector(UAMStateMachine):
         super().__init__(node_name)
 
         # --- Generic tactile-servoing parameters (shared by all tactile missions) ---
+        self.declare_parameter('im.n_tactips', 1)
         self.declare_parameter('im.tactile_servoing_time', 65.0)  # [s] max servoing duration
-        self.tactile_servoing_time = self.get_parameter('im.tactile_servoing_time').get_parameter_value().double_value
-
         self.declare_parameter('im.no_contact_timeout', 10.0)  # [s] lost-contact grace period
+
+        self.n_tactips = self.get_parameter('im.n_tactips').get_parameter_value().integer_value
+        self.tactile_servoing_time = self.get_parameter('im.tactile_servoing_time').get_parameter_value().double_value
         no_contact_timeout = self.get_parameter('im.no_contact_timeout').get_parameter_value().double_value
         self.ts_no_contact_counter = 0
         self.ts_no_contact_max_cycles = int(no_contact_timeout * self.frequency)
 
         # --- Tactip interfaces ---
-        self.sub_tactip = self.create_subscription(TwistStamped, '/tactip/pose', self.tactip_callback, 10)
-        self.sub_tactip_contact = self.create_subscription(Int8, '/tactip/contact', self.tactip_contact_callback, 10)
-        self.tactip_data = None
-        self.contact = False
+        self.tactip_pose_subscribers_ = []
+        self.tactip_contact_subscribers_ = []
 
-        # --- Controller interfaces ---
+        self.tactip_pose_ = [None] * self.n_tactips
+        self.tactip_contact_ = [None] * self.n_tactips
+        for n in range(self.n_tactips):
+            self.tactip_pose_subscribers_.append(self.create_subscription(TwistStamped, '/tactip_'+str(n)+'/pose', self._make_tactip_pose_callback(n), 10))
+            self.tactip_contact_subscribers_.append(self.create_subscription(Int8, '/tactip_'+str(n)+'/contact', self._make_tactip_contact_callback(n), 10))
+
+        # --- Tactile Servoing controller interfaces ---
         self.sub_controller = self.create_subscription(TrajectorySetpoint, '/controller/out/trajectory_setpoint', self.controller_callback, 10)
         self.sub_controller_servo = self.create_subscription(JointState, '/controller/out/servo_state', self.controller_servo_callback, 10)
         self.vehicle_trajectory_setpoint = TrajectorySetpoint()
@@ -114,17 +121,21 @@ class TactileMissionDirector(UAMStateMachine):
     # ------------------------------------------------------------------
     # Callbacks
     # ------------------------------------------------------------------
-    def tactip_callback(self, msg):
-        self.tactip_data = msg
-
-    def tactip_contact_callback(self, msg):
-        self.contact = bool(msg.data)
-
     def controller_callback(self, msg):
         self.vehicle_trajectory_setpoint = msg
 
     def controller_servo_callback(self, msg):
         self.servo_reference = msg
+
+    def _make_tactip_pose_callback(self, index):
+        def callback(msg: TwistStamped):
+            self.tactip_pose_[index] = msg.twist
+        return callback
+
+    def _make_tactip_contact_callback(self, index):
+        def callback(msg: Int8):
+            self.tactip_contact_[index] = msg.data
+        return callback
 
     def set_new_ssim_ref(self, value: bool):
         """Set the current tactip image as the SSIM contact-detection reference."""

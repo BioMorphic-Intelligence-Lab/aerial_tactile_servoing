@@ -18,12 +18,13 @@ class PinchGraspMission(TactileMissionDirector):
 
         # --- Mission-graph constants (from the per-mission YAML) ---
         self.declare_parameter('im.takeoff_altitude', 1.5)  # [m]
+        self.declare_parameter('im.pre_contact_arm_position', [1.57, 0.0, -1.57, -1.57, 0.0, 1.57])  # [rad] q1,q2,q3
+        self.declare_parameter('im.pre_grasp_arm_position', [2.0943, 0.0, -1.0, -2.0943, 0.0, 1.0])
+        self.declare_parameter('im.land_arm_position', [1.57, 0.0, -1.57, -1.57, 0.0, 1.57])  # [rad]
+
         self.takeoff_altitude = self.get_parameter('im.takeoff_altitude').get_parameter_value().double_value
-
-        self.declare_parameter('im.pre_contact_arm_position', [1.0472, 0.0, -0.5236])  # [rad] q1,q2,q3
         self.pre_contact_arm_position = list(self.get_parameter('im.pre_contact_arm_position').get_parameter_value().double_array_value)
-
-        self.declare_parameter('im.land_arm_position', [1.57, 0.0, -1.57])  # [rad]
+        self.pre_grasp_arm_position = list(self.get_parameter('im.pre_grasp_arm_position').get_parameter_value().double_array_value)
         self.land_arm_position = list(self.get_parameter('im.land_arm_position').get_parameter_value().double_array_value)
 
 
@@ -46,13 +47,26 @@ class PinchGraspMission(TactileMissionDirector):
                 self.state_takeoff(target_altitude=self.takeoff_altitude, next_state="hover")
 
             case "hover":
-                self.state_hover(duration_sec=10., next_state="pre_contact_arm_position")
+                self.state_hover(duration_sec=10., next_state="pre_grasp_config")
 
-            case "pre_contact_arm_position":
-                self.state_move_arms_joint_position(q_des=self.pre_contact_arm_position, next_state="land_arms_position")
+            case "pre_grasp_config":
+                self.state_move_arms_joint_position(q_des=self.pre_grasp_arm_position, next_state="approach_grasp")
 
-            case "land_arms_position":
-                self.state_move_arms_joint_position(q_des=self.land_arm_position, next_state="land")
+            case "approach_grasp":
+                self.get_logger().info(f"{self.tactip_contact_}")
+                if abs(self.arm_task_positions_[0][1]) < 0.2 or abs(self.arm_task_positions_[1][1]) < 0.2:
+                    transition = True
+                elif all(self.tactip_contact_):
+                    transition = True
+                else:
+                    transition = False
+                self.state_move_arms_task_velocity(pdot_des=[0.0, -0.05, 0.0, 0.0, 0.05, 0.0], transition=transition, next_state="control_grasp")
+
+            case "control_grasp":
+                self.state_hover(duration_sec=20., next_state="release")
+
+            case "release":
+                    self.state_move_arms_joint_position(q_des=self.land_arm_position, next_state="land")
 
             case "land":
                 self.state_land(next_state="done")
