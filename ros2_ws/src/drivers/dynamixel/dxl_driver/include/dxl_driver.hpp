@@ -144,6 +144,12 @@ private:
     void read_shutdown_conditions();
     void read_hardware_error_status();
 
+    // Servo-health monitoring: scans the alert bit already present in the cyclic
+    // SyncReads (free hardware-error detection) and runs a stall watchdog on data
+    // already on the bus. Called once per loop. See the .cpp for details.
+    void check_servo_health();
+    std::string decode_hardware_error(uint8_t status) const;
+
     void configure_servos();
 
     bool write_home_position_at_current_position();
@@ -162,6 +168,11 @@ private:
     int num_servos_;
     std::vector<ServoData> servodata_;
 
+    // Per-servo state for check_servo_health(). Latches keep each message to one
+    // print per event instead of every cycle.
+    std::vector<int> stall_counter_;       // consecutive commanded-but-stalled cycles
+    std::vector<bool> stall_reported_;     // stall message already printed
+    std::vector<bool> hw_error_reported_;  // hardware-error message already printed
 
 };
 
