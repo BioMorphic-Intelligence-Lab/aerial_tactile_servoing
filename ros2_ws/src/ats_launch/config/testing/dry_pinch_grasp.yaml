@@ -14,7 +14,7 @@
       frequency: 100.0
       position_clip: 3.0
       n_arms: 2
-      tolerance: 0.1
+      tolerance: 0.05
       # sm.sim and sm.fcu_on are NOT set here: they describe the run environment
       # (simulation vs hardware, flight controller in the loop or not), so the
       # launch owns them. vbats.launch.py -> real, fcu_on arg (default true);
@@ -26,14 +26,14 @@
       # --- Pinch grasp implementation
       takeoff_altitude: 1.0               # [m]
       pre_contact_arm_position: [1.0472, 0.0, 0.5236, -1.0472, 0.0, -0.5236]  # [rad] q1,q2,q3 (pi/3, 0, pi/6)
-      pre_grasp_arm_position: [2.0943, 0.0, 1.0, -2.0943, 0.0, -1.0]
+      pre_grasp_arm_position: [1.9, 0.0, 1.6, -1.9, 0.0, -1.6]
       land_arm_position: [1.57, 0.0, -1.57, -1.57, 0.0, 1.57]            # [rad]
 
 /tactip_driver:
   ros__parameters:
     sources: [0, 2]
     dimensions: [8, 8]
-    ssim_contact_thresholds: [0.8, 0.8]
+    ssim_contact_thresholds: [0.8, 0.85]
     model_names: ['simple_cnn_B1', 'simple_cnn_B2']
     frequency: 15.0
     fake_data: false
@@ -44,7 +44,7 @@
 /manipulator:
   ros__parameters:
     frequency: 50.
-    minimum_pivot_distance: 1.0
+    minimum_pivot_distance: 0.7
     pivot_ramp: 1.0
     verbose: false
     n_arms: 2

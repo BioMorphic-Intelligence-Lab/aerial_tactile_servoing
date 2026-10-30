@@ -30,7 +30,7 @@ def generate_launch_description():
         output='screen',
         emulate_tty=True, # Directs python print statements to the terminal
         parameters=[
-            {'sources': [4]},
+            {'sources': [0]},
             {'dimensions': [8]},
             {'ssim_contact_thresholds': [0.8]},
             {'model_names': ['simple_cnn_B1']},

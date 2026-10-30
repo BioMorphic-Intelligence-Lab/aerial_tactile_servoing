@@ -391,6 +391,10 @@ class UAMStateMachine(Node):
         self.publish_trajectory_position_setpoint(*self.hover_position)
         self.get_logger().info(f'Hovering... {(datetime.datetime.now()-self.state_start_time).seconds:.1f}/{duration_sec} sec', throttle_duration_sec=1)
 
+        # Publish arm velocity zero and keep current position
+        for i in range(self.n_arms):
+            self.publish_joint_pos(arm_index=i, q_des=self.servo_state.position[i*3:i*3+3])
+
         # State transition
         if not self.offboard and self.fcu_on:
             self.transition_to_state('emergency')

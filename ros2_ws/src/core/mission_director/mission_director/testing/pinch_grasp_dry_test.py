@@ -35,7 +35,7 @@ class PinchGraspMission(TactileMissionDirector):
 
             case "approach_grasp":
                 # self.get_logger().info(f"{self.tactip_contact_}")
-                if abs(self.arm_task_positions_[0][1]) < 0.1 or abs(self.arm_task_positions_[1][1]) < 0.1:
+                if abs(self.arm_task_positions_[0][1]) < 0.05 or abs(self.arm_task_positions_[1][1]) < 0.05:
                     self.get_logger().info("Transition by approach of center")
                     transition = True
                 elif all(self.tactip_contact_):
@@ -43,13 +43,13 @@ class PinchGraspMission(TactileMissionDirector):
                     transition = True
                 else:
                     transition = False
-                self.state_move_arms_task_velocity(pdot_des=[0.0, -0.05, 0.0, 0.0, 0.05, 0.0], transition=transition, next_state="control_grasp")
+                self.state_move_arms_task_velocity(pdot_des=[0.0, -0.03, 0.0, 0.0, 0.03, 0.0], transition=transition, next_state="control_grasp")
 
             case "control_grasp":
-                self.state_hover(duration_sec=20., next_state="release")
+                self.state_hover(duration_sec=10., next_state="release")
 
             case "release":
-                    self.state_move_arms_joint_position(q_des=self.land_arm_position, next_state="done")
+                self.state_move_arms_joint_position(q_des=self.land_arm_position, next_state="done")
 
             case "done":
                 self.get_logger().info("Mission completed successfully.", throttle_duration_sec=5.)

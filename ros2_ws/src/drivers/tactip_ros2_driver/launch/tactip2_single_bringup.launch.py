@@ -29,7 +29,7 @@ def generate_launch_description():
         name='tactip_driver',
         output='screen',
         parameters=[
-            {'sources': [6]},
+            {'sources': [2]},
             {'dimensions': [8]},
             {'ssim_contact_thresholds': [0.8]},
             {'model_names': ['simple_cnn_B2']},
