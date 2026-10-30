@@ -14,6 +14,12 @@ from .dependencies.labelled_model import LabelledModel
 
 
 class TacTip:
+    # Startup probe: how hard to try for a first good frame before declaring the camera dead.
+    PROBE_MAX_ATTEMPTS = 15
+    PROBE_RETRY_DELAY = 0.05  # seconds
+    # Runtime read: a dropped frame is transient, so retry a few times within a single cycle.
+    READ_MAX_ATTEMPTS = 3
+
     def __init__(self, source, model_name):
         """model_dir: absolute path to a model directory, or a bare name resolved against
         share/tactip_ros2_driver/models/. None keeps the single-model path so existing
@@ -73,9 +79,22 @@ class TacTip:
         # Confirm the camera actually gave us that size. A mismatch corrupts every prediction
         # without raising anything anywhere, so fail at startup rather than in flight.
         if self.expected_size is not None:
-            ok, probe = self.cam.read()
+            # A freshly opened USB camera (especially two sharing a bus) routinely drops the first
+            # frames, so a single failed read is not evidence the device is dead. Retry the probe a
+            # number of times and only fail if we never get a frame -- this keeps the fail-fast
+            # guarantee for a genuinely absent/busy camera without aborting a healthy one on one
+            # unlucky frame.
+            ok, probe = False, None
+            for _ in range(self.PROBE_MAX_ATTEMPTS):
+                ok, probe = self.cam.read()
+                if ok and probe is not None:
+                    break
+                time.sleep(self.PROBE_RETRY_DELAY)
             if not ok or probe is None:
-                raise Exception(f"Camera /dev/video{self.source} opened but returned no frame (ok: {ok}).")
+                raise Exception(
+                    f"Camera /dev/video{self.source} opened but returned no frame after "
+                    f"{self.PROBE_MAX_ATTEMPTS} attempts (last ok: {ok})."
+                )
             h, w = probe.shape[:2]
             if (w, h) != self.expected_size:
                 raise Exception(
@@ -127,11 +146,21 @@ class TacTip:
         self.sensor_params = load_json_obj(os.path.join(self.model_path, 'processed_image_params'))
 
     def read(self):
-        _, img = self.cam.read()
-        return img
+        # A dropped frame mid-flight is transient (USB jitter, vibration), not a reason to bring
+        # the node down, so retry a few times within the cycle. Return None only if every attempt
+        # failed; the caller decides what to do with a missing frame.
+        for _ in range(self.READ_MAX_ATTEMPTS):
+            ok, img = self.cam.read()
+            if ok and img is not None:
+                return img
+        return None
 
     def process(self, raw_outfile=None, proc_outfile=None):
         img = self.read()
+        if img is None:
+            # Signal "no frame this cycle" instead of feeding None into process_image (which would
+            # raise and crash the timer callback). The caller skips this cycle.
+            return None
         if raw_outfile:
             cv2.imwrite(raw_outfile, img)
         img = process_image(img, **self.sensor_params)

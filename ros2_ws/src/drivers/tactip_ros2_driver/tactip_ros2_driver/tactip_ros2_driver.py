@@ -72,8 +72,17 @@ class TactipDriver(Node):
                 self.get_logger().info(f"Start sensor {i}, reading from /dev/video{s}" )
                 self.get_logger().info(f"Sensor processing params: {self.sensors[-1].sensor_params}")
 
-                # Reference SSIM image
-                self.ref_ssim_images_.append(self.sensors[-1].process().squeeze())
+                # Reference SSIM image. The camera is warm here (the probe just succeeded), but a
+                # dropped frame would make process() return None; fail fast with a clear message
+                # rather than a cryptic NoneType error, since every later cycle needs this reference.
+                ref_image = self.sensors[-1].process()
+                if ref_image is None:
+                    self.get_logger().fatal(
+                        f"Failed to capture reference SSIM image for TacTip sensor {i} "
+                        f"(model '{self.model_names[i]}', /dev/video{s}): no frame returned."
+                    )
+                    raise SystemExit(1)
+                self.ref_ssim_images_.append(ref_image.squeeze())
             # Create publishers
             self.create_publishers_(list(self.get_parameter('sources').get_parameter_value().integer_array_value))
         else:
@@ -112,6 +121,15 @@ class TactipDriver(Node):
         # Evaluate for each sensor
         for i, sensor in enumerate(self.sensors):
             sensor_image = sensor.process()
+            if sensor_image is None:
+                # Camera dropped a frame this cycle. Skip it rather than crashing the node: we
+                # simply publish nothing for this sensor and try again next tick. Throttled so a
+                # bad patch of frames does not flood the log.
+                self.get_logger().warn(
+                    f"Tactip {i}: no frame this cycle, skipping.",
+                    throttle_duration_sec=1.0,
+                )
+                continue
             ssim_score = ssim(self.ref_ssim_images_[i], sensor_image.squeeze())
 
             # Deduce contact, if contact, publish real data
