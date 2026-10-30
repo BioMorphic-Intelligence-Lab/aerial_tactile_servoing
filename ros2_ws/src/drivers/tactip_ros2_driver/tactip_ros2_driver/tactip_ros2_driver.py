@@ -59,7 +59,16 @@ class TactipDriver(Node):
         if not self.fake_data:
             # Initialize TacTip sensors
             for i, s in enumerate(self.get_parameter('sources').get_parameter_value().integer_array_value):
-                self.sensors.append(TacTip(s,self.model_names[i]))
+                try:
+                    self.sensors.append(TacTip(s, self.model_names[i]))
+                except Exception as e:
+                    # A missing/busy camera is not recoverable mid-mission, so fail fast at startup
+                    # with one clear, node-tagged line naming the sensor instead of a raw traceback.
+                    self.get_logger().fatal(
+                        f"Failed to initialize TacTip sensor {i} "
+                        f"(model '{self.model_names[i]}', /dev/video{s}): {e}"
+                    )
+                    raise SystemExit(1)
                 self.get_logger().info(f"Start sensor {i}, reading from /dev/video{s}" )
                 self.get_logger().info(f"Sensor processing params: {self.sensors[-1].sensor_params}")
 

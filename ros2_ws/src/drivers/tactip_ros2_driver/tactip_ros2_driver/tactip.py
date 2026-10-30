@@ -31,7 +31,16 @@ class TacTip:
         # set up the camera
         self.source = source
         self.cam = cv2.VideoCapture(self.source, cv2.CAP_V4L2)
-        self.cam.open(self.source, cv2.CAP_V4L2)
+        # VideoCapture never raises on a failed open; it just returns a closed object. Check it here
+        # so the error names the real cause (device could not be opened) instead of surfacing later
+        # as a misleading "returned no frame" from the probe below.
+        if not self.cam.isOpened():
+            raise RuntimeError(
+                f"Could not open camera /dev/video{self.source}. "
+                f"Check it is connected and is a capture device (`v4l2-ctl --list-devices`), "
+                f"that the index in `sources` is correct, and that no other process is using it "
+                f"(`fuser /dev/video{self.source}`)."
+            )
         for _ in range(10):
             self.cam.read()
 
