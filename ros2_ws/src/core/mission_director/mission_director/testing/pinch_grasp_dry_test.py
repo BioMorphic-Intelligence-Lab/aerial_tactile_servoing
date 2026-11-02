@@ -2,6 +2,7 @@ import datetime
 
 from mission_director.base_classes.tactile_mission_director import TactileMissionDirector, run_mission
 
+# TODO: Add enum class for state numbers
 
 class PinchGraspMission(TactileMissionDirector):
     """Tactile pinch grasping dry test mission.
@@ -35,16 +36,37 @@ class PinchGraspMission(TactileMissionDirector):
 
             case "approach_grasp":
                 # self.get_logger().info(f"{self.tactip_contact_}")
+                next_state="control_grasp"
                 if abs(self.arm_task_positions_[0][1]) < 0.05 or abs(self.arm_task_positions_[1][1]) < 0.05:
                     self.get_logger().info("Transition by approach of center")
                     transition = True
-                elif all(self.tactip_contact_):
-                    self.get_logger().info("Transition by contact")
+                elif self.tactip_contact_[0] and not self.tactip_contact_[1]:
+                    self.get_logger().info("Transition by contact on 0")
+                    next_state="approach_grasp_0"
+                    transition = True
+                elif not self.tactip_contact_[0] and self.tactip_contact_[1]:
+                    self.get_logger().info("Transition by contact on 1")
+                    next_state="approach_grasp_1"
                     transition = True
                 else:
                     transition = False
-                self.state_move_arms_task_velocity(pdot_des=[0.0, -0.03, 0.0, 0.0, 0.03, 0.0], transition=transition, next_state="control_grasp")
+                self.state_move_arms_task_velocity(pdot_des=[0.0, -0.03, 0.0, 0.0, 0.03, 0.0], transition=transition, next_state=next_state, state_number=25)
 
+            case "approach_grasp_0":
+                if all(self.tactip_contact_):
+                    transition = True
+                else:
+                    transition = False
+
+                self.state_move_arms_task_velocity(pdot_des=[0.0, 0.0, 0.0, 0.0, 0.03, 0.0], transition=transition, next_state="control_grasp", state_number=26)
+
+            case "approach_grasp_1":
+                if all(self.tactip_contact_):
+                    transition = True
+                else:
+                    transition = False
+                self.state_move_arms_task_velocity(pdot_des=[0.0, -0.03, 0.0, 0.0, 0.0, 0.0], transition=transition, next_state="control_grasp", state_number=27)
+            
             case "control_grasp":
                 self.state_hover(duration_sec=10., next_state="release")
 

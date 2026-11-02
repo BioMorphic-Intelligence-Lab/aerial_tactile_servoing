@@ -492,8 +492,8 @@ class UAMStateMachine(Node):
                 self.publish_joint_vel(arm_index=n, qdot_des=[0.0 for x in range(dof)])
             self.transition_to_state(new_state=next_state)
 
-    def state_move_arms_task_velocity(self, pdot_des: list, transition: bool=False, next_state='emergency'):
-        self.handle_state(state_number=14)
+    def state_move_arms_task_velocity(self, pdot_des: list, transition: bool=False, next_state: str='emergency', state_number :int=14):
+        self.handle_state(state_number=state_number)
 
         # Run once when the state is called for the first time.
         if self.first_state_loop:
