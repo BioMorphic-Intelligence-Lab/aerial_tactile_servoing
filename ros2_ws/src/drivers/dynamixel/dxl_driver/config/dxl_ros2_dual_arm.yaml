@@ -1,5 +1,6 @@
 /dxl_driver:
   ros__parameters:
+    servo_mode: "position" # expected reference field; must match servos.operating_modes
     driver:
       frequency: 100.0
 

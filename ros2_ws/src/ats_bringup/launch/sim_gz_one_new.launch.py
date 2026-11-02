@@ -37,7 +37,7 @@ def generate_launch_description():
         parameters=[
             {'frequency': 100.0},
             {'verbose': False},
-            {'operating_mode': 'velocity'}  # position or velocity
+            {'servo_mode': 'velocity'}  # position or velocity
         ],
         arguments=['--ros-args', '--log-level', 'info']
     )

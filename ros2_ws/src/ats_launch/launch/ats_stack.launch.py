@@ -57,6 +57,7 @@ def _build(context, *args, **kwargs):
     fcu_on = LaunchConfiguration("fcu_on").perform(context).lower() == "true"
     mission_params = LaunchConfiguration("mission_params").perform(context)
     md_executable = LaunchConfiguration("md_executable").perform(context)
+    servo_mode = LaunchConfiguration("servo_mode").perform(context)
 
     # The mission director is sim/real agnostic. sm.sim and sm.fcu_on describe
     # the run environment, not the mission, so they are NOT in the mission YAML:
@@ -95,7 +96,7 @@ def _build(context, *args, **kwargs):
                 parameters=[
                     {"frequency": 100.0},
                     {"verbose": False},
-                    {"operating_mode": "velocity"},
+                    {"servo_mode": servo_mode},
                 ],
                 arguments=_LOG_ARGS,
             )
@@ -108,7 +109,10 @@ def _build(context, *args, **kwargs):
                 executable="dxl_driver_node",
                 name="dxl_driver",
                 output="screen",
-                parameters=[os.path.join(share_dir, "config", "servo", morphology+".yaml")],
+                parameters=[
+                    os.path.join(share_dir, "config", "servo", morphology+".yaml"),
+                    {"servo_mode": servo_mode},
+                ],
                 arguments=_LOG_ARGS,
             )
         )
@@ -140,8 +144,8 @@ def _build(context, *args, **kwargs):
             executable="manipulator_controller",
             name="manipulator",
             output="screen",
-            parameters=[mission_params],
-            arguments=_LOG_ARGS,            
+            parameters=[mission_params, {"servo_mode": servo_mode}],
+            arguments=_LOG_ARGS,
         )
     )
     # actions.append(
@@ -206,6 +210,13 @@ def generate_launch_description():
                 "sim",
                 default_value="false",
                 description="Run the Gazebo graph instead of the hardware drivers.",
+            ),
+            DeclareLaunchArgument(
+                "servo_mode",
+                default_value="velocity",
+                description="Which JointState field carries the servo reference: "
+                "'velocity' or 'position'. Fed to both the controller and the "
+                "driver/sim layer; must match servos.operating_modes.",
             ),
             DeclareLaunchArgument(
                 "fcu_on",

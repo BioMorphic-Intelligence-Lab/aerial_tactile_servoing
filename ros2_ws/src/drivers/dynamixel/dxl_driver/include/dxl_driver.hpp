@@ -160,8 +160,17 @@ private:
 
     void check_parameter_sizes(size_t num_servos) const;
 
+    // Cross-checks the `servo_mode` launch arg against the configured per-servo
+    // operating modes at startup and warns on any mismatch.
+    void check_servo_mode_consistency() const;
+
     // Data
     rclcpp::TimerBase::SharedPtr timer_;
+
+    // Expected reference contract set by the `servo_mode` launch arg
+    // ("position" or "velocity"); used for the startup consistency check and
+    // the reference-mismatch warnings. Hardware truth stays servos.operating_modes.
+    std::string servo_mode_;
 
     std::vector<uint8_t> ids_;
     std::unordered_map<int, size_t> id2index_; 

@@ -10,8 +10,8 @@ class SimRemapper(Node):
 
         self.declare_parameter('frequency', 25.)
         self.declare_parameter('verbose', False)
-        self.declare_parameter('operating_mode', 'position')  # position or velocity
-        self.operating_mode = self.get_parameter('operating_mode').get_parameter_value().string_value
+        self.declare_parameter('servo_mode', 'position')  # position or velocity
+        self.servo_mode = self.get_parameter('servo_mode').get_parameter_value().string_value
 
         # Arm subscribers
         self.subscriber_servo_state = self.create_subscription(JointState, '/servo/in/state', self.servo_refs_callback, 10)
@@ -46,9 +46,9 @@ class SimRemapper(Node):
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
     
     def timer_callback(self):
-        if self.operating_mode == 'position':
+        if self.servo_mode == 'position':
             self.move_arm_to_position(self.q_cmd)
-        elif self.operating_mode == 'velocity':
+        elif self.servo_mode == 'velocity':
             self.publish_arm_velocity_commands(self.qd_cmd)
 
         if self.feedback_length != self.ref_length:

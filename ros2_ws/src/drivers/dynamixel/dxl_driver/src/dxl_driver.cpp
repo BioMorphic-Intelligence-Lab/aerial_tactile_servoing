@@ -41,6 +41,7 @@ DXLDriver::DXLDriver(dynamixel::GroupSyncRead *positionReader, dynamixel::GroupS
     this->declare_parameter("servos.max_angles", std::vector<double>(0.0));
     this->declare_parameter("servos.start_offsets", std::vector<double>(0.0));
     this->declare_parameter("servos.return_delay_times", std::vector<int>(0));
+    this->declare_parameter("servo_mode", std::string("velocity")); // expected reference contract: "position" or "velocity"
 
     // Generate uint8_t vector of ids
     std::vector<int64_t> int_ids = this->get_parameter("servos.ids").as_integer_array();
@@ -95,6 +96,10 @@ DXLDriver::DXLDriver(dynamixel::GroupSyncRead *positionReader, dynamixel::GroupS
         }
     }
     RCLCPP_INFO(this->get_logger(), "Succeeded assigning servodata");
+
+    // Cross-check the servo_mode launch arg against the configured operating modes
+    servo_mode_ = this->get_parameter("servo_mode").as_string();
+    check_servo_mode_consistency();
 
     // Health-monitoring state, one entry per servo.
     stall_counter_.assign(num_servos_, 0);
@@ -880,9 +885,13 @@ void DXLDriver::servo_reference_callback(const sensor_msgs::msg::JointState::Sha
             }
             else
             {
+                // No position field: likely a servo_mode mismatch (the controller
+                // is publishing velocities). Hold the last goal position -- holding
+                // is safe in position mode, so do not overwrite the goal here.
                 RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                    "Servo %d is in EXTENDED_POSITION mode but received reference has no position field (size %zu) -- ignoring",
-                    servodata_[i].id, msg->position.size());
+                    "Servo %d is in EXTENDED_POSITION mode but received reference has no position field (size %zu) -- "
+                    "likely a servo_mode mismatch (driver expects '%s'); holding last goal position",
+                    servodata_[i].id, msg->position.size(), servo_mode_.c_str());
             }
         }
         else if (servodata_[i].operating_mode == DXLMode::VELOCITY)
@@ -893,9 +902,14 @@ void DXLDriver::servo_reference_callback(const sensor_msgs::msg::JointState::Sha
             }
             else
             {
+                // No velocity field: almost certainly a servo_mode mismatch (the
+                // controller is publishing positions). Fail safe by zeroing the
+                // velocity goal so the joint cannot coast on its last command.
+                servodata_[i].goal_velocity = 0.0;
                 RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                    "Servo %d is in VELOCITY mode but received reference has no velocity field (size %zu) -- ignoring",
-                    servodata_[i].id, msg->velocity.size());
+                    "Servo %d is in VELOCITY mode but received reference has no velocity field (size %zu) -- "
+                    "likely a servo_mode mismatch (driver expects '%s'); zeroing velocity goal",
+                    servodata_[i].id, msg->velocity.size(), servo_mode_.c_str());
             }
         }
     }
@@ -1006,6 +1020,47 @@ void DXLDriver::check_parameter_sizes(size_t num_servos) const
     {
         RCLCPP_ERROR(this->get_logger(), "servos.start_offsets not the same size as number of servos!");
         exit(-1);
+    }
+}
+
+void DXLDriver::check_servo_mode_consistency() const
+{
+    // Classify each servo's configured operating mode as position-like or
+    // velocity and compare against the servo_mode launch arg. A mismatch means
+    // the controller and driver disagree on which JointState field carries the
+    // reference -- a potential runaway-arm hazard, so warn loudly.
+    if (servo_mode_ != "position" && servo_mode_ != "velocity")
+    {
+        RCLCPP_WARN(this->get_logger(),
+            "servo_mode '%s' is not 'position' or 'velocity'; skipping consistency check",
+            servo_mode_.c_str());
+        return;
+    }
+    for (int i = 0; i < num_servos_; i++)
+    {
+        std::string servo_class;
+        switch (servodata_[i].operating_mode)
+        {
+            case DXLMode::VELOCITY:
+                servo_class = "velocity";
+                break;
+            case DXLMode::POSITION:
+            case DXLMode::EXTENDED_POSITION:
+            case DXLMode::POSITION_CURRENT:
+                servo_class = "position";
+                break;
+            default:
+                servo_class = "other"; // current / PWM -- unsupported by this driver's write paths
+                break;
+        }
+        if (servo_class != servo_mode_)
+        {
+            RCLCPP_WARN(this->get_logger(),
+                "[ID: %d] operating_mode %d classifies as '%s' but servo_mode is '%s' -- "
+                "controller and driver disagree on the reference field; check the launch configuration",
+                servodata_[i].id, static_cast<int>(servodata_[i].operating_mode),
+                servo_class.c_str(), servo_mode_.c_str());
+        }
     }
 }
 
