@@ -6,7 +6,7 @@ import numpy as np
 
 from std_msgs.msg import Int8
 from std_srvs.srv import SetBool
-from geometry_msgs.msg import TwistStamped
+from geometry_msgs.msg import TwistStamped, WrenchStamped
 from sensor_msgs.msg import JointState
 from px4_msgs.msg import TrajectorySetpoint
 
@@ -38,22 +38,28 @@ class TactileMissionDirector(UAMStateMachine):
         self.declare_parameter('im.n_tactips', 1)
         self.declare_parameter('im.tactile_servoing_time', 65.0)  # [s] max servoing duration
         self.declare_parameter('im.no_contact_timeout', 10.0)  # [s] lost-contact grace period
+        self.declare_parameter('im.arm_lengths', [0.12025, 0.336, 0.255])
 
         self.n_tactips = self.get_parameter('im.n_tactips').get_parameter_value().integer_value
         self.tactile_servoing_time = self.get_parameter('im.tactile_servoing_time').get_parameter_value().double_value
         no_contact_timeout = self.get_parameter('im.no_contact_timeout').get_parameter_value().double_value
+        self.arm_lengths = self.get_parameter('im.arm_lengths').get_parameter_value().double_array_value
+
         self.ts_no_contact_counter = 0
         self.ts_no_contact_max_cycles = int(no_contact_timeout * self.frequency)
 
         # --- Tactip interfaces ---
         self.tactip_pose_subscribers_ = []
         self.tactip_contact_subscribers_ = []
+        self.tactip_wrench_subscribers_ = []
 
         self.tactip_pose_ = [None] * self.n_tactips
         self.tactip_contact_ = [None] * self.n_tactips
+        self.tactip_wrench_ = [None] * self.n_tactips
         for n in range(self.n_tactips):
             self.tactip_pose_subscribers_.append(self.create_subscription(TwistStamped, '/tactip_'+str(n)+'/pose', self._make_tactip_pose_callback(n), 10))
             self.tactip_contact_subscribers_.append(self.create_subscription(Int8, '/tactip_'+str(n)+'/contact', self._make_tactip_contact_callback(n), 10))
+            self.tactip_wrench_subscribers_.append(self.create_subscription(WrenchStamped, '/tactip_'+str(n)+'/wrench', self._make_tactip_wrench_callback(n), 10))
 
         # --- Tactile Servoing controller interfaces ---
         self.sub_controller = self.create_subscription(TrajectorySetpoint, '/controller/out/trajectory_setpoint', self.controller_callback, 10)
@@ -137,6 +143,11 @@ class TactileMissionDirector(UAMStateMachine):
             self.tactip_contact_[index] = msg.data
         return callback
 
+    def _make_tactip_wrench_callback(self, index):
+        def callback(msg: TwistStamped):
+            self.tactip_wrench_[index] = msg.wrench
+        return callback
+
     def set_new_ssim_ref(self, value: bool):
         """Set the current tactip image as the SSIM contact-detection reference."""
         req = SetBool.Request()
@@ -153,6 +164,60 @@ class TactileMissionDirector(UAMStateMachine):
             )
         except Exception as e:
             self.get_logger().warn(str(e))
+
+    # ------------------------------------------------------------------
+    # Math helpers
+    # ------------------------------------------------------------------
+    def evaluate_R_CS(self, Rx, Ry):
+        R_CS = np.zeros((3,3))
+        R_CS[0,0] = np.cos(Ry)
+        R_CS[0,1] = np.sin(Rx)*np.sin(Ry)
+        R_CS[0,2] = np.sin(Ry)*np.cos(Rx)
+        R_CS[1,0] = 0
+        R_CS[1,1] = np.cos(Rx)
+        R_CS[1,2] = -np.sin(Rx)
+        R_CS[2,0] = -np.sin(Ry)
+        R_CS[2,1] = np.sin(Rx)*np.cos(Ry)
+        R_CS[2,2] = np.cos(Rx)*np.cos(Ry)
+        return R_CS
+
+    ''' Evaluate transformation matrix of sensor frame in contact frame
+    This is the alpha and beta that is the output of the TacTip
+    '''
+    def evaluate_P_CS(self, Rx, Ry, x_CS, y_CS, z_CS):
+        P_CS = np.eye(4)
+        P_CS[0:3, 0:3] = self.evaluate_R_CS(Rx, Ry)
+        P_CS[0,3] = x_CS
+        P_CS[1,3] = y_CS
+        P_CS[2,3] = z_CS
+        return P_CS
+
+    def evaluate_R_BS(self, q_1, q_2, q_3):
+        R_BS = np.zeros((3,3))
+        R_BS[0,0] = np.cos(q_2)
+        R_BS[0,1] = np.sin(q_2)*np.sin(q_3)
+        R_BS[0,2] = np.sin(q_2)*np.cos(q_3)
+        R_BS[1,0] = np.sin(q_1)*np.sin(q_2)
+        R_BS[1,1] = -np.sin(q_1)*np.sin(q_3)*np.cos(q_2) + np.cos(q_1)*np.cos(q_3)
+        R_BS[1,2] = -np.sin(q_1)*np.cos(q_2)*np.cos(q_3) - np.sin(q_3)*np.cos(q_1)
+        R_BS[2,0] = -np.sin(q_2)*np.cos(q_1)
+        R_BS[2,1] = np.sin(q_1)*np.cos(q_3) + np.sin(q_3)*np.cos(q_1)*np.cos(q_2)
+        R_BS[2,2] = -np.sin(q_1)*np.sin(q_3) + np.cos(q_1)*np.cos(q_2)*np.cos(q_3)
+        return R_BS
+
+    ''' Evaluate transformation matrix of sensor frame in body frame
+    '''
+    def evaluate_P_BS(self, q_1, q_2, q_3):
+        P_BS = np.eye(4)
+        P_BS[0:3, 0:3] = self.evaluate_R_BS(q_1, q_2, q_3)
+        P_BS[0,3] = -(self.arm_lengths[1] + self.arm_lengths[2]*np.cos(q_3))*np.sin(q_2)
+        P_BS[1,3] = self.arm_lengths[0]*np.sin(q_1) + self.arm_lengths[1]*np.sin(q_1)*np.cos(q_2) + self.arm_lengths[2]*np.sin(q_1)*np.cos(q_2)*np.cos(q_3) + self.arm_lengths[2]*np.sin(q_3)*np.cos(q_1)
+        P_BS[2,3] = -self.arm_lengths[0]*np.cos(q_1) - self.arm_lengths[1]*np.cos(q_1)*np.cos(q_2) + self.arm_lengths[2]*np.sin(q_1)*np.sin(q_3) - self.arm_lengths[2]*np.cos(q_1)*np.cos(q_2)*np.cos(q_3)
+        P_BS[3,0] = 0
+        P_BS[3,1] = 0
+        P_BS[3,2] = 0
+        P_BS[3,3] = 1
+        return P_BS
 
 
 def run_mission(node_cls):

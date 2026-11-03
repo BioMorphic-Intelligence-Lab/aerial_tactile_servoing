@@ -193,6 +193,11 @@ class UAMStateMachine(Node):
             VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, param1=1.0)
         self.get_logger().info('Arm command sent')
 
+    def publish_land_command(self):
+        """Switch to Auto.Land and land at the current position."""
+        self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_LAND)
+        self.get_logger().info("Land command sent")
+
     def publish_vehicle_command(self, command, **params) -> None:
         """Publish a vehicle command."""
         msg = VehicleCommand()
@@ -248,7 +253,7 @@ class UAMStateMachine(Node):
             self.offboard = True
         else:
             self.offboard = False
-        
+
         if msg.latest_disarming_reason == VehicleStatus.ARM_DISARM_REASON_KILL_SWITCH:
             self.killed = True
         else:
@@ -295,7 +300,7 @@ class UAMStateMachine(Node):
         if (self.home_position[0] != 0.0 and self.home_position[1] != 0.0 and len(self.servo_state.position)>0):
             self.get_logger().info(f'Got position fix! \t x: {self.home_position[0]:.3f} [m] \t y: {self.home_position[1]:.3f} [m] \t {np.rad2deg(self.home_position[3]):.2f} [deg]')
             self.transition_to_state(new_state=next_state)
-        elif self.input_state == 1 or self.fcu_on==False:
+        elif self.input_state == 1 or (self.fcu_on==False and len(self.servo_state.position)>0):
             self.get_logger().info('Bypassing position fix wait')
             self.transition_to_state(new_state=next_state)
 
@@ -362,18 +367,25 @@ class UAMStateMachine(Node):
             self.land_position[1] = self.vehicle_local_position.y
             self.land_position[2] = self.vehicle_local_position.z
             self.land_position[3] = self.vehicle_local_position.heading
+            self.publish_land_command()
             self.get_logger().info(f'[5] Landing from altitude: {self.land_position[2]} m at speed {landing_speed} m/s')
             self.first_state_loop = False
 
-        self.publish_trajectory_position_setpoint(*self.land_position)
-        self.land_position[2] += landing_speed / self.frequency  # Increase z (down) at landing speed
+        # self.publish_trajectory_position_setpoint(*self.land_position)
+        # self.land_position[2] += landing_speed / self.frequency  # Increase z (down) at landing speed
 
         # State transition
         if not self.offboard and self.fcu_on:
             self.transition_to_state('emergency')
-        elif (self.vehicle_local_position.z >= -0.1 and self.land_position[2] > 0.5) or self.input_state==1:
+        elif (self.vehicle_local_position.z >= -0.1 and self.land_position[2] > 0.5) or not self.armed or self.input_state==1:
             self.transition_to_state(new_state=next_state)
             self.flying = False
+
+    def state_done(self, next_state='emergency'):
+        self.handle_state(state_number = -1)
+        self.get_logger().info("Mission completed successfully.", throttle_duration_sec=5.)
+        if self.input_state == 1:
+            self.transition_to_state(new_state=next_state)
 
     def state_hover(self, duration_sec: float, next_state='emergency'):
         self.handle_state(state_number=10)
@@ -406,7 +418,6 @@ class UAMStateMachine(Node):
     Args:
         q (list): Target joint positions for the arms.
         next_state (str, optional): Next state to transition to after completion. Defaults to 'emergency'.
-        epsilon (float, optional): Position error threshold for completion. Defaults to 0.1.
     """
     def state_move_arms_joint_position(self, q_des: list, next_state='emergency'): 
         self.handle_state(state_number=11)
@@ -434,8 +445,14 @@ class UAMStateMachine(Node):
         elif (len(self.servo_state.position) >= self.n_arms*dof and (error < self.tolerance)) or self.input_state == 1: # If error is small enough or input state is 1
             self.transition_to_state(new_state=next_state)
 
-    def state_move_arms_task_position(self, p_des: list, next_state='emergency'):
-        self.handle_state(state_number=12)
+    """ Move arms to end-effector positions. Transitions automatically when positions are reached.
+    Args:
+        p_des (list): Target end-effector positions for the arms. Should be length 3*n_arms.
+        next_state (str, optional): Next state to transition to after completion. Defaults to 'emergency'.
+        state_number (int, optional): Manually specified state number. Defaults to 12.
+    """
+    def state_move_arms_task_position(self, p_des: list, next_state='emergency', state_number: int=12):
+        self.handle_state(state_number=state_number)
 
         # Run once when the state is called for the first time.
         if self.first_state_loop:
@@ -466,8 +483,20 @@ class UAMStateMachine(Node):
         elif (feedback_ready and error < self.tolerance) or self.input_state == 1:
             self.transition_to_state(new_state=next_state)
 
-    def state_move_arms_joint_velocity(self, qdot_des: list, transition: bool=False, next_state='emergency'):
-        self.handle_state(state_number=13)
+    """ Move arms by specifying joint velocities.
+    Args:
+        qdot_des (list): Target joint velocities for the arms. Should be length 3*n_arms.
+        transition (bool, optional): Set to True to transition to the next state. Default False.
+        next_state (str, optional): Next state to transition to after completion. Defaults to 'emergency'.
+        state_number (int, optional): Manually specified state number. Defaults to 13.
+    """
+    def state_move_arms_joint_velocity(self, qdot_des: list, transition: bool=False, next_state='emergency', state_number: int=13):
+        self.handle_state(state_number=state_number)
+
+        if len(qdot_des) != self.n_arms*3:
+            self.get_logger().error(f"[STATE {state_number}] Commanded joint velocities is not length {self.n_arms*3}. Terminating.")
+            self.transition_to_state(new_state='emergency')
+            return
 
         # Run once when the state is called for the first time.
         if self.first_state_loop:
@@ -492,8 +521,20 @@ class UAMStateMachine(Node):
                 self.publish_joint_vel(arm_index=n, qdot_des=[0.0 for x in range(dof)])
             self.transition_to_state(new_state=next_state)
 
+    """ Move arms by specifying a linear end-effector xyz velocity.
+    Args:
+        pdot_des (list): Target end-effector velocities for the arms. Should be length 3*n_arms.
+        transition (bool, optional): Set to True to transition to the next state. Default False.
+        next_state (str, optional): Next state to transition to after completion. Defaults to 'emergency'.
+        state_number (int, optional): Manually specified state number. Defaults to 14.
+    """
     def state_move_arms_task_velocity(self, pdot_des: list, transition: bool=False, next_state: str='emergency', state_number :int=14):
         self.handle_state(state_number=state_number)
+
+        if len(pdot_des) != self.n_arms*3:
+            self.get_logger().error(f"[STATE {state_number}] Commanded EE velocity is not length {self.n_arms*3}. Terminating.")
+            self.transition_to_state(new_state='emergency')
+            return
 
         # Run once when the state is called for the first time.
         if self.first_state_loop:
@@ -650,7 +691,7 @@ class UAMStateMachine(Node):
             self.transition_to_state(new_state=next_state)
 
     def state_emergency(self):
-        self.handle_state(state_number=-1)
+        self.handle_state(state_number=-2)
         self.get_logger().warn("EMERGENCY STATE! No offboard mode.", throttle_duration_sec=1)
 
         q_emergency = [1.578, 0.0, -1.85, -1.578, 0.0, 1.85]

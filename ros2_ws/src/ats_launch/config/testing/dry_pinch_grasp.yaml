@@ -23,6 +23,7 @@
       n_tactips: 2
       tactile_servoing_time: 180.0        # [s] max servoing duration
       no_contact_timeout: 10.0            # [s] lost-contact grace period
+      arm_lengths: [0.12025, 0.336, 0.255]
       # --- Pinch grasp implementation
       takeoff_altitude: 1.0               # [m]
       pre_contact_arm_position: [1.0472, 0.0, 0.5236, -1.0472, 0.0, -0.5236]  # [rad] q1,q2,q3 (pi/3, 0, pi/6)
