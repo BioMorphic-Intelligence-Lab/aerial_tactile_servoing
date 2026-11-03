@@ -419,8 +419,8 @@ class UAMStateMachine(Node):
         q (list): Target joint positions for the arms.
         next_state (str, optional): Next state to transition to after completion. Defaults to 'emergency'.
     """
-    def state_move_arms_joint_position(self, q_des: list, next_state='emergency'): 
-        self.handle_state(state_number=11)
+    def state_move_arms_joint_position(self, q_des: list, next_state='emergency', state_number :int=11): 
+        self.handle_state(state_number=state_number)
 
         # Run once when the state is called for the first time.
         if self.first_state_loop:
@@ -428,7 +428,7 @@ class UAMStateMachine(Node):
             self.hover_position[1] = self.vehicle_local_position.y
             self.hover_position[2] = self.vehicle_local_position.z
             self.hover_position[3] = self.vehicle_local_position.heading
-            self.get_logger().info(f'[11] Hovering at altitude: {self.hover_position[2]:.2f} m while moving arms to states {q_des} in mode joint position')
+            self.get_logger().info(f'[{state_number}] Hovering at altitude: {self.hover_position[2]:.2f} m while moving arms to states {q_des} in mode joint position')
             self.first_state_loop = False
 
         error = 0.
@@ -460,7 +460,7 @@ class UAMStateMachine(Node):
             self.hover_position[1] = self.vehicle_local_position.y
             self.hover_position[2] = self.vehicle_local_position.z
             self.hover_position[3] = self.vehicle_local_position.heading
-            self.get_logger().info(f'[12] Hovering at altitude: {self.hover_position[2]:.2f} m while moving arms to location {p_des} in mode task position')
+            self.get_logger().info(f'[{state_number}] Hovering at altitude: {self.hover_position[2]:.2f} m while moving arms to location {p_des} in mode task position')
             self.first_state_loop = False
 
         error = 0.
@@ -504,7 +504,7 @@ class UAMStateMachine(Node):
             self.hover_position[1] = self.vehicle_local_position.y
             self.hover_position[2] = self.vehicle_local_position.z
             self.hover_position[3] = self.vehicle_local_position.heading
-            self.get_logger().info(f'[13] Hovering at altitude: {self.hover_position[2]:.2f} m while moving arms to at speed {qdot_des} in mode joint velocity')
+            self.get_logger().info(f'[{state_number}] Hovering at altitude: {self.hover_position[2]:.2f} m while moving arms to at speed {qdot_des} in mode joint velocity')
             self.first_state_loop = False
 
         dof = len(qdot_des)//self.n_arms
@@ -542,7 +542,7 @@ class UAMStateMachine(Node):
             self.hover_position[1] = self.vehicle_local_position.y
             self.hover_position[2] = self.vehicle_local_position.z
             self.hover_position[3] = self.vehicle_local_position.heading
-            self.get_logger().info(f'[14] Hovering at altitude: {self.hover_position[2]:.2f} m while moving arms to at speed {pdot_des} in mode task velocity')
+            self.get_logger().info(f'[{state_number}] Hovering at altitude: {self.hover_position[2]:.2f} m while moving arms to at speed {pdot_des} in mode task velocity')
             self.first_state_loop = False
 
         for i in range(self.n_arms):

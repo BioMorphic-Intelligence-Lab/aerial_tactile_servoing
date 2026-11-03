@@ -16,7 +16,7 @@
 
 
 #define DEVICE_NAME "/dev/ttyUSB0"
-#define BAUDRATE 115200
+#define BAUDRATE 1000000
 #define PROTOCOL_VERSION 2.0
 
 namespace DXLREGISTER

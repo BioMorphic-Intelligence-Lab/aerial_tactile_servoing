@@ -23,8 +23,8 @@ class PinchGraspMission(TactileMissionDirector):
 
         # Make into parameters
         self.kp_shear = 1.0
-        self.kp_force = 0.01
-        self.squeeze_force_ref = 1.5
+        self.kp_force = 0.1
+        self.squeeze_force_ref = 3.0
 
         self.takeoff_altitude = self.get_parameter('im.takeoff_altitude').get_parameter_value().double_value
         self.pre_contact_arm_position = list(self.get_parameter('im.pre_contact_arm_position').get_parameter_value().double_array_value)
@@ -40,6 +40,8 @@ class PinchGraspMission(TactileMissionDirector):
 
             case "pre_grasp_config":
                 self.state_move_arms_joint_position(q_des=self.pre_grasp_arm_position, next_state="wait")
+                if not self.sim:
+                    self.set_new_ssim_ref(True) # Get new SSIM reference image
 
             case "wait":
                 self.state_do_nothing(next_state="approach_grasp")
@@ -85,8 +87,8 @@ class PinchGraspMission(TactileMissionDirector):
                 R_BS_block = np.zeros((self.n_arms*3, self.n_arms*3))
                 for n in range(self.n_arms):
                     v_c_cmd[n*3 : n*3+3] = np.array([
-                        0.0, # self.kp_shear * self.tactip_pose_[n].angular.y,
-                        0.0, #-self.kp_shear * self.tactip_pose_[n].angular.x,
+                        0.0, # self.kp_shear * np.deg2rad(self.tactip_pose_[n].angular.y),
+                        0.0, #-self.kp_shear * np.deg2rad(self.tactip_pose_[n].angular.x),
                         -self.kp_force * (self.squeeze_force_ref - self.tactip_wrench_[n].force.z)
                     ])
                     R_CS_block[n*3:n*3+3, n*3:n*3+3] = self.evaluate_R_CS(np.deg2rad(self.tactip_pose_[n].angular.x), np.deg2rad(self.tactip_pose_[n].angular.y))
@@ -97,7 +99,8 @@ class PinchGraspMission(TactileMissionDirector):
                 v_b_cmd = R_BC_block@v_c_cmd # Rotate from contact frame into sensor frame
 
                 transition = False
-                if (datetime.datetime.now()-self.state_start_time).seconds > 10.:
+                self.get_logger().info(f"[29] Grasp force: {self.tactip_wrench_[0].force.z:.2f} N | {self.tactip_wrench_[1].force.z:.2f} N, {(datetime.datetime.now()-self.state_start_time).seconds:.1f}/20 sec", throttle_duration_sec=1.0)
+                if (datetime.datetime.now()-self.state_start_time).seconds > 20.:
                     transition = True
 
                 self.state_move_arms_task_velocity(pdot_des=v_b_cmd, transition=transition, next_state="release", state_number=29)

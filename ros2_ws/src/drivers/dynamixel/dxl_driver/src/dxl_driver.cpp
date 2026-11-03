@@ -108,9 +108,9 @@ DXLDriver::DXLDriver(dynamixel::GroupSyncRead *positionReader, dynamixel::GroupS
 
     // ROS2 servo interfaces
     sub_servo_reference = this->create_subscription<sensor_msgs::msg::JointState>(
-      "/servo/in/state", 10, 
+      "/servo/in/state", 1, 
       std::bind(&DXLDriver::servo_reference_callback, this, std::placeholders::_1));
-    pub_servo_state = this->create_publisher<sensor_msgs::msg::JointState>("/servo/out/state", 10);
+    pub_servo_state = this->create_publisher<sensor_msgs::msg::JointState>("/servo/out/state", 1);
 
     set_torque_enable_srv_ = this->create_service<dxl_driver::srv::SetTorqueEnable>(
         "/set_torque_enable", std::bind(&DXLDriver::srv_set_torque_enable_callback,

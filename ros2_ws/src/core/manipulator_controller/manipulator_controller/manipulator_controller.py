@@ -127,8 +127,8 @@ class ManipulatorController(Node):
         }
 
         # Servo interface
-        self.subscriber_servo = self.create_subscription(JointState, '/servo/out/state', self.callback_servo, 10)
-        self.publisher_servo = self.create_publisher(JointState, '/servo/in/state', 10)
+        self.subscriber_servo = self.create_subscription(JointState, '/servo/out/state', self.callback_servo, 1)
+        self.publisher_servo = self.create_publisher(JointState, '/servo/in/state', 1)
 
         # Controller interface
         self.task_pos_subscribers_ = []
