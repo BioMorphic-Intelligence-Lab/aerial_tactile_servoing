@@ -7,6 +7,11 @@ from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PointStamped
 import itertools
 
+
+def _ang_diff(a, b):
+    """Signed smallest angle (a - b), wrapped to (-pi, pi]."""
+    return math.atan2(math.sin(a - b), math.cos(a - b))
+
 class ManipulatorController(Node):
     def __init__(self):
         """
@@ -56,11 +61,13 @@ class ManipulatorController(Node):
         /manipulator/out/arm_<i>/task/{position,velocity}.
 
         For multi-arm morphologies (n_arms > 1) a collision guard keeps opposed
-        arms' base joints at least `minimum_pivot_distance` apart. In velocity
-        mode it scales down only the *closing* joint velocities (ramped over
-        `pivot_ramp`); in position mode it clamps the commanded base-joint
-        setpoints to a hard floor/ceiling at `minimum_pivot_distance` from the
-        other arm's present base position. Link geometry is set by `link_lengths`.
+        arms' base joints at least `minimum_pivot_distance` apart, measured as a
+        wrapped angular distance so a wrap-around approach (one joint near +pi,
+        the other near -pi) is caught. In velocity mode it scales down only the
+        *closing* joint velocities (ramped over `pivot_ramp`); in position mode it
+        pushes the two commanded base-joint setpoints symmetrically apart whenever
+        they are within `minimum_pivot_distance`. Link geometry is set by
+        `link_lengths`.
 
         TODO: Implement singularity guards and out of workspace guards (for position commands)
         """
@@ -228,33 +235,38 @@ class ManipulatorController(Node):
         self.publisher_servo.publish(msg)
 
     def apply_collision_guard(self, cmd_servo):
+        # Base-joint separation is an ANGLE, so it is measured on the circle (wrapped
+        # to (-pi, pi]) -- a plain subtraction misreads a wrap-around approach (e.g.
+        # +pi vs -pi, physically adjacent) as a wide-open ~2*pi gap and never fires.
         for a, b in itertools.combinations(self.arms, 2):
             if a.q_present is None or b.q_present is None:
                 continue
-            h, l = (a, b) if a.q_present[0] >= b.q_present[0] else (b, a)   # high / low side
-            ih, il = h.index * 3, l.index * 3
+            ia, ib = a.index * 3, b.index * 3
+            d = _ang_diff(a.q_present[0], b.q_present[0])   # a relative to b, signed
+            gap = abs(d)
+            side = 1.0 if d >= 0.0 else -1.0                # +1: a sits on b's positive side
 
             if self.servo_mode == 'velocity':
-                gap = h.q_present[0] - l.q_present[0]
-                # high arm closes when moving negative; low arm closes when moving positive.
-                # Scale ONLY the closing component -> opening stays at full speed.
+                # Scale ONLY the closing component (the one that shrinks |d|) -> opening
+                # stays at full speed. a closes moving -side; b closes moving +side.
                 scale = float(np.clip((gap - self.min_pivot_distance) / self.pivot_ramp, 0.0, 1.0))
-                if cmd_servo[ih] < 0.0:
-                    cmd_servo[ih] *= scale
-                if cmd_servo[il] > 0.0:
-                    cmd_servo[il] *= scale
-            else:  # position: clamp each base-joint setpoint to a hard floor/ceiling
-                # at minimum_pivot_distance from the OTHER arm's present base position.
-                floor_high = l.q_present[0] + self.min_pivot_distance
-                ceil_low = h.q_present[0] - self.min_pivot_distance
-                if cmd_servo[ih] < floor_high:
-                    cmd_servo[ih] = floor_high
-                    if h.q_set is not None:  # keep the integrator from winding up past the clamp
-                        h.q_set[0] = floor_high
-                if cmd_servo[il] > ceil_low:
-                    cmd_servo[il] = ceil_low
-                    if l.q_set is not None:
-                        l.q_set[0] = ceil_low
+                if side * cmd_servo[ia] < 0.0:
+                    cmd_servo[ia] *= scale
+                if side * cmd_servo[ib] > 0.0:
+                    cmd_servo[ib] *= scale
+            else:  # position: keep the two COMMANDED setpoints >= min_pivot apart.
+                # Clamp against each other (both are known here) and split the
+                # correction symmetrically, so there is no one-cycle mutual lag.
+                dc = _ang_diff(cmd_servo[ia], cmd_servo[ib])   # commanded separation, signed
+                if abs(dc) < self.min_pivot_distance:
+                    s = (1.0 if dc > 0.0 else -1.0) if dc != 0.0 else side
+                    push = 0.5 * (self.min_pivot_distance - abs(dc))
+                    cmd_servo[ia] += s * push
+                    cmd_servo[ib] -= s * push
+                    if a.q_set is not None:  # keep the integrator from winding up past the clamp
+                        a.q_set[0] = cmd_servo[ia]
+                    if b.q_set is not None:
+                        b.q_set[0] = cmd_servo[ib]
 
         return cmd_servo
 
