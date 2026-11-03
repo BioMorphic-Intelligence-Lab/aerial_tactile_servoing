@@ -23,8 +23,8 @@ class PinchGraspMission(TactileMissionDirector):
 
         # Make into parameters
         self.kp_shear = 1.0
-        self.kp_force = 1.0
-        self.squeeze_force_ref = 3.0
+        self.kp_force = 0.01
+        self.squeeze_force_ref = 1.5
 
         self.takeoff_altitude = self.get_parameter('im.takeoff_altitude').get_parameter_value().double_value
         self.pre_contact_arm_position = list(self.get_parameter('im.pre_contact_arm_position').get_parameter_value().double_array_value)
@@ -39,13 +39,17 @@ class PinchGraspMission(TactileMissionDirector):
                 self.state_entrypoint(next_state="pre_grasp_config")
 
             case "pre_grasp_config":
-                self.state_move_arms_joint_position(q_des=self.pre_grasp_arm_position, next_state="approach_grasp")
+                self.state_move_arms_joint_position(q_des=self.pre_grasp_arm_position, next_state="wait")
+
+            case "wait":
+                self.state_do_nothing(next_state="approach_grasp")
 
             case "approach_grasp":
                 # self.get_logger().info(f"{self.tactip_contact_}")
-                next_state="control_grasp"
+                next_state="hold_grasp"
                 if abs(self.arm_task_positions_[0][1]) < 0.05 or abs(self.arm_task_positions_[1][1]) < 0.05:
                     self.get_logger().info("Transition by approach of center")
+                    next_state="control_grasp"
                     transition = True
                 elif self.tactip_contact_[0] and not self.tactip_contact_[1]:
                     self.get_logger().info("Transition by contact on 0")
@@ -81,11 +85,11 @@ class PinchGraspMission(TactileMissionDirector):
                 R_BS_block = np.zeros((self.n_arms*3, self.n_arms*3))
                 for n in range(self.n_arms):
                     v_c_cmd[n*3 : n*3+3] = np.array([
-                        self.kp_shear * self.tactip_pose_[n].angular.y,
-                        -self.kp_shear * self.tactip_pose_[n].angular.x,
+                        0.0, # self.kp_shear * self.tactip_pose_[n].angular.y,
+                        0.0, #-self.kp_shear * self.tactip_pose_[n].angular.x,
                         -self.kp_force * (self.squeeze_force_ref - self.tactip_wrench_[n].force.z)
                     ])
-                    R_CS_block[n*3:n*3+3, n*3:n*3+3] = self.evaluate_R_CS(self.tactip_pose_[n].angular.x, self.tactip_pose_[n].angular.y)
+                    R_CS_block[n*3:n*3+3, n*3:n*3+3] = self.evaluate_R_CS(np.deg2rad(self.tactip_pose_[n].angular.x), np.deg2rad(self.tactip_pose_[n].angular.y))
                     R_BS_block[n*3:n*3+3, n*3:n*3+3] = self.evaluate_R_BS(*self.servo_state.position[n*3:n*3+3])
                 # Invert rotation
                 R_SC_block = np.linalg.inv(R_CS_block)
@@ -97,6 +101,9 @@ class PinchGraspMission(TactileMissionDirector):
                     transition = True
 
                 self.state_move_arms_task_velocity(pdot_des=v_b_cmd, transition=transition, next_state="release", state_number=29)
+
+            case "hold_grasp":
+                self.state_hover(duration_sec=20., next_state="release")
 
             case "release":
                 self.state_move_arms_joint_position(q_des=self.land_arm_position, next_state="done")

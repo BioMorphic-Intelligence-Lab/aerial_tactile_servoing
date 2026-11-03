@@ -224,7 +224,7 @@ class ManipulatorController(Node):
             cmd = self.apply_collision_guard(cmd)
 
         msg = JointState()
-        msg.name = ['q'+str(i+1) for i in range(len(cmd))]
+        msg.name = ['q'+str(i) for i in range(len(cmd))]
         msg.header.stamp = self.get_clock().now().to_msg()
         # Fill ONLY the field the active servo mode uses; leave the other empty so
         # a servo_mode mismatch with the driver is detectable downstream.
