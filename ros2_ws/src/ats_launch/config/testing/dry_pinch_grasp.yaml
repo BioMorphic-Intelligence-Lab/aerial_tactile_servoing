@@ -44,7 +44,7 @@
   
 /manipulator:
   ros__parameters:
-    frequency: 50.
+    frequency: 100.
     minimum_pivot_distance: 0.7
     pivot_ramp: 1.0
     verbose: false

@@ -39,11 +39,13 @@ class PinchGraspMission(TactileMissionDirector):
                 self.state_entrypoint(next_state="pre_grasp_config")
 
             case "pre_grasp_config":
-                self.state_move_arms_joint_position(q_des=self.pre_grasp_arm_position, next_state="wait")
-                if not self.sim:
-                    self.set_new_ssim_ref(True) # Get new SSIM reference image
+                self.state_move_arms_joint_position(q_des=self.pre_grasp_arm_position, next_state="wait", state_number=24)
 
             case "wait":
+                if self.first_state_loop:
+                    self.first_state_loop = False
+                    if not self.sim:
+                        self.set_new_ssim_ref(True) # Get new SSIM reference image
                 self.state_do_nothing(next_state="approach_grasp")
 
             case "approach_grasp":

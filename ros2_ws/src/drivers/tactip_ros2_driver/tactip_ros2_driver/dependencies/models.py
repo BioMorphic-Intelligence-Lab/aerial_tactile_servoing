@@ -64,7 +64,7 @@ def create_model(
 
     if saved_model_dir is not None:
         model.load_state_dict(torch.load(os.path.join(
-            saved_model_dir, 'best_model.pth'), map_location='cpu')
+            saved_model_dir, 'best_model.pth'), map_location='cpu', weights_only=True)
         )
         print(f"Loaded model from {os.path.join(saved_model_dir, 'best_model.pth')}")
 

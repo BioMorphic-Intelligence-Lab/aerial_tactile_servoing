@@ -15,6 +15,21 @@ from std_srvs.srv import SetBool
 
 from .tactip import TacTip
 
+# ---------------------------------------------------------------------------
+  # PERF NOTE (rate tuning): feedback rate is camera-bound, not model-bound.
+  #   - Cameras: fixed ~17 fps, YUYV only, no V4L2 controls (exposure/res/MJPG
+  #     all do nothing). ~17 Hz/tip is the hard ceiling -> need new hardware to beat it.
+  #   - Model predict (~15 ms) is already << 58 ms frame period. Do NOT shrink it
+  #     further for speed; size it for accuracy/CPU headroom only.
+  #   - Live ~7 Hz is a blocking-read cliff: serial blocking read() + per-cycle work
+  #     (SSIM/publish/TF) tips over one frame period -> both reads wait for the next
+  #     frame -> ~2x frame period. Microbenchmark hits the full 17 Hz.
+  #   - FIX: non-blocking capture (grabber thread per camera + CAP_PROP_BUFFERSIZE=1),
+  #     single process, serial inference. Do NOT multiprocess the tips: two PyTorch
+  #     procs oversubscribe the 8 cores and predict goes 15 -> 64 ms (net slower).
+  # ---------------------------------------------------------------------------
+
+
 class TactipDriver(Node):
     def __init__(self):
         super().__init__('tactip_driver')
@@ -70,6 +85,7 @@ class TactipDriver(Node):
                     )
                     raise SystemExit(1)
                 self.get_logger().info(f"Start sensor {i}, reading from /dev/video{s}" )
+                self.get_logger().info(f"With model {self.model_names[i]}")
                 self.get_logger().info(f"Sensor processing params: {self.sensors[-1].sensor_params}")
 
                 # Reference SSIM image. The camera is warm here (the probe just succeeded), but a

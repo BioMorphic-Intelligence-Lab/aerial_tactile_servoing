@@ -5,7 +5,7 @@ import os
 package_name = 'tactip_ros2_driver'
 
 # Default model, used when a node does not set the 'model_dir' parameter (single-arm missions).
-installed_models = ['simple_cnn_B1', 'simple_cnn_B2']
+installed_models = ['simple_cnn_B1', 'simple_cnn_B2', 'simple_cnn_B2-smaller', 'simple_cnn_B2-smallest']
 
 #  multiple driver instances (e.g. the dual-arm TacTips, which are physically different sensors
 # with their own force limits and image processing) can each load their own model via 'model_dir'.

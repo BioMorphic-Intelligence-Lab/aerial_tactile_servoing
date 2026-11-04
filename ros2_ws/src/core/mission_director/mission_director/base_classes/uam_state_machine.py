@@ -304,9 +304,9 @@ class UAMStateMachine(Node):
             self.get_logger().info('Bypassing position fix wait')
             self.transition_to_state(new_state=next_state)
 
-    def state_do_nothing(self, next_state='emergency'):
-        self.handle_state(state_number=1)
-        self.get_logger().info('[1] Doing nothing... Publish 1 to continue \n ros2 topic pub --once /md/input std_msgs/msg/Int32 "{data: 1}"', throttle_duration_sec=1)
+    def state_do_nothing(self, next_state='emergency', state_number :int=1):
+        self.handle_state(state_number=state_number)
+        self.get_logger().info('['+str(state_number)+'] Doing nothing... Publish 1 to continue \n ros2 topic pub --once /md/input std_msgs/msg/Int32 "{data: 1}"', throttle_duration_sec=1)
 
         # State transition
         if self.input_state == 1:

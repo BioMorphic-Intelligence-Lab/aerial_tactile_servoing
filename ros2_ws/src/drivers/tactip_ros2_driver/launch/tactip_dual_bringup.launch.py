@@ -32,11 +32,11 @@ def generate_launch_description():
             {'sources': [0, 2]},
             {'dimensions': [8, 8]},
             {'ssim_contact_thresholds': [0.8, 0.85]},
-            {'model_names': ['simple_cnn_B1', 'simple_cnn_B2']},
+            {'model_names': ['simple_cnn_B2-smallest', 'simple_cnn_B2-smallest']},
             {'frequency': 10.},
             {'fake_data': False},
             {'verbose': False},
-            {'test_model_time': False},
+            {'test_model_time': True},
             {'zero_when_no_contact': True},
         ],
         arguments=['--ros-args', '--log-level', 'info']

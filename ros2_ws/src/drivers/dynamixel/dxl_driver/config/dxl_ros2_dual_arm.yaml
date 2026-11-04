@@ -2,7 +2,7 @@
   ros__parameters:
     servo_mode: "position" # expected reference field; must match servos.operating_modes
     driver:
-      frequency: 75.0
+      frequency: 100.0
 
     servos:
       ids: [31, 32, 33, 41, 42, 43] # Servo IDs
