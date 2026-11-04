@@ -37,10 +37,10 @@ DXLDriver::DXLDriver(dynamixel::GroupSyncRead *positionReader, dynamixel::GroupS
     this->declare_parameter("servos.directions", std::vector<int>{1});
     this->declare_parameter("servos.max_speeds", std::vector<double>{0.1});
     this->declare_parameter("servos.gear_ratios", std::vector<double>{1.0});
-    this->declare_parameter("servos.min_angles", std::vector<double>(0.0));
-    this->declare_parameter("servos.max_angles", std::vector<double>(0.0));
-    this->declare_parameter("servos.start_offsets", std::vector<double>(0.0));
-    this->declare_parameter("servos.return_delay_times", std::vector<int>(0));
+    this->declare_parameter("servos.min_angles", std::vector<double>{0.0});
+    this->declare_parameter("servos.max_angles", std::vector<double>{0.0});
+    this->declare_parameter("servos.start_offsets", std::vector<double>{0.0});
+    this->declare_parameter("servos.return_delay_times", std::vector<int>{});
     this->declare_parameter("servo_mode", std::string("velocity")); // expected reference contract: "position" or "velocity"
 
     // Generate uint8_t vector of ids
@@ -60,6 +60,7 @@ DXLDriver::DXLDriver(dynamixel::GroupSyncRead *positionReader, dynamixel::GroupS
     std::vector<double> min_angles = this->get_parameter("servos.min_angles").as_double_array();
     std::vector<double> max_angles = this->get_parameter("servos.max_angles").as_double_array();
     std::vector<double> start_offsets = this->get_parameter("servos.start_offsets").as_double_array();
+    std::vector<int64_t> return_delay_times = this->get_parameter("servos.return_delay_times").as_integer_array();
 
     for (int i = 0; i < num_servos_; i++)
     {
@@ -651,12 +652,11 @@ void DXLDriver::configure_servos()
 
         // Write return delay times
         std::vector<int64_t> return_delay_times = this->get_parameter("servos.return_delay_times").as_integer_array();
-        if(!std::reduce(return_delay_times.begin(), return_delay_times.end())==0) // If the return delay times are not zero
+        if(std::reduce(return_delay_times.begin(), return_delay_times.end()) != 0 && return_delay_times.empty()) // If the return delay times are not zero and not empty
         {
             write_return_delay_times(return_delay_times);
         }
     } 
-
 }
 
 // Writes max velocity from the servodata_
@@ -743,11 +743,11 @@ bool DXLDriver::write_return_delay_times(const std::vector<int64_t> return_delay
     for (int i=0; i<num_servos_; i++)
     {
         uint8_t ret_time = static_cast<uint8_t>(return_delay_times[i]);
-        dxl_comm_result = packetHandler->read1ByteTxRx(
+        dxl_comm_result = packetHandler->write1ByteTxRx(
             portHandler,
             servodata_[i].id,
             DXLREGISTER::RETURN_DELAY,
-            &ret_time,
+            ret_time,
             &dxl_error
         );
         if (dxl_comm_result == COMM_SUCCESS)
@@ -1019,6 +1019,12 @@ void DXLDriver::check_parameter_sizes(size_t num_servos) const
     if (this->get_parameter("servos.start_offsets").as_double_array().size() != num_servos)
     {
         RCLCPP_ERROR(this->get_logger(), "servos.start_offsets not the same size as number of servos!");
+        exit(-1);
+    }
+    auto ret_delay_times = this->get_parameter("servos.return_delay_times").as_integer_array();
+    if (!ret_delay_times.empty() && ret_delay_times.size() != num_servos)
+    {
+        RCLCPP_ERROR(this->get_logger(), "servos.return_delay_times set but not the same size as number of servos!");
         exit(-1);
     }
 }
