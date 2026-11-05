@@ -30,7 +30,7 @@ def generate_launch_description():
         output='screen',
         emulate_tty=True, # Directs python print statements to the terminal
         parameters=[
-            {'sources': [0]},
+            {'sources': [4]},
             {'dimensions': [8]},
             {'ssim_contact_thresholds': [0.8]},
             {'model_names': ['simple_cnn_B1']},
@@ -39,6 +39,7 @@ def generate_launch_description():
             {'verbose': False},
             {'test_model_time': True},
             {'zero_when_no_contact': True},
+            {'ssim_dims': [0, 0]}
         ],
         arguments=['--ros-args', '--log-level', 'info']
     )

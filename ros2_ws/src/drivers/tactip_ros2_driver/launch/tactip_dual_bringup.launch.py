@@ -39,6 +39,7 @@ def generate_launch_description():
             {'test_model_time': True},
             {'torch_threads': 4},
             {'zero_when_no_contact': True},
+            {'ssim_dims': [320, 240]}
         ],
         arguments=['--ros-args', '--log-level', 'info']
     )

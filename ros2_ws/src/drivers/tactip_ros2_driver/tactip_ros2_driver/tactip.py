@@ -40,14 +40,20 @@ class TacTip:
     # Grabber thread: back-off after a failed read so a dead camera does not spin a core.
     GRAB_FAIL_BACKOFF = 0.005  # seconds
 
-    def __init__(self, source, model_name, clock=time.time):
+    def __init__(self, source, model_name, clock=time.time, ssim_dims=None):
         """model_dir: absolute path to a model directory, or a bare name resolved against
         share/tactip_ros2_driver/models/. None keeps the single-model path so existing
         single-arm missions are unaffected. B1 and B2 are physically different sensors with their
         own force limits and image processing, so each instance must load its own model.
 
         clock: callable returning the capture timestamp attached to each grabbed frame. The node
-        passes its ROS clock's now() so message stamps respect use_sim_time."""
+        passes its ROS clock's now() so message stamps respect use_sim_time.
+
+        ssim_dims: (width, height) the processed image is downsampled to before SSIM, or None for
+        full resolution. Full-frame SSIM is memory-bound (~15 full-size float32 temporaries) and
+        cost ~16 ms per frame on board; 320x240 is an exact 2x reduction (resize ~0.01 ms) that
+        cuts SSIM ~9x. Only the SSIM sees the downsampled image; the model input is unchanged.
+        SSIM scores depend on resolution, so contact thresholds are tied to this setting."""
         self.model_path = os.path.join(BASE_MODEL_PATH,model_name)
         self._clock = clock
 
@@ -66,6 +72,7 @@ class TacTip:
         # other threads only request a refresh.
         self._ssim_ref = None
         self._ref_refresh = threading.Event()
+        self.ssim_dims = tuple(ssim_dims) if ssim_dims else None
 
         # Params are loaded before opening the camera so the exposure below can come from them.
         self.model_label_params = {}
@@ -206,7 +213,15 @@ class TacTip:
         """Set the SSIM contact reference directly (before start())."""
         if self.running:
             raise RuntimeError("Use request_ssim_reference() while the capture thread is running.")
-        self._ssim_ref = processed_img.squeeze()
+        self._ssim_ref = self._ssim_view(processed_img)
+
+    def _ssim_view(self, processed_img):
+        """The image SSIM is computed on: the processed image, downsampled to ssim_dims if set.
+        Used for both the reference and live frames so their sizes always match."""
+        img = processed_img.squeeze()
+        if self.ssim_dims is None:
+            return img
+        return cv2.resize(img, self.ssim_dims, interpolation=cv2.INTER_AREA)
 
     def request_ssim_reference(self):
         """Ask the capture thread to use its next frame as the SSIM reference (thread-safe)."""
@@ -259,11 +274,12 @@ class TacTip:
                 t0 = time.perf_counter()
                 processed = process_image(img, **self.sensor_params)
                 t1 = time.perf_counter()
+                view = self._ssim_view(processed)
                 refreshed = self._ref_refresh.is_set() or self._ssim_ref is None
                 if refreshed:
                     self._ref_refresh.clear()
-                    self._ssim_ref = processed.squeeze()
-                score = ssim(self._ssim_ref, processed.squeeze())
+                    self._ssim_ref = view
+                score = ssim(self._ssim_ref, view)
                 t2 = time.perf_counter()
             except Exception as e:
                 # A bad frame must not kill the thread (the sensor would go silent for good).

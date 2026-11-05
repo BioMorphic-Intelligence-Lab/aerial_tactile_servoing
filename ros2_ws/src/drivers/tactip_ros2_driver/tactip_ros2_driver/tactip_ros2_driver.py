@@ -88,6 +88,9 @@ class TactipDriver(Node):
         self.declare_parameter('test_model_time', False)
         self.declare_parameter('torch_threads', 4)  # 0 = leave PyTorch's default (all cores)
         self.declare_parameter('zero_when_no_contact', True)
+        # [width, height] the processed image is downsampled to before SSIM; [0, 0] = full
+        # resolution. Contact thresholds depend on this, so retune them if it changes.
+        self.declare_parameter('ssim_dims', [0, 0])
 
         # Grabbing the parameters
         self.fake_data = self.get_parameter('fake_data').get_parameter_value().bool_value
@@ -100,6 +103,10 @@ class TactipDriver(Node):
         self.zero_when_no_contact = self.get_parameter('zero_when_no_contact').get_parameter_value().bool_value
         torch_threads = self.get_parameter('torch_threads').get_parameter_value().integer_value
         sources = list(self.get_parameter('sources').get_parameter_value().integer_array_value)
+        ssim_dims = list(self.get_parameter('ssim_dims').get_parameter_value().integer_array_value)
+        if len(ssim_dims) != 2 or min(ssim_dims) < 0:
+            raise ValueError(f"ssim_dims must be [width, height] (or [0, 0] for full resolution), got {ssim_dims}")
+        ssim_dims = tuple(ssim_dims) if min(ssim_dims) > 0 else None
 
         if torch_threads > 0:
             torch.set_num_threads(torch_threads)
@@ -119,14 +126,14 @@ class TactipDriver(Node):
         self._stop = threading.Event()
 
         # Node feedback
-        self.get_logger().info(f"Tactip driver initialized with dimensions: {list(self.dimensions)} and ssim thresholds: {self.ssim_thresholds}")
+        self.get_logger().info(f"Tactip driver initialized with dimensions: {list(self.dimensions)}, ssim thresholds: {self.ssim_thresholds}, ssim dims: {ssim_dims or 'full resolution'}")
 
         # Initialize the sensor(s)
         if not self.fake_data:
             # Initialize TacTip sensors
             for i, s in enumerate(sources):
                 try:
-                    self.sensors.append(TacTip(s, self.model_names[i], clock=self.get_clock().now))
+                    self.sensors.append(TacTip(s, self.model_names[i], clock=self.get_clock().now, ssim_dims=ssim_dims))
                 except Exception as e:
                     # A missing/busy camera is not recoverable mid-mission, so fail fast at startup
                     # with one clear, node-tagged line naming the sensor instead of a raw traceback.
