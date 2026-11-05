@@ -28,8 +28,9 @@ def generate_launch_description():
         executable='tactip_ros2_driver',
         name='tactip_driver',
         output='screen',
+        emulate_tty=True,
         parameters=[
-            {'sources': [4, 6]},
+            {'sources': [0, 2]},
             {'dimensions': [8, 8]},
             {'ssim_contact_thresholds': [0.8, 0.85]},
             {'model_names': ['simple_cnn_B1', 'simple_cnn_B2']},

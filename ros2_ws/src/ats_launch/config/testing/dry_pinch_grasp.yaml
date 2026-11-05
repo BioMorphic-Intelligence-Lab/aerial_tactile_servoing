@@ -35,12 +35,14 @@
     sources: [0, 2]
     dimensions: [8, 8]
     ssim_contact_thresholds: [0.8, 0.85]
-    model_names: ['simple_cnn_B1', 'simple_cnn_B2']
-    frequency: 15.0
+    model_names: ['simple_cnn_B2-smallest', 'simple_cnn_B2-smallest']
+    frequency: 0.
     fake_data: false
     verbose: false
-    test_model_time: false
-    zero_when_no_contact: true
+    test_model_time: true
+    torch_treads: 4
+    zero_when_no_contact: false
+    ssim_dims: [0, 0]
   
 /manipulator:
   ros__parameters:

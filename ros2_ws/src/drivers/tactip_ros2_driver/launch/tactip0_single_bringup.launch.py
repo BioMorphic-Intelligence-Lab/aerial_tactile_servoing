@@ -33,14 +33,14 @@ def generate_launch_description():
             {'sources': [4]},
             {'dimensions': [8]},
             {'ssim_contact_thresholds': [0.8]},
-            {'model_names': ['simple_cnn_B1']},
+            {'model_names': ['simple_cnn_B2-smallest']},
             {'frequency': 0.},  # max publish rate [Hz]; 0 = every camera frame
             {'fake_data': False},
             {'verbose': False},
             {'test_model_time': True},
             {'backend', 'torch'},
             {'zero_when_no_contact': True},
-            {'ssim_dims': [0, 0]}
+            {'ssim_dims': [0, 0]},
         ],
         arguments=['--ros-args', '--log-level', 'info']
     )
