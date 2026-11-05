@@ -53,6 +53,9 @@ class _TimingStats:
         self.t_proc = 0.0
         self.t_ssim = 0.0
         self.t_pred = 0.0
+        self.t_prep = 0.0    # inside predict: image prep + tensor conversion
+        self.t_fwd = 0.0     # inside predict: model forward pass
+        self.t_dec = 0.0     # inside predict: label decoding
         self.t_pub = 0.0
         self.age_sum = 0.0
         self.age_max = 0.0
@@ -241,6 +244,10 @@ class TactipDriver(Node):
         if frame.ssim < self.ssim_thresholds[i] or not self.zero_when_no_contact:
             pose, wrench = self.predict_pose_wrench_(i, frame.image)
             stats.predicted += 1
+            prep, fwd, dec = self.sensors[i].pose_model.last_timing
+            stats.t_prep += prep
+            stats.t_fwd += fwd
+            stats.t_dec += dec
         else:
             pose, wrench = [0.0] * 6, [0.0] * 6
         t3 = time.perf_counter()
@@ -279,12 +286,16 @@ class TactipDriver(Node):
             st = self._timing[i]
             n = max(st.processed, 1)
             ms = lambda t: 1000.0 * t / n
+            n_pred = max(st.predicted, 1)
+            ms_pred = lambda t: 1000.0 * t / n_pred  # per frame the model actually ran on
             self.get_logger().info(
                 f"[timing] tactip_{i}: grab {(sensor.seq - st.seq0) / dt:.1f} Hz | "
                 f"out {st.processed / dt:.1f} Hz (predict {st.predicted / dt:.1f} Hz, "
                 f"cap-skipped {st.cap_skipped}) | "
                 f"capture thread: proc {ms(st.t_proc):.1f} ssim {ms(st.t_ssim):.1f} ms | "
-                f"worker: predict {ms(st.t_pred):.1f} pub {ms(st.t_pub):.1f} ms | "
+                f"worker: predict {ms_pred(st.t_pred):.1f} (prep {ms_pred(st.t_prep):.1f} "
+                f"fwd {ms_pred(st.t_fwd):.1f} decode {ms_pred(st.t_dec):.1f}) "
+                f"pub {ms(st.t_pub):.1f} ms | "
                 f"frame age mean {ms(st.age_sum):.1f} max {1000.0 * st.age_max:.1f} ms | "
                 f"read fails {sensor.failed_reads - st.failed_reads0}")
             st.reset(seq=sensor.seq, failed_reads=sensor.failed_reads)

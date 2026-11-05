@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import torch
 from torch.autograd import Variable
@@ -18,9 +20,11 @@ class LabelledModel:
         self.label_names = label_encoder.label_names
         self.target_label_names = label_encoder.target_label_names
         self.device = device
+        # (prep, forward, decode) seconds of the last predict() call, for timing logs
+        self.last_timing = (0.0, 0.0, 0.0)
 
     def predict(self, tactile_image):
-
+        t0 = time.perf_counter()
         processed_image = process_image(
             tactile_image,
             gray=False,
@@ -33,7 +37,9 @@ class LabelledModel:
 
         # perform inference with the trained model
         model_input = Variable(torch.from_numpy(processed_image)).float().to(self.device)
+        t1 = time.perf_counter()
         outputs = self.model(model_input)
+        t2 = time.perf_counter()
 
         # decode the prediction
         predictions_dict = self.label_encoder.decode_label(outputs)
@@ -48,6 +54,7 @@ class LabelledModel:
                 #print(label_name, predicted_val, end=" ")
                 pass
 
+        self.last_timing = (t1 - t0, t2 - t1, time.perf_counter() - t2)
         return predictions_arr
 
 
