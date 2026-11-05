@@ -4,6 +4,10 @@ TacTip driver for ROS2, heavily inspired by RealSensor implementation
 import os
 import cv2
 import time
+import threading
+from dataclasses import dataclass
+
+import torch
 
 from .dependencies.image_transforms import process_image
 from .dependencies.models import create_model
@@ -11,21 +15,57 @@ from .dependencies.utils import load_json_obj
 from .dependencies.label_encoder import LabelEncoder
 from .dependencies.label_encoder import BASE_MODEL_PATH
 from .dependencies.labelled_model import LabelledModel
+from .fast_ssim import structural_similarity as ssim
+
+
+@dataclass(frozen=True)
+class Frame:
+    """One captured frame, already processed and scored by the capture thread."""
+    image: object          # processed image (model input), from process_image()
+    ssim: float            # SSIM against this sensor's contact reference
+    seq: int               # increments per captured frame; gaps mean frames were overwritten
+    stamp: object          # clock() at capture
+    mono: float            # time.monotonic() at capture, for frame-age measurements
+    t_process: float       # seconds spent in process_image
+    t_ssim: float          # seconds spent in SSIM
+    ref_refreshed: bool    # this frame became the new SSIM reference
 
 
 class TacTip:
     # Startup probe: how hard to try for a first good frame before declaring the camera dead.
     PROBE_MAX_ATTEMPTS = 15
     PROBE_RETRY_DELAY = 0.05  # seconds
-    # Runtime read: a dropped frame is transient, so retry a few times within a single cycle.
+    # Synchronous read (startup only): a dropped frame is transient, so retry a few times.
     READ_MAX_ATTEMPTS = 3
+    # Grabber thread: back-off after a failed read so a dead camera does not spin a core.
+    GRAB_FAIL_BACKOFF = 0.005  # seconds
 
-    def __init__(self, source, model_name):
+    def __init__(self, source, model_name, clock=time.time):
         """model_dir: absolute path to a model directory, or a bare name resolved against
         share/tactip_ros2_driver/models/. None keeps the single-model path so existing
         single-arm missions are unaffected. B1 and B2 are physically different sensors with their
-        own force limits and image processing, so each instance must load its own model."""
+        own force limits and image processing, so each instance must load its own model.
+
+        clock: callable returning the capture timestamp attached to each grabbed frame. The node
+        passes its ROS clock's now() so message stamps respect use_sim_time."""
         self.model_path = os.path.join(BASE_MODEL_PATH,model_name)
+        self._clock = clock
+
+        # Latest-frame slot, filled by the capture thread (see start()). Guarded by self._cond.
+        self._cond = threading.Condition()
+        self._frame = None         # latest Frame
+        self._seq = 0              # increments on every successfully captured frame
+        self._mono = None          # time.monotonic() of the latest frame
+        self.failed_reads = 0      # cumulative failed cam.read() calls in the capture thread
+        self.process_errors = 0    # cumulative exceptions in process_image / SSIM
+        self.last_error = None
+        self._stop_event = threading.Event()
+        self._thread = None
+
+        # SSIM contact reference (processed image). Owned by the capture thread once running;
+        # other threads only request a refresh.
+        self._ssim_ref = None
+        self._ref_refresh = threading.Event()
 
         # Params are loaded before opening the camera so the exposure below can come from them.
         self.model_label_params = {}
@@ -145,32 +185,145 @@ class TacTip:
         self.model_params = load_json_obj(os.path.join(self.model_path, 'model_params'))
         self.sensor_params = load_json_obj(os.path.join(self.model_path, 'processed_image_params'))
 
+    # ------------------------------------------------------------------------------------------
+    # Non-blocking capture.
+    #
+    # cam.read() blocks until the camera delivers the next frame (~58 ms at the cameras' fixed
+    # ~17 fps). Reading two cameras one after another from the processing loop meant any extra
+    # work pushed the second read past a frame boundary, halving the rate. Instead, a capture
+    # thread per camera reads continuously and publishes only the newest frame; consumers take it
+    # without waiting.
+    #
+    # The capture thread also runs process_image and SSIM (~25 ms together on 640x480). Both
+    # release the GIL, so the cameras' preprocessing runs in parallel and the single inference
+    # worker only predicts and publishes. Done serially in the worker instead, two cameras' worth
+    # of preprocessing saturated it below the camera rate. As long as read + preprocessing stays
+    # under one frame period, the thread is back in read() before the next frame is due, so no
+    # frame queues up in the driver.
+    # ------------------------------------------------------------------------------------------
+
+    def set_ssim_reference(self, processed_img):
+        """Set the SSIM contact reference directly (before start())."""
+        if self.running:
+            raise RuntimeError("Use request_ssim_reference() while the capture thread is running.")
+        self._ssim_ref = processed_img.squeeze()
+
+    def request_ssim_reference(self):
+        """Ask the capture thread to use its next frame as the SSIM reference (thread-safe)."""
+        self._ref_refresh.set()
+
+    def start(self, cond=None):
+        """Start the capture thread. Pass a shared threading.Condition to be woken whenever this
+        (or any other sensor sharing it) has a new frame; it also guards the frame slot."""
+        if self._thread is not None:
+            return
+        if cond is not None:
+            self._cond = cond
+        # Ask the driver to keep at most one queued frame. These cameras may ignore it, but the
+        # thread draining continuously makes the driver queue irrelevant either way.
+        self.cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        # Until the first frame arrives, frame_age() counts from now, so a camera that never
+        # delivers is reported as stale after the timeout rather than immediately.
+        if self._mono is None:
+            self._mono = time.monotonic()
+        self._stop_event.clear()
+        self._thread = threading.Thread(
+            target=self._capture_loop, name=f'tactip_capture_video{self.source}', daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        """Stop the capture thread and release the camera."""
+        self._stop_event.set()
+        if self._thread is not None:
+            # read() returns within one frame period, so this join is short.
+            self._thread.join(timeout=1.0)
+            self._thread = None
+        self.cam.release()
+
+    @property
+    def running(self):
+        return self._thread is not None
+
+    def _capture_loop(self):
+        while not self._stop_event.is_set():
+            ok, img = self.cam.read()
+            if not ok or img is None:
+                # Transient drop (USB jitter, vibration): keep going. The consumer notices a
+                # dead camera through frame_age().
+                self.failed_reads += 1
+                time.sleep(self.GRAB_FAIL_BACKOFF)
+                continue
+            stamp = self._clock()
+            mono = time.monotonic()
+            try:
+                t0 = time.perf_counter()
+                processed = process_image(img, **self.sensor_params)
+                t1 = time.perf_counter()
+                refreshed = self._ref_refresh.is_set() or self._ssim_ref is None
+                if refreshed:
+                    self._ref_refresh.clear()
+                    self._ssim_ref = processed.squeeze()
+                score = ssim(self._ssim_ref, processed.squeeze())
+                t2 = time.perf_counter()
+            except Exception as e:
+                # A bad frame must not kill the thread (the sensor would go silent for good).
+                self.process_errors += 1
+                self.last_error = repr(e)
+                continue
+            with self._cond:
+                self._seq += 1
+                self._frame = Frame(processed, score, self._seq, stamp, mono,
+                                    t1 - t0, t2 - t1, refreshed)
+                self._mono = mono
+                self._cond.notify_all()
+
+    @property
+    def seq(self):
+        """Sequence number of the newest frame (0 = none yet)."""
+        return self._seq
+
+    def latest(self):
+        """Newest Frame, or None if none yet. Never blocks on the camera."""
+        with self._cond:
+            return self._frame
+
+    def frame_age(self):
+        """Seconds since the newest frame was captured (or since start() if none yet; inf
+        before start())."""
+        mono = self._mono
+        return float('inf') if mono is None else time.monotonic() - mono
+
     def read(self):
-        # A dropped frame mid-flight is transient (USB jitter, vibration), not a reason to bring
-        # the node down, so retry a few times within the cycle. Return None only if every attempt
-        # failed; the caller decides what to do with a missing frame.
+        """Blocking read, for use before start() only (e.g. the startup SSIM reference).
+        Retries a few dropped frames; returns None if every attempt failed."""
+        if self.running:
+            raise RuntimeError("TacTip.read() called while the grabber thread owns the camera; "
+                               "use latest() instead.")
         for _ in range(self.READ_MAX_ATTEMPTS):
             ok, img = self.cam.read()
             if ok and img is not None:
                 return img
         return None
 
-    def process(self, raw_outfile=None, proc_outfile=None):
-        img = self.read()
+    def process(self, img=None, raw_outfile=None, proc_outfile=None):
+        """Apply the sensor's image processing to a raw frame. Without img, does a blocking
+        read() first (startup only). Returns None if no frame could be read."""
         if img is None:
-            # Signal "no frame this cycle" instead of feeding None into process_image (which would
-            # raise and crash the timer callback). The caller skips this cycle.
-            return None
+            img = self.read()
+            if img is None:
+                return None
         if raw_outfile:
             cv2.imwrite(raw_outfile, img)
         img = process_image(img, **self.sensor_params)
         if proc_outfile:
             cv2.imwrite(proc_outfile, img)
         return img
-    
+
     def predict(self, processed_img):
-        return self.pose_model.predict(processed_img)
+        # inference_mode skips autograd bookkeeping; model is already in eval().
+        with torch.inference_mode():
+            return self.pose_model.predict(processed_img)
 
     def get_measurement(self):
         img = self.process()
-        return self.predict(img)
+        return None if img is None else self.predict(img)

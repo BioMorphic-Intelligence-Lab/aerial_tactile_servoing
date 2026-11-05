@@ -34,7 +34,7 @@ def generate_launch_description():
             {'dimensions': [8]},
             {'ssim_contact_thresholds': [0.8]},
             {'model_names': ['simple_cnn_B1']},
-            {'frequency': 10.},
+            {'frequency': 0.},  # max publish rate [Hz]; 0 = every camera frame
             {'fake_data': False},
             {'verbose': False},
             {'test_model_time': True},
