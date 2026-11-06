@@ -37,7 +37,6 @@ def generate_launch_description():
             {'fake_data': False},
             {'verbose': False},
             {'test_model_time': True},
-            {'torch_threads': 4},
             {'zero_when_no_contact': True},
             {'ssim_dims': [320, 240]}
         ],

@@ -20,6 +20,12 @@ from .fast_ssim import structural_similarity as ssim
 # Quantized NPU model inside each model directory, made by tools/npu_bench/convert_rknn.py
 RKNN_MODEL_FILE = 'model_int8.rknn'
 
+# PyTorch backend thread pool. PyTorch defaults to one thread per core and splits every op evenly
+# across them, so on the RK3588 (4x A76 + 4x A55) the default both crowds out the rest of the stack
+# and runs at the pace of the slow cores. 4 matches the big-core count. Process-wide setting; set
+# OMP_NUM_THREADS in the environment to override it on other hardware.
+TORCH_THREADS = min(4, os.cpu_count() or 1)
+
 
 @dataclass(frozen=True)
 class Frame:
@@ -194,6 +200,8 @@ class TacTip:
             except Exception as e:
                 print(f"[TacTip] WARNING: RKNN backend unavailable ({e}); falling back to PyTorch")
 
+        if 'OMP_NUM_THREADS' not in os.environ:
+            torch.set_num_threads(TORCH_THREADS)
         model = create_model(
             in_dim=self.model_image_params["image_processing"]["dims"],
             in_channels=1,

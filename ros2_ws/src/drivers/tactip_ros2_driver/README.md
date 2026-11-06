@@ -53,7 +53,6 @@ Per-sensor parameters are lists with one entry per TacTip.
 | `ssim_contact_thresholds` | [0.9] | Contact asserted below this SSIM |
 | `frequency` | 0.0 | Max publish rate per sensor (Hz); 0 = every camera frame |
 | `zero_when_no_contact` | true | Publish zero pose (and skip the model) when not in contact |
-| `torch_threads` | 4 | PyTorch intra-op threads; 0 = PyTorch default (all cores) |
 | `backend` | torch | `torch` (PyTorch, CPU) or `rknn` (`model_int8.rknn` on the RK3588 NPU, falls back to `torch` if it cannot load) |
 | `test_model_time` | false | Log grab/publish rates, per-stage times and frame age every 5 s |
 | `verbose` | true | Log every measurement |

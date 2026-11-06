@@ -5,7 +5,6 @@ import threading
 import time
 
 import numpy as np
-import torch
 from scipy.spatial.transform import Rotation as R
 
 from geometry_msgs.msg import TwistStamped, TransformStamped, WrenchStamped
@@ -33,8 +32,8 @@ from .tactip import TacTip
 # wins, no queue).
 #
 # Inference stays serial in a single process on purpose: two PyTorch processes oversubscribe the
-# onboard 8 cores and predict goes 15 -> 64 ms. torch_threads bounds intra-op threads for the same
-# reason, leaving cores for the grabbers, SSIM and rclpy.
+# onboard 8 cores and predict goes 15 -> 64 ms. The PyTorch backend also bounds its intra-op threads
+# for the same reason (see TacTip.setup_model), leaving cores for the grabbers, SSIM and rclpy.
 # ---------------------------------------------------------------------------------------------
 
 
@@ -86,7 +85,6 @@ class TactipDriver(Node):
         self.declare_parameter('verbose', True)
         # Periodic timing log (rates, per-stage times, frame age) every TIMING_LOG_PERIOD s
         self.declare_parameter('test_model_time', False)
-        self.declare_parameter('torch_threads', 4)  # 0 = leave PyTorch's default (all cores)
         # Inference backend for all sensors: 'torch' (PyTorch, CPU) or 'rknn' (model_int8.rknn on
         # the RK3588 NPU). 'rknn' falls back to 'torch' per sensor if the NPU model cannot load.
         self.declare_parameter('backend', 'torch')
@@ -104,16 +102,12 @@ class TactipDriver(Node):
         self.verbose = self.get_parameter('verbose').get_parameter_value().bool_value
         self.timing_log = self.get_parameter('test_model_time').get_parameter_value().bool_value
         self.zero_when_no_contact = self.get_parameter('zero_when_no_contact').get_parameter_value().bool_value
-        torch_threads = self.get_parameter('torch_threads').get_parameter_value().integer_value
         backend = self.get_parameter('backend').get_parameter_value().string_value
         sources = list(self.get_parameter('sources').get_parameter_value().integer_array_value)
         ssim_dims = list(self.get_parameter('ssim_dims').get_parameter_value().integer_array_value)
         if len(ssim_dims) != 2 or min(ssim_dims) < 0:
             raise ValueError(f"ssim_dims must be [width, height] (or [0, 0] for full resolution), got {ssim_dims}")
         ssim_dims = tuple(ssim_dims) if min(ssim_dims) > 0 else None
-
-        if torch_threads > 0:
-            torch.set_num_threads(torch_threads)
 
         # Initializing lists
         self.sensors = []
