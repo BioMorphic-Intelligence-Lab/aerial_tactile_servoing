@@ -2,10 +2,20 @@
 """Step 2 (laptop, x86 Linux, rknn-toolkit2): convert model.onnx to .rknn for the RK3588 NPU and
 check the quantized model's accuracy in the RKNN simulator.
 
-    python3 convert_rknn.py out/simple_cnn_B1            # int8 (default)
-    python3 convert_rknn.py out/simple_cnn_B1 --fp16     # fp16, no quantization, for comparison
+    python3 convert_rknn.py out/simple_cnn_B1                # int8 convs, fp16 head (default)
+    python3 convert_rknn.py out/simple_cnn_B1 --head int8    # everything int8
+    python3 convert_rknn.py out/simple_cnn_B1 --fp16         # no quantization, for comparison
 
-Writes out/<model>/model_int8.rknn (or model_fp16.rknn).
+Writes out/<model>/model_int8.rknn (or model_fp16.rknn with --fp16). The name is what the driver
+loads; with the default fp16 head it holds int8 convolutions plus an fp16 fully connected head.
+
+Why the fp16 head: RKNN quantizes each tensor with ONE scale (per layer, not per channel), fitted
+to the range seen on the calibration images. The 11-value output tensor therefore clips at the
+largest value any output reached during calibration, and so do the hidden FC activations. In
+flight the sensor sees contacts beyond the training data (deeper presses, harder forces), where
+the fp32 model extrapolates usefully but the int8 head stops dead (e.g. pose_z capped at 3.24 mm).
+Running the FC layers in fp16 (hybrid quantization) removes those ceilings; the convolutions,
+which are nearly all of the compute, stay int8. --head int8 restores the old all-int8 model.
 
 The /255 input scaling is folded into the model (mean 0, std 255), so on the board you feed the
 H x W uint8 image straight in as NHWC (1, H, W, 1).
@@ -56,6 +66,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('out_dir', help='output directory of export_onnx.py for one model')
     ap.add_argument('--fp16', action='store_true', help='no quantization (fp16 on the NPU)')
+    ap.add_argument('--head', choices=['fp16', 'int8'], default='fp16',
+                    help='precision of the fully connected head (layers after the flatten)')
     ap.add_argument('--n-check', type=int, default=100,
                     help='images used for the accuracy check (0 = all)')
     ap.add_argument('--val-dir', help='held-out val_data dir (targets.csv + processed_images/)')
@@ -68,7 +80,10 @@ def main():
     rknn = RKNN(verbose=False)
     rknn.config(mean_values=[[0]], std_values=[[255]], target_platform='rk3588')
     assert rknn.load_onnx(model=onnx_path) == 0, "load_onnx failed"
-    assert rknn.build(do_quantization=not args.fp16, dataset=dataset) == 0, "build failed"
+    if args.fp16 or args.head == 'int8':
+        assert rknn.build(do_quantization=not args.fp16, dataset=dataset) == 0, "build failed"
+    else:
+        build_fp16_head(rknn, args.out_dir, dataset)
     assert rknn.export_rknn(rknn_path) == 0, "export_rknn failed"
     print(f"Wrote {rknn_path}")
 
@@ -99,7 +114,7 @@ def main():
     with open(label_file) as f:
         decode = decoder(json.load(f))
     d_ref, d_got = decode(ref), decode(got)
-    quant = 'fp16' if args.fp16 else 'int8'
+    quant = 'fp16' if args.fp16 else ('int8' if args.head == 'int8' else 'rknn')
     src = 'validation' if truth else 'calibration'
     print(f"\nPer-label error, {len(paths)} {src} images (mean abs; max abs in brackets):")
     hdr = f"  {'label':10s} {quant + ' vs fp32':>20s}"
@@ -125,6 +140,43 @@ def err(name, a, b):
 
 def fmt(e):
     return f"{e.mean():.4f} ({e.max():.3f})"
+
+
+def build_fp16_head(rknn, out_dir, dataset):
+    """Hybrid quantization: int8 everywhere, except the tensors after the flatten (the FC head
+    and the output path), which are computed in fp16.
+
+    Step 1 calibrates and writes an intermediate model plus a quantization config listing every
+    tensor; step 2 builds with the tensors named in custom_quantize_layers kept in fp16. The
+    tensor names are RKNN's internal ones (e.g. 'out_mm', 'out_int8'), so they are read from the
+    intermediate model rather than from the ONNX graph."""
+    import onnx  # the intermediate .model is an ONNX protobuf
+
+    cwd = os.getcwd()
+    os.chdir(out_dir)  # step 1 writes <onnx basename>.{model,data,quantization.cfg} into the cwd
+    try:
+        assert rknn.hybrid_quantization_step1(dataset=os.path.basename(dataset), proposal=False) == 0, \
+            "hybrid_quantization_step1 failed"
+        nodes = onnx.load('model.model').graph.node
+        flatten = next(i for i, n in enumerate(nodes) if n.op_type == 'Reshape')
+        # Everything after the flatten, except the final dtype conversion ('out', already float).
+        head = [o for n in nodes[flatten + 1:] if n.op_type != 'exDataConvert' for o in n.output]
+        print(f"fp16 head tensors: {head}")
+
+        with open('model.quantization.cfg') as f:
+            cfg = f.read()
+        assert 'custom_quantize_layers: {}' in cfg, "unexpected quantization.cfg layout"
+        layers = ''.join(f'    "{t}": float16\n' for t in head)
+        with open('model.quantization.cfg', 'w') as f:
+            f.write(cfg.replace('custom_quantize_layers: {}', 'custom_quantize_layers:\n' + layers))
+
+        assert rknn.hybrid_quantization_step2(
+            model_input='model.model', data_input='model.data',
+            model_quantization_cfg='model.quantization.cfg') == 0, "hybrid_quantization_step2 failed"
+        for f in ('model.model', 'model.data'):  # large intermediates; keep the .cfg for reference
+            os.remove(f)
+    finally:
+        os.chdir(cwd)
 
 
 def check_images(args, dataset, model_name):

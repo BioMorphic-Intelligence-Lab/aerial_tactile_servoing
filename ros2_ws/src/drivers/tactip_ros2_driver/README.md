@@ -30,16 +30,16 @@ With `backend:=rknn` each sensor runs the quantized `model_int8.rknn` from its m
 NPU core 0 (cores 1 and 2 hang on the current Orange Pi kernel). The models take turns from the
 single inference worker, which is what the NPU driver needs. For B1 + B2 a full round takes about
 5.5 ms on the NPU, against about 19 ms on the A76 cores with ONNX Runtime, and the CPU stays free
-for the rest of the stack. The int8 models are within a few percent of fp32 accuracy on the
-validation sets.
+for the rest of the stack. The NPU models are within about 2% of fp32 accuracy on the validation
+sets (timing measured with the all-int8 head; re-measure after model changes).
 
-A retrained model needs a new `.rknn` (laptop, see `tools/npu_bench/instructions.txt`):
+The `.rknn` keeps the convolutions in int8 but runs the fully connected head in fp16. RKNN uses one
+quantization scale per tensor, fitted to the calibration images, so an all-int8 head clips every
+output at the largest value seen in the training data (e.g. depth stuck at 3.24 mm), whereas
+contacts in flight go beyond it. The fp16 head extrapolates like the PyTorch model.
 
-```bash
-python3 tools/npu_bench/export_onnx.py <model> --calib-dir <data>/train_data/processed_images
-python3 tools/npu_bench/convert_rknn.py tools/npu_bench/out/<model> --val-dir <data>/val_data --n-check 0
-cp tools/npu_bench/out/<model>/model_int8.rknn resource/models/<model>/
-```
+A retrained model needs a new `.rknn`. The conversion workflow (setup, commands, how to read the
+accuracy check, checks on the Pi) is in [tools/npu_bench/README.md](tools/npu_bench/README.md).
 
 ## Parameters
 

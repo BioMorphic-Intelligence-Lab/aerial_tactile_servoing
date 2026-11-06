@@ -76,7 +76,8 @@ def make_calib(out_dir, dims, calib_dir, n_max):
         if not files:
             sys.exit(f"No images found in {calib_dir}")
         rng = np.random.default_rng(0)
-        files = [files[i] for i in sorted(rng.choice(len(files), min(n_max, len(files)), replace=False))]
+        if n_max and n_max < len(files):
+            files = [files[i] for i in sorted(rng.choice(len(files), n_max, replace=False))]
         for i, src in enumerate(files):
             img = cv2.imread(src, cv2.IMREAD_GRAYSCALE)
             img = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)
@@ -85,7 +86,7 @@ def make_calib(out_dir, dims, calib_dir, n_max):
     else:
         print("WARNING: no --calib-dir, using synthetic images. OK for timing, NOT for accuracy.")
         rng = np.random.default_rng(0)
-        for i in range(min(n_max, 50)):
+        for i in range(min(n_max or 50, 50)):
             full = (rng.random((480, 640)) > 0.5).astype(np.uint8) * 255
             img = cv2.resize(full, (w, h), interpolation=cv2.INTER_AREA)
             paths.append(os.path.join(calib_out, f'{i:04d}.png'))
@@ -99,7 +100,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('model', help='model directory name under resource/models, or a path')
     ap.add_argument('--calib-dir', help='directory of processed tactile images (recursive)')
-    ap.add_argument('--n-calib', type=int, default=300, help='max calibration images')
+    ap.add_argument('--n-calib', type=int, default=0,
+                    help='max calibration images (0 = all). Use all: a random subset can miss the\n'
+                    'extremes (e.g. the hardest presses), and the int8 output then clips there.')
     ap.add_argument('--out', default=os.path.join(HERE, 'out'))
     ap.add_argument('--opset', type=int, default=13)
     args = ap.parse_args()

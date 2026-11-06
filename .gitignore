@@ -64,3 +64,4 @@ qtcreator-*
 CATKIN_IGNORE
 COLCON_IGNORE
 ats_env/
+ros2_ws/src/drivers/tactip_ros2_driver/tools/npu_bench/out/
