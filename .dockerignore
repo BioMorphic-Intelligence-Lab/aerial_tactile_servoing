@@ -1,0 +1,4 @@
+# The images only COPY files from docker/; the code is bind-mounted (no-build) or cloned
+# (colcon-build). Keeping everything else out avoids sending GBs of data/ and ros2_ws to the daemon.
+*
+!docker/

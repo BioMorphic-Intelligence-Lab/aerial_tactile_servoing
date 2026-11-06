@@ -39,8 +39,9 @@ RUN pip3 install -U \
 # Versions must match the rknn-toolkit2 that converted the models (tools/npu_bench).
 # Only installed on arm64, so the image still builds on x86 (where the driver falls back to torch).
 ARG RKNN_VERSION=2.3.2
-ADD --chmod=644 https://github.com/airockchip/rknn-toolkit2/raw/v${RKNN_VERSION}/rknpu2/runtime/Linux/librknn_api/aarch64/librknnrt.so /usr/lib/librknnrt.so
-RUN if [ "$(uname -m)" = "aarch64" ]; then \
+ADD https://github.com/airockchip/rknn-toolkit2/raw/v${RKNN_VERSION}/rknpu2/runtime/Linux/librknn_api/aarch64/librknnrt.so /usr/lib/librknnrt.so
+RUN chmod 644 /usr/lib/librknnrt.so && \
+    if [ "$(uname -m)" = "aarch64" ]; then \
         pip3 install rknn-toolkit-lite2==${RKNN_VERSION} ; \
     else rm /usr/lib/librknnrt.so ; fi
 
