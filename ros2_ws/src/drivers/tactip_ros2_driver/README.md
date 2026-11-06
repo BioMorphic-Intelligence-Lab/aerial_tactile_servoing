@@ -29,9 +29,11 @@ matches `skimage.metrics.structural_similarity` (~1e-9) at about a quarter of th
 With `backend:=rknn` each sensor runs the quantized `model_int8.rknn` from its model directory on
 NPU core 0 (cores 1 and 2 hang on the current Orange Pi kernel). The models take turns from the
 single inference worker, which is what the NPU driver needs. For B1 + B2 a full round takes about
-5.5 ms on the NPU, against about 19 ms on the A76 cores with ONNX Runtime, and the CPU stays free
-for the rest of the stack. The NPU models are within about 2% of fp32 accuracy on the validation
-sets (timing measured with the all-int8 head; re-measure after model changes).
+7.5 ms on the NPU (3.8 ms per model), against about 85 ms with PyTorch on the CPU, so both sensors
+publish at the camera rate (~17 Hz) and the CPU stays free for the rest of the stack. The NPU
+models are within about 2% of fp32 accuracy on the validation sets.
+
+`tactip_dual_bringup.launch.py` uses the NPU by default; `backend:=torch` switches back to PyTorch.
 
 The `.rknn` keeps the convolutions in int8 but runs the fully connected head in fp16. RKNN uses one
 quantization scale per tensor, fitted to the calibration images, so an all-int8 head clips every

@@ -12,6 +12,10 @@ Launch the tactip driver for both TacTips (dual-arm), standalone.
 
   ros2 launch tactip_ros2_driver tactip_dual_bringup.launch.py
   ros2 launch tactip_ros2_driver tactip_dual_bringup.launch.py logging:=true
+  ros2 launch tactip_ros2_driver tactip_dual_bringup.launch.py backend:=torch
+
+backend:=rknn (default) runs the models on the RK3588 NPU; backend:=torch runs them with PyTorch
+on the CPU (also the automatic fallback if the NPU model cannot load).
 
 Rosbag recording follows the ats_launch convention (see ats_stack.launch.py):
 logging:=true records all topics to <log_path>/<rosbag_prefix>_ros2bag_<stamp>,
@@ -54,6 +58,7 @@ def _build(context, *args, **kwargs):
                 {"fake_data": False},
                 {"verbose": False},
                 {"test_model_time": True},
+                {"backend": 'rknn'}, # Set to 'torch' on pc
                 {"zero_when_no_contact": True},
                 {"ssim_dims": [320, 240]},
             ],
@@ -85,6 +90,11 @@ def _build(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
+            DeclareLaunchArgument(
+                "backend",
+                default_value="rknn",
+                description="Inference backend: 'rknn' (NPU) or 'torch' (PyTorch, CPU).",
+            ),
             DeclareLaunchArgument(
                 "logging",
                 default_value="false",
