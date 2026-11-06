@@ -24,6 +24,23 @@ frame's capture time. Inference is kept serial in one process: running the tips 
 PyTorch processes oversubscribes the CPU. SSIM uses `fast_ssim.py`, an OpenCV implementation that
 matches `skimage.metrics.structural_similarity` (~1e-9) at about a quarter of the cost.
 
+## NPU backend
+
+With `backend:=rknn` each sensor runs the quantized `model_int8.rknn` from its model directory on
+NPU core 0 (cores 1 and 2 hang on the current Orange Pi kernel). The models take turns from the
+single inference worker, which is what the NPU driver needs. For B1 + B2 a full round takes about
+5.5 ms on the NPU, against about 19 ms on the A76 cores with ONNX Runtime, and the CPU stays free
+for the rest of the stack. The int8 models are within a few percent of fp32 accuracy on the
+validation sets.
+
+A retrained model needs a new `.rknn` (laptop, see `tools/npu_bench/instructions.txt`):
+
+```bash
+python3 tools/npu_bench/export_onnx.py <model> --calib-dir <data>/train_data/processed_images
+python3 tools/npu_bench/convert_rknn.py tools/npu_bench/out/<model> --val-dir <data>/val_data --n-check 0
+cp tools/npu_bench/out/<model>/model_int8.rknn resource/models/<model>/
+```
+
 ## Parameters
 
 Per-sensor parameters are lists with one entry per TacTip.
@@ -37,6 +54,7 @@ Per-sensor parameters are lists with one entry per TacTip.
 | `frequency` | 0.0 | Max publish rate per sensor (Hz); 0 = every camera frame |
 | `zero_when_no_contact` | true | Publish zero pose (and skip the model) when not in contact |
 | `torch_threads` | 4 | PyTorch intra-op threads; 0 = PyTorch default (all cores) |
+| `backend` | torch | `torch` (PyTorch, CPU) or `rknn` (`model_int8.rknn` on the RK3588 NPU, falls back to `torch` if it cannot load) |
 | `test_model_time` | false | Log grab/publish rates, per-stage times and frame age every 5 s |
 | `verbose` | true | Log every measurement |
 | `fake_data` | false | Bypass the cameras and publish synthetic data |

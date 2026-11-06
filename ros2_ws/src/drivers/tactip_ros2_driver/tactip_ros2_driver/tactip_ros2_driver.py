@@ -87,6 +87,9 @@ class TactipDriver(Node):
         # Periodic timing log (rates, per-stage times, frame age) every TIMING_LOG_PERIOD s
         self.declare_parameter('test_model_time', False)
         self.declare_parameter('torch_threads', 4)  # 0 = leave PyTorch's default (all cores)
+        # Inference backend for all sensors: 'torch' (PyTorch, CPU) or 'rknn' (model_int8.rknn on
+        # the RK3588 NPU). 'rknn' falls back to 'torch' per sensor if the NPU model cannot load.
+        self.declare_parameter('backend', 'torch')
         self.declare_parameter('zero_when_no_contact', True)
         # [width, height] the processed image is downsampled to before SSIM; [0, 0] = full
         # resolution. Contact thresholds depend on this, so retune them if it changes.
@@ -102,6 +105,7 @@ class TactipDriver(Node):
         self.timing_log = self.get_parameter('test_model_time').get_parameter_value().bool_value
         self.zero_when_no_contact = self.get_parameter('zero_when_no_contact').get_parameter_value().bool_value
         torch_threads = self.get_parameter('torch_threads').get_parameter_value().integer_value
+        backend = self.get_parameter('backend').get_parameter_value().string_value
         sources = list(self.get_parameter('sources').get_parameter_value().integer_array_value)
         ssim_dims = list(self.get_parameter('ssim_dims').get_parameter_value().integer_array_value)
         if len(ssim_dims) != 2 or min(ssim_dims) < 0:
@@ -133,7 +137,8 @@ class TactipDriver(Node):
             # Initialize TacTip sensors
             for i, s in enumerate(sources):
                 try:
-                    self.sensors.append(TacTip(s, self.model_names[i], clock=self.get_clock().now, ssim_dims=ssim_dims))
+                    self.sensors.append(TacTip(s, self.model_names[i], clock=self.get_clock().now,
+                                               ssim_dims=ssim_dims, backend=backend))
                 except Exception as e:
                     # A missing/busy camera is not recoverable mid-mission, so fail fast at startup
                     # with one clear, node-tagged line naming the sensor instead of a raw traceback.
@@ -143,7 +148,11 @@ class TactipDriver(Node):
                     )
                     raise SystemExit(1)
                 self.get_logger().info(f"Start sensor {i}, reading from /dev/video{s}" )
-                self.get_logger().info(f"With model {self.model_names[i]}")
+                self.get_logger().info(f"With model {self.model_names[i]} (backend: {self.sensors[-1].backend})")
+                if self.sensors[-1].backend != backend:
+                    self.get_logger().warn(
+                        f"Sensor {i}: requested backend '{backend}' unavailable, "
+                        f"using '{self.sensors[-1].backend}' instead")
                 self.get_logger().info(f"Sensor processing params: {self.sensors[-1].sensor_params}")
 
                 # Reference SSIM image, read synchronously before the capture thread starts. The camera is

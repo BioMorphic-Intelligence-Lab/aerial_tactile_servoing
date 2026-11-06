@@ -33,6 +33,12 @@ def stats(name, t):
     t = np.array(t) * 1e3
     print(f"{name}: n={len(t)}  mean {t.mean():.2f}  p50 {np.percentile(t, 50):.2f}  "
           f"p90 {np.percentile(t, 90):.2f}  p99 {np.percentile(t, 99):.2f}  max {t.max():.2f} ms")
+    # Rare spikes matter for a control loop: how many, and where (index 0-ish = cold start).
+    spikes = np.flatnonzero(t > 3 * np.percentile(t, 50))
+    if len(spikes):
+        worst = spikes[np.argsort(t[spikes])[::-1][:5]]
+        print(f"    {len(spikes)} spikes >3x p50; worst at iter "
+              + ", ".join(f"{i} ({t[i]:.1f} ms)" for i in worst))
 
 
 def npu_runner(path, core):
@@ -60,6 +66,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('models', nargs='*', help='.rknn file(s); two = run concurrently')
     ap.add_argument('--cores', nargs='*', default=None, help="NPU core per model: 0 1 2 auto all")
+    ap.add_argument('--sequential', action='store_true',
+                    help='several models: alternate them from one thread instead of running concurrently')
     ap.add_argument('--onnx', help='CPU baseline: run this .onnx with ONNX Runtime instead')
     ap.add_argument('--threads', type=int, default=4, help='ONNX Runtime intra-op threads')
     ap.add_argument('--affinity', help='CPU list to pin to, e.g. 4-7')
@@ -103,6 +111,24 @@ def main():
     if len(runners) == 1:
         run_loop(lambda a: runners[0].inference(inputs=[a]), x, args.warmup, args.iters, out, 0)
         stats(names[0], out[0])
+    elif args.sequential:
+        # One thread, models take turns (what a single inference worker would do): only one job
+        # is ever on the NPU, so this sidesteps any concurrency problem in the driver.
+        for _ in range(args.warmup):
+            for r in runners:
+                r.inference(inputs=[x])
+        times = [[] for _ in runners]
+        t0 = time.perf_counter()
+        for _ in range(args.iters):
+            for r, t in zip(runners, times):
+                t1 = time.perf_counter()
+                r.inference(inputs=[x])
+                t.append(time.perf_counter() - t1)
+        wall = time.perf_counter() - t0
+        for n, t in zip(names, times):
+            stats(n, t)
+        print(f"Full round (all models once): {wall / args.iters * 1e3:.2f} ms  "
+              f"(camera frame period ~57 ms)")
     else:
         # Concurrent: both models hammer the NPU at once. If wall-clock throughput is ~2x a single
         # model, the cores really run in parallel (and the Python binding releases the GIL).

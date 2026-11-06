@@ -1,0 +1,47 @@
+On the laptop
+
+  cd ~/aerial_tactile_servoing/ros2_ws/src/drivers/tactip_ros2_driver/tools/npu_bench
+
+  # one-time: environment (CPU-only torch keeps it small)
+  python3 -m venv ~/rknn-env
+  source ~/rknn-env/bin/activate
+  pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch
+  pip install --no-cache-dir rknn-toolkit2==2.3.2 onnx==1.16.1 onnxruntime opencv-python-headless
+
+  # 1. export (no --calib-dir: synthetic calibration, fine for timing)
+  python3 export_onnx.py simple_cnn_B1
+  python3 export_onnx.py simple_cnn_B2-smallest
+
+  # 2. convert to int8 .rknn for RK3588
+  python3 convert_rknn.py out/simple_cnn_B1
+  python3 convert_rknn.py out/simple_cnn_B2-smallest
+
+  # copy to the Orange Pi (replace user@host)
+  scp -r bench_npu.py out/simple_cnn_B1 out/simple_cnn_B2-smallest user@orangepi:~/npu_bench/
+  Ignore the accuracy table that convert_rknn.py prints for now; with synthetic images it
+  means nothing.
+
+  On the Orange Pi 5
+
+  # one-time: check the NPU driver, install the runtime library (same version as the toolkit)
+  sudo cat /sys/kernel/debug/rknpu/version
+  sudo wget -O /usr/lib/librknnrt.so \
+    https://github.com/airockchip/rknn-toolkit2/raw/v2.3.2/rknpu2/runtime/Linux/librknn_api/aa
+  rch64/librknnrt.so
+
+  python3 -m venv ~/rknn-env
+  source ~/rknn-env/bin/activate
+  pip install rknn-toolkit-lite2==2.3.2 numpy onnxruntime
+
+  # benchmarks
+  cd ~/npu_bench
+  python3 bench_npu.py simple_cnn_B1/model_int8.rknn
+  python3 bench_npu.py simple_cnn_B2-smallest/model_int8.rknn
+  python3 bench_npu.py simple_cnn_B1/model_int8.rknn simple_cnn_B1/model_int8.rknn --cores 0 1
+  python3 bench_npu.py simple_cnn_B1/model_int8.rknn simple_cnn_B2-smallest/model_int8.rknn --cores 0 1 --sequential
+
+  # CPU comparison: fast vs slow cores (check numbering first with: lscpu -e)
+  python3 bench_npu.py --onnx simple_cnn_B1/model.onnx --threads 4 --affinity 4-7
+  python3 bench_npu.py --onnx simple_cnn_B1/model.onnx --threads 4 --affinity 0-3
+  The third NPU run uses B1 twice, once per core, to stand in for two sensors running at the
+  same time.

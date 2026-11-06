@@ -14,8 +14,11 @@ from .dependencies.models import create_model
 from .dependencies.utils import load_json_obj
 from .dependencies.label_encoder import LabelEncoder
 from .dependencies.label_encoder import BASE_MODEL_PATH
-from .dependencies.labelled_model import LabelledModel
+from .dependencies.labelled_model import LabelledModel, RKNNLabelledModel
 from .fast_ssim import structural_similarity as ssim
+
+# Quantized NPU model inside each model directory, made by tools/npu_bench/convert_rknn.py
+RKNN_MODEL_FILE = 'model_int8.rknn'
 
 
 @dataclass(frozen=True)
@@ -40,7 +43,7 @@ class TacTip:
     # Grabber thread: back-off after a failed read so a dead camera does not spin a core.
     GRAB_FAIL_BACKOFF = 0.005  # seconds
 
-    def __init__(self, source, model_name, clock=time.time, ssim_dims=None):
+    def __init__(self, source, model_name, clock=time.time, ssim_dims=None, backend='torch'):
         """model_dir: absolute path to a model directory, or a bare name resolved against
         share/tactip_ros2_driver/models/. None keeps the single-model path so existing
         single-arm missions are unaffected. B1 and B2 are physically different sensors with their
@@ -53,7 +56,9 @@ class TacTip:
         full resolution. Full-frame SSIM is memory-bound (~15 full-size float32 temporaries) and
         cost ~16 ms per frame on board; 320x240 is an exact 2x reduction (resize ~0.01 ms) that
         cuts SSIM ~9x. Only the SSIM sees the downsampled image; the model input is unchanged.
-        SSIM scores depend on resolution, so contact thresholds are tied to this setting."""
+        SSIM scores depend on resolution, so contact thresholds are tied to this setting.
+
+        backend: 'torch' (PyTorch on CPU) or 'rknn' (quantized model on the NPU); see setup_model."""
         self.model_path = os.path.join(BASE_MODEL_PATH,model_name)
         self._clock = clock
 
@@ -165,10 +170,30 @@ class TacTip:
         if self.sensor_params == {}:
             raise Exception("Sensor params not found")
 
-        # create the label encoder/decoder
+        self.pose_model = None
+        self.backend = None
+        self.setup_model(backend)
+
+    def setup_model(self, backend):
+        """backend 'torch' runs the .pth with PyTorch on the CPU. 'rknn' runs the quantized
+        model_int8.rknn from the same model directory on NPU core 0; if that fails (file missing,
+        rknnlite not installed, no NPU) it falls back to PyTorch with a warning, so a broken NPU
+        setup degrades the rate instead of grounding the vehicle."""
         label_encoder = LabelEncoder(self.model_label_params, device='cpu')
-        
-        # setup the model
+
+        if backend not in ('torch', 'rknn'):
+            raise ValueError(f"Unknown backend '{backend}' (expected 'torch' or 'rknn')")
+        if backend == 'rknn':
+            rknn_path = os.path.join(self.model_path, RKNN_MODEL_FILE)
+            try:
+                self.pose_model = RKNNLabelledModel(
+                    rknn_path, self.model_image_params['image_processing'], label_encoder)
+                self.backend = 'rknn'
+                print(f"[TacTip] Using NPU model {rknn_path}")
+                return
+            except Exception as e:
+                print(f"[TacTip] WARNING: RKNN backend unavailable ({e}); falling back to PyTorch")
+
         model = create_model(
             in_dim=self.model_image_params["image_processing"]["dims"],
             in_channels=1,
@@ -178,13 +203,13 @@ class TacTip:
             device='cpu'
         )
         model.eval()
-
         self.pose_model = LabelledModel(
             model,
             self.model_image_params['image_processing'],
             label_encoder,
             device='cpu'
         )
+        self.backend = 'torch'
 
     def setup_params(self):
         self.model_label_params = load_json_obj(os.path.join(self.model_path, 'model_label_params'))
@@ -254,6 +279,8 @@ class TacTip:
             self._thread.join(timeout=1.0)
             self._thread = None
         self.cam.release()
+        if self.backend == 'rknn':
+            self.pose_model.release()
 
     @property
     def running(self):

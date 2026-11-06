@@ -19,7 +19,7 @@ setup(
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob('launch/*.launch.py')),] + 
-        [('share/' + package_name + '/models/' + os.path.basename(d), glob(d + '/*.json') + glob(d + '/*.pth')) for d in model_dirs],
+        [('share/' + package_name + '/models/' + os.path.basename(d), glob(d + '/*.json') + glob(d + '/*.pth') + glob(d + '/*.rknn')) for d in model_dirs],
     install_requires=[
         'setuptools', 
         'scikit-image', 

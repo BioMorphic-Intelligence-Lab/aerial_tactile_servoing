@@ -33,4 +33,15 @@ RUN pip3 install -U \
     matplotlib==3.9.2 \
     seaborn==0.13.2
 
+# RK3588 NPU runtime for the TacTip driver's 'rknn' backend (Orange Pi 5). The kernel driver lives
+# on the host; the container only needs the user-space runtime library and its Python binding, and
+# access to the NPU device node (a /dev/dri render node; --privileged covers it).
+# Versions must match the rknn-toolkit2 that converted the models (tools/npu_bench).
+# Only installed on arm64, so the image still builds on x86 (where the driver falls back to torch).
+ARG RKNN_VERSION=2.3.2
+ADD --chmod=644 https://github.com/airockchip/rknn-toolkit2/raw/v${RKNN_VERSION}/rknpu2/runtime/Linux/librknn_api/aarch64/librknnrt.so /usr/lib/librknnrt.so
+RUN if [ "$(uname -m)" = "aarch64" ]; then \
+        pip3 install rknn-toolkit-lite2==${RKNN_VERSION} ; \
+    else rm /usr/lib/librknnrt.so ; fi
+
 WORKDIR /ros2_ws/aerial_tactile_servoing
