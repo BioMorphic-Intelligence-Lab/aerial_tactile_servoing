@@ -134,6 +134,7 @@ def _build(context, *args, **kwargs):
             executable="tactip_ros2_driver",
             name="tactip_driver",
             output="screen",
+            emulate_tty=True,
             parameters=tactip_params,
             arguments=_LOG_ARGS,
         )

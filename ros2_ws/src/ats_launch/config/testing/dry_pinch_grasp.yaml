@@ -32,17 +32,17 @@
 
 /tactip_driver:
   ros__parameters:
-    sources: [0, 2]
+    sources: [2, 0]
     dimensions: [8, 8]
-    ssim_contact_thresholds: [0.8, 0.85]
+    ssim_contact_thresholds: [0.75, 0.75]
     model_names: ['simple_cnn_B1', 'simple_cnn_B2']
     frequency: 0.
     fake_data: false
     verbose: false
-    test_model_time: true
+    test_model_time: false
     backend: 'rknn'
-    zero_when_no_contact: false
-    ssim_dims: [0, 0]
+    zero_when_no_contact: true
+    ssim_dims: [320, 240]
   
 /manipulator:
   ros__parameters:

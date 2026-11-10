@@ -22,9 +22,10 @@ class PinchGraspMission(TactileMissionDirector):
 
 
         # Make into parameters
-        self.kp_shear = 1.0
-        self.kp_force = 0.1
-        self.squeeze_force_ref = 3.0
+        self.kp_shear = 0.08
+        self.kp_force = 0.01
+        self.squeeze_force_ref = 4.0
+        self.approach_speed = 0.45
 
         self.takeoff_altitude = self.get_parameter('im.takeoff_altitude').get_parameter_value().double_value
         self.pre_contact_arm_position = list(self.get_parameter('im.pre_contact_arm_position').get_parameter_value().double_array_value)
@@ -65,7 +66,7 @@ class PinchGraspMission(TactileMissionDirector):
                     transition = True
                 else:
                     transition = False
-                self.state_move_arms_task_velocity(pdot_des=[0.0, -0.03, 0.0, 0.0, 0.03, 0.0], transition=transition, next_state=next_state, state_number=25)
+                self.state_move_arms_task_velocity(pdot_des=[0.0, -self.approach_speed, 0.0, 0.0, self.approach_speed, 0.0], transition=transition, next_state=next_state, state_number=25)
 
             case "approach_grasp_0":
                 if all(self.tactip_contact_):
@@ -73,14 +74,14 @@ class PinchGraspMission(TactileMissionDirector):
                 else:
                     transition = False
 
-                self.state_move_arms_task_velocity(pdot_des=[0.0, 0.0, 0.0, 0.0, 0.03, 0.0], transition=transition, next_state="control_grasp", state_number=26)
+                self.state_move_arms_task_velocity(pdot_des=[0.0, 0.0, 0.0, 0.0, self.approach_speed, 0.0], transition=transition, next_state="control_grasp", state_number=26)
 
             case "approach_grasp_1":
                 if all(self.tactip_contact_):
                     transition = True
                 else:
                     transition = False
-                self.state_move_arms_task_velocity(pdot_des=[0.0, -0.03, 0.0, 0.0, 0.0, 0.0], transition=transition, next_state="control_grasp", state_number=27)
+                self.state_move_arms_task_velocity(pdot_des=[0.0, -self.approach_speed, 0.0, 0.0, 0.0, 0.0], transition=transition, next_state="control_grasp", state_number=27)
 
             case "control_grasp":
                 # Step 1: calculate 
@@ -89,7 +90,7 @@ class PinchGraspMission(TactileMissionDirector):
                 R_BS_block = np.zeros((self.n_arms*3, self.n_arms*3))
                 for n in range(self.n_arms):
                     v_c_cmd[n*3 : n*3+3] = np.array([
-                        0.0, # self.kp_shear * np.deg2rad(self.tactip_pose_[n].angular.y),
+                        self.kp_shear * np.deg2rad(self.tactip_pose_[n].angular.y),
                         0.0, #-self.kp_shear * np.deg2rad(self.tactip_pose_[n].angular.x),
                         -self.kp_force * (self.squeeze_force_ref - self.tactip_wrench_[n].force.z)
                     ])
@@ -102,19 +103,26 @@ class PinchGraspMission(TactileMissionDirector):
 
                 transition = False
                 self.get_logger().info(f"[29] Grasp force: {self.tactip_wrench_[0].force.z:.2f} N | {self.tactip_wrench_[1].force.z:.2f} N, {(datetime.datetime.now()-self.state_start_time).seconds:.1f}/20 sec", throttle_duration_sec=1.0)
-                if (datetime.datetime.now()-self.state_start_time).seconds > 20.:
+                if (datetime.datetime.now()-self.state_start_time).seconds > 30.:
                     transition = True
 
                 self.state_move_arms_task_velocity(pdot_des=v_b_cmd, transition=transition, next_state="release", state_number=29)
 
             case "hold_grasp":
-                self.state_hover(duration_sec=20., next_state="release")
+                transition = False
+                self.get_logger().info(f"[28] Grasp force: {self.tactip_wrench_[0].force.z:.2f} N | {self.tactip_wrench_[1].force.z:.2f} N, {(datetime.datetime.now()-self.state_start_time).seconds:.1f}/20 sec", throttle_duration_sec=1.0)
+                
+                if (datetime.datetime.now()-self.state_start_time).seconds > 40.:
+                    transition = True
+                elif self.input_state == 1:
+                    transition = True
+                self.state_move_arms_task_velocity(pdot_des=[0.0, -0.0, 0.0, 0.0, 0.0, 0.0], transition=transition, next_state="release", state_number=28)
 
             case "release":
                 self.state_move_arms_joint_position(q_des=self.land_arm_position, next_state="done")
 
             case "done":
-                self.get_logger().info("Mission completed successfully.", throttle_duration_sec=5.)
+                self.state_done(next_state="entrypoint")
 
             # --- Do not remove these states ---
             case "emergency":
