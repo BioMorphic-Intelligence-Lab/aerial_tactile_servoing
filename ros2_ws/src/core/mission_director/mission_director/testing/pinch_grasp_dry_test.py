@@ -22,7 +22,7 @@ class PinchGraspMission(TactileMissionDirector):
 
 
         # Make into parameters
-        self.kp_shear = 0.08
+        self.kp_shear = 0.04
         self.kp_force = 0.01
         self.squeeze_force_ref = 4.0
         self.approach_speed = 0.45
@@ -84,11 +84,24 @@ class PinchGraspMission(TactileMissionDirector):
                 self.state_move_arms_task_velocity(pdot_des=[0.0, -self.approach_speed, 0.0, 0.0, 0.0, 0.0], transition=transition, next_state="control_grasp", state_number=27)
 
             case "control_grasp":
+                # Test: calculate the 
+
                 # Step 1: calculate 
                 v_c_cmd = np.zeros(self.n_arms*3)
+                p_BC = np.zeros(self.n_arms*3)
                 R_CS_block = np.zeros((self.n_arms*3, self.n_arms*3))
                 R_BS_block = np.zeros((self.n_arms*3, self.n_arms*3))
                 for n in range(self.n_arms):
+                    P_BC = self.evaluate_P_BC(
+                        *self.servo_state.position[n*3 : n*3+3], 
+                        np.deg2rad(self.tactip_pose_[n].angular.x), 
+                        np.deg2rad(self.tactip_pose_[n].angular.y), 
+                        self.tactip_pose_[n].linear.x/1000., 
+                        self.tactip_pose_[n].linear.y/1000., 
+                        self.tactip_pose_[n].linear.z/1000.)
+
+                    p_BC[n*3 : n*3+3] = P_BC[0:3, 3]
+
                     v_c_cmd[n*3 : n*3+3] = np.array([
                         self.kp_shear * np.deg2rad(self.tactip_pose_[n].angular.y),
                         0.0, #-self.kp_shear * np.deg2rad(self.tactip_pose_[n].angular.x),
@@ -96,6 +109,11 @@ class PinchGraspMission(TactileMissionDirector):
                     ])
                     R_CS_block[n*3:n*3+3, n*3:n*3+3] = self.evaluate_R_CS(np.deg2rad(self.tactip_pose_[n].angular.x), np.deg2rad(self.tactip_pose_[n].angular.y))
                     R_BS_block[n*3:n*3+3, n*3:n*3+3] = self.evaluate_R_BS(*self.servo_state.position[n*3:n*3+3])
+                # Print direction vector
+                direction = p_BC[0:3] - p_BC[3:6]
+                angle = self.calculate_angle(direction, np.array([0.0, 1.0, 0.0]))
+                midpoint = (p_BC[0:3] + p_BC[3:6])/2.
+                self.get_logger().info(f"Dir between fingertips: [{direction[0]:.2f}, {direction[1]:.2f}, {direction[2]:.2f}], angle: {angle:.2f} rad/{angle*180./np.pi:.2f} deg, midpoint [{midpoint[0]:.2f}, {midpoint[1]:.2f}, {midpoint[2]:.2f}]", throttle_duration_sec=1.0)
                 # Invert rotation
                 R_SC_block = np.linalg.inv(R_CS_block)
                 R_BC_block = R_BS_block@R_SC_block
@@ -131,6 +149,25 @@ class PinchGraspMission(TactileMissionDirector):
             case _:
                 self.get_logger().error(f"Unknown state: {self.FSM_state}")
                 self.transition_to_state(new_state="emergency")
+
+    def calculate_angle(self, v1, v2, axis=None):
+        """Angle between v1 and v2 in radians.
+
+        Without `axis`: unsigned angle in [0, pi].
+        With `axis` (normal of the plane of rotation): signed angle in (-pi, pi],
+        positive for a right-handed rotation from v1 to v2 about `axis`.
+        """
+        v1 = np.asarray(v1, dtype=float)
+        v2 = np.asarray(v2, dtype=float)
+        cross = np.cross(v1, v2)
+        dot = np.dot(v1, v2)
+
+        if axis is None:
+            return np.arctan2(np.linalg.norm(cross), dot)
+
+        axis = np.asarray(axis, dtype=float)
+        axis = axis / np.linalg.norm(axis)
+        return np.arctan2(np.dot(cross, axis), dot)
 
 def main():
     run_mission(PinchGraspMission)

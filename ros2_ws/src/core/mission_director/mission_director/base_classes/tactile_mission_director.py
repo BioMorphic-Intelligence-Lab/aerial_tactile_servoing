@@ -192,6 +192,21 @@ class TactileMissionDirector(UAMStateMachine):
         P_CS[2,3] = z_CS
         return P_CS
 
+    def evaluate_P_SC(self, Rx, Ry, x_CS, y_CS, z_CS):
+        R_CS = self.evaluate_R_CS(Rx, Ry)
+        R_SC = np.transpose(R_CS)
+        P_SC = np.eye(4)
+        P_SC[0:3, 0:3] = R_SC
+        p_CS = np.array([x_CS, y_CS, z_CS])
+        P_SC[0:3, 3] = -R_SC @ p_CS
+        return P_SC
+
+    def evaluate_P_BC(self, q1, q2, q3, Rx, Ry, x_CS, y_CS, z_CS):
+        P_BS = self.evaluate_P_BS(q1, q2, q3)
+        P_SC = self.evaluate_P_SC(Rx, Ry, x_CS, y_CS, z_CS)
+        P_BC = P_BS @ P_SC
+        return P_BC
+
     def evaluate_R_BS(self, q_1, q_2, q_3):
         R_BS = np.zeros((3,3))
         R_BS[0,0] = np.cos(q_2)
