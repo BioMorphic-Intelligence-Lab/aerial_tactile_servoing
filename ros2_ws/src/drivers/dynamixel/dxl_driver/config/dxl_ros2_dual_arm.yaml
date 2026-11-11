@@ -15,5 +15,5 @@
       #max_angles: [5.0, 0.52, 1.85, 1.0, 0.52, 1.85] # Maximum angle limit in rad (if both set to zero, no limits are applied)
       min_angles: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
       max_angles: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-      start_offsets: [1.86, 0.0, -2.078, -1.86, 0.0, 2.078] # Start offset in rad added to the initial position after homing
-      #start_offsets: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      #start_offsets: [1.86, 0.0, -2.078, -1.86, 0.0, 2.078] # Start offset in rad added to the initial position after homing
+      start_offsets: [1.5708, 0.0, -1.5708, -1.5708, 0.0, 1.5708]

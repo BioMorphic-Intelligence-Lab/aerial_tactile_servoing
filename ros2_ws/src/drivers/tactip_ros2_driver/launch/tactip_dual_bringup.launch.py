@@ -50,7 +50,7 @@ def _build(context, *args, **kwargs):
             output="screen",
             emulate_tty=True,
             parameters=[
-                {"sources": [2, 0]},
+                {"sources": [0, 2]},
                 {"dimensions": [8, 8]},
                 {"ssim_contact_thresholds": [0.8, 0.85]},
                 {"model_names": ["simple_cnn_B1", "simple_cnn_B2"]},

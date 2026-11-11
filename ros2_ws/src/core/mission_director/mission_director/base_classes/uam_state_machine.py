@@ -306,7 +306,7 @@ class UAMStateMachine(Node):
 
     def state_do_nothing(self, next_state='emergency', state_number :int=1):
         self.handle_state(state_number=state_number)
-        self.get_logger().info('['+str(state_number)+'] Doing nothing... Publish 1 to continue \n ros2 topic pub --once /md/input std_msgs/msg/Int32 "{data: 1}"', throttle_duration_sec=1)
+        self.get_logger().info('['+str(state_number)+'] Doing nothing... Publish 1 to continue \n ros2 topic pub --once /md/input std_msgs/msg/Int32 "{data: 1}"', throttle_duration_sec=5)
 
         # State transition
         if self.input_state == 1:
@@ -383,7 +383,7 @@ class UAMStateMachine(Node):
 
     def state_done(self, next_state='emergency'):
         self.handle_state(state_number = -1)
-        self.get_logger().info("Mission completed successfully.", throttle_duration_sec=5.)
+        self.get_logger().info(f"Mission completed successfully. Publish 1 on /md/input to go to state {next_state}", throttle_duration_sec=5.)
         if self.input_state == 1:
             self.transition_to_state(new_state=next_state)
 

@@ -1,6 +1,8 @@
 import datetime
 import numpy as np
 
+
+from geometry_msgs.msg import TwistStamped
 from mission_director.base_classes.tactile_mission_director import TactileMissionDirector, run_mission
 
 # TODO: Add enum class for state numbers
@@ -23,14 +25,17 @@ class PinchGraspMission(TactileMissionDirector):
 
         # Make into parameters
         self.kp_shear = 0.04
-        self.kp_force = 0.01
-        self.squeeze_force_ref = 4.0
+        self.kp_drift = 0.01
+        self.kp_force = 0.005
+        self.squeeze_force_ref = 7.0
         self.approach_speed = 0.45
 
         self.takeoff_altitude = self.get_parameter('im.takeoff_altitude').get_parameter_value().double_value
         self.pre_contact_arm_position = list(self.get_parameter('im.pre_contact_arm_position').get_parameter_value().double_array_value)
         self.pre_grasp_arm_position = list(self.get_parameter('im.pre_grasp_arm_position').get_parameter_value().double_array_value)
         self.land_arm_position = list(self.get_parameter('im.land_arm_position').get_parameter_value().double_array_value)
+
+        self.pub_log_vcmd = self.create_publisher(TwistStamped, "/log/vcmd", 10)
 
         self.get_logger().info('Tactile Pinch Grasping mission initialized.')
 
@@ -52,7 +57,7 @@ class PinchGraspMission(TactileMissionDirector):
             case "approach_grasp":
                 # self.get_logger().info(f"{self.tactip_contact_}")
                 next_state="hold_grasp"
-                if abs(self.arm_task_positions_[0][1]) < 0.05 or abs(self.arm_task_positions_[1][1]) < 0.05:
+                if abs(self.arm_task_positions_[0][1]) < 0.01 or abs(self.arm_task_positions_[1][1]) < 0.01:
                     self.get_logger().info("Transition by approach of center")
                     next_state="control_grasp"
                     transition = True
@@ -103,21 +108,31 @@ class PinchGraspMission(TactileMissionDirector):
                     p_BC[n*3 : n*3+3] = P_BC[0:3, 3]
 
                     v_c_cmd[n*3 : n*3+3] = np.array([
-                        self.kp_shear * np.deg2rad(self.tactip_pose_[n].angular.y),
-                        0.0, #-self.kp_shear * np.deg2rad(self.tactip_pose_[n].angular.x),
+                        self.kp_shear * np.deg2rad(self.tactip_pose_[n].angular.y) - self.kp_drift * np.deg2rad(self.tactip_pose_[0].angular.y+self.tactip_pose_[1].angular.y),
+                        -self.kp_shear * np.deg2rad(self.tactip_pose_[n].angular.x), #+ self.kp_drift * np.deg2rad(self.tactip_pose_[0].angular.x+self.tactip_pose_[1].angular.x),
                         -self.kp_force * (self.squeeze_force_ref - self.tactip_wrench_[n].force.z)
                     ])
                     R_CS_block[n*3:n*3+3, n*3:n*3+3] = self.evaluate_R_CS(np.deg2rad(self.tactip_pose_[n].angular.x), np.deg2rad(self.tactip_pose_[n].angular.y))
                     R_BS_block[n*3:n*3+3, n*3:n*3+3] = self.evaluate_R_BS(*self.servo_state.position[n*3:n*3+3])
+                self.publish_vcmd(v_c_cmd)
+
                 # Print direction vector
                 direction = p_BC[0:3] - p_BC[3:6]
                 angle = self.calculate_angle(direction, np.array([0.0, 1.0, 0.0]))
                 midpoint = (p_BC[0:3] + p_BC[3:6])/2.
                 self.get_logger().info(f"Dir between fingertips: [{direction[0]:.2f}, {direction[1]:.2f}, {direction[2]:.2f}], angle: {angle:.2f} rad/{angle*180./np.pi:.2f} deg, midpoint [{midpoint[0]:.2f}, {midpoint[1]:.2f}, {midpoint[2]:.2f}]", throttle_duration_sec=1.0)
+                
                 # Invert rotation
-                R_SC_block = np.linalg.inv(R_CS_block)
+                R_SC_block = R_CS_block.T
                 R_BC_block = R_BS_block@R_SC_block
                 v_b_cmd = R_BC_block@v_c_cmd # Rotate from contact frame into sensor frame
+
+                # contact normal vector in body frame (contact normal inward is -z in the contact frame)
+                n_B = R_BC_block @ np.array([0., 0., -1., 0., 0., -1.]) # Should be 6x1
+                n_obj = n_B[0:3]-n_B[3:6] # this is the direction vector of the object orientation
+                n_B_ref = np.array([0., 1., 0.])
+
+
 
                 transition = False
                 self.get_logger().info(f"[29] Grasp force: {self.tactip_wrench_[0].force.z:.2f} N | {self.tactip_wrench_[1].force.z:.2f} N, {(datetime.datetime.now()-self.state_start_time).seconds:.1f}/20 sec", throttle_duration_sec=1.0)
@@ -168,6 +183,18 @@ class PinchGraspMission(TactileMissionDirector):
         axis = np.asarray(axis, dtype=float)
         axis = axis / np.linalg.norm(axis)
         return np.arctan2(np.dot(cross, axis), dot)
+
+    def publish_vcmd(self, vcmd):
+        msg = TwistStamped()
+        msg.twist.linear.x = vcmd[0]
+        msg.twist.linear.y = vcmd[1]
+        msg.twist.linear.z = vcmd[2]
+        msg.twist.angular.x = vcmd[3]
+        msg.twist.angular.y = vcmd[4]
+        msg.twist.angular.z = vcmd[5]
+        msg.header.stamp = self.get_clock().now().to_msg()
+        self.pub_log_vcmd.publish(msg)
+
 
 def main():
     run_mission(PinchGraspMission)
